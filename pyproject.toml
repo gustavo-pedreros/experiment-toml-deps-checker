@@ -1,0 +1,168 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gradle-deps-monitor"
+version = "0.1.0"
+description = "Freeze-time technical due-diligence report for Android / Gradle projects"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Paul Ayala" },
+]
+keywords = ["android", "gradle", "dependencies", "version-catalog", "toml", "freeze"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "import-linter>=2.0",
+]
+
+[project.scripts]
+gradle-deps-monitor = "gradle_deps_monitor.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/gustavo-pedreros/toml-deps-checker"
+Repository = "https://github.com/gustavo-pedreros/toml-deps-checker"
+Issues = "https://github.com/gustavo-pedreros/toml-deps-checker/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gradle_deps_monitor"]
+
+# ---------------------------------------------------------------------------
+# Ruff — linting and formatting
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = [
+    # Legacy script kept as reference until feature parity is reached;
+    # not subject to the new tooling rules.
+    "version-stats.py",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["E501"]
+
+# ---------------------------------------------------------------------------
+# Mypy — strict for the inner layers, relaxed for adapters
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+warn_return_any = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = "gradle_deps_monitor.infrastructure.*"
+strict = false
+
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-ra --strict-markers"
+pythonpath = ["src"]
+
+# ---------------------------------------------------------------------------
+# Import-linter — enforces the layered architecture from ADR-0006.
+# Each contract names the source layer and the layers it must NOT import.
+# ---------------------------------------------------------------------------
+[tool.importlinter]
+root_package = "gradle_deps_monitor"
+
+[[tool.importlinter.contracts]]
+name = "Domain has no internal dependencies"
+type = "forbidden"
+source_modules = ["gradle_deps_monitor.domain"]
+forbidden_modules = [
+    "gradle_deps_monitor.application",
+    "gradle_deps_monitor.checks",
+    "gradle_deps_monitor.infrastructure",
+    "gradle_deps_monitor.presentation",
+    "gradle_deps_monitor.bootstrap",
+    "gradle_deps_monitor.cli",
+]
+
+[[tool.importlinter.contracts]]
+name = "Application does not depend on infrastructure, presentation, or wiring"
+type = "forbidden"
+source_modules = ["gradle_deps_monitor.application"]
+forbidden_modules = [
+    "gradle_deps_monitor.infrastructure",
+    "gradle_deps_monitor.presentation",
+    "gradle_deps_monitor.bootstrap",
+    "gradle_deps_monitor.cli",
+]
+
+[[tool.importlinter.contracts]]
+name = "Checks only depend on domain"
+type = "forbidden"
+source_modules = ["gradle_deps_monitor.checks"]
+forbidden_modules = [
+    "gradle_deps_monitor.application",
+    "gradle_deps_monitor.infrastructure",
+    "gradle_deps_monitor.presentation",
+    "gradle_deps_monitor.bootstrap",
+    "gradle_deps_monitor.cli",
+]
+
+[[tool.importlinter.contracts]]
+name = "Presentation does not reach into infrastructure"
+type = "forbidden"
+source_modules = ["gradle_deps_monitor.presentation"]
+forbidden_modules = [
+    "gradle_deps_monitor.infrastructure",
+    "gradle_deps_monitor.bootstrap",
+]
+
+[[tool.importlinter.contracts]]
+name = "Infrastructure does not depend on presentation or wiring"
+type = "forbidden"
+source_modules = ["gradle_deps_monitor.infrastructure"]
+forbidden_modules = [
+    "gradle_deps_monitor.presentation",
+    "gradle_deps_monitor.bootstrap",
+    "gradle_deps_monitor.cli",
+]
