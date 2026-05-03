@@ -1,0 +1,107 @@
+# Roadmap
+
+This roadmap captures the multi-phase plan for evolving the tool from
+its current state (a Bash + Python script that compares dependency
+versions) into a comprehensive freeze-time technical due-diligence
+report for Android/Gradle projects.
+
+The plan is grouped into phases. Phases are sequential by default, but
+individual items inside a phase may be reordered or shipped
+independently.
+
+Each item links to a proposal (RFC) when one exists. Decisions that
+have already been made and that constrain implementation are recorded
+as ADRs.
+
+## Status legend
+
+- 📋 **Planned** — accepted into the roadmap, not yet started
+- 🚧 **In progress** — actively being built
+- ✅ **Shipped** — merged and released
+- 💭 **Exploring** — under discussion, may or may not be picked up
+- ❌ **Rejected** — considered and declined (with rationale in the proposal)
+
+## Phase 1 — Foundation
+
+The technical baseline that everything else depends on. The
+overall shape of this phase is constrained by [ADR-0006](adr/0006-pragmatic-clean-architecture.md)
+(Clean Architecture) and [ADR-0007](adr/0007-tooling-stack.md)
+(tooling stack).
+
+| Status | Item | Reference |
+|--------|------|-----------|
+| 📋 | Project skeleton (`pyproject.toml`, `src/` layout, CI, import-linter) | [ADR-0006](adr/0006-pragmatic-clean-architecture.md), [ADR-0007](adr/0007-tooling-stack.md) |
+| 📋 | Drop the Bash wrapper, move to a single Python entry point | [ADR-0001](adr/0001-python-over-bash.md) |
+| 📋 | Robust TOML parsing (inline versions, `[plugins]`, `[bundles]`) | — |
+| 📋 | Parallel HTTP requests via `httpx` async | — |
+| 📋 | On-disk cache with TTL | — |
+| 📋 | Markdown + JSON outputs, committable to `freeze-reports/` | [ADR-0002](adr/0002-markdown-as-canonical-output-format.md) |
+| 📋 | Slack Block Kit output | — |
+| 📋 | Console executive summary | — |
+| 📋 | JSON output schema versioned (`schema_version: 1`) | — |
+| 📋 | Catalog Health audit (pluggable rules) | [RFC-0011](proposals/0011-catalog-health-audit.md) |
+
+## Phase 2 — High-impact features for freeze workflow
+
+Features that materially change the value of a freeze report.
+
+| Status | Item | Reference |
+|--------|------|-----------|
+| 📋 | CVE scan via GitHub Advisory Database + OSS Index | [RFC-0001](proposals/0001-cve-scan.md) |
+| 📋 | Play Store compliance check | [RFC-0002](proposals/0002-play-store-compliance.md) |
+| 📋 | Diff between freezes (with first-run handling) | [RFC-0003](proposals/0003-freeze-diff.md) |
+| 📋 | Changelog scraper for major upgrades | [RFC-0004](proposals/0004-changelog-scraper.md) |
+
+## Phase 3 — Differentiating features
+
+Features that move the tool from "useful" to "category-defining" for
+Android teams at scale.
+
+| Status | Item | Reference |
+|--------|------|-----------|
+| 📋 | Toolchain compatibility matrix (Kotlin / Compose / AGP / KSP / Hilt) | [RFC-0005](proposals/0005-toolchain-compatibility-matrix.md) |
+| 📋 | Library health & deprecation prediction (hybrid KB + POM relocation) | [RFC-0006](proposals/0006-library-health-and-deprecation.md) |
+| 📋 | Module usage map (opt-in, expensive but high-signal) | [RFC-0007](proposals/0007-module-usage-map.md) |
+
+## Phase 4 — Polish and consolidation
+
+| Status | Item | Reference |
+|--------|------|-----------|
+| 📋 | Risk score (opt-in, transparent breakdown, configurable weights) | [RFC-0008](proposals/0008-risk-score.md) |
+| 📋 | License audit | [RFC-0009](proposals/0009-license-audit.md) |
+| 📋 | HTML export | [RFC-0010](proposals/0010-html-export.md) |
+| 💭 | Tag annotation auto-generation | — |
+| 💭 | Trend dashboard across freeze history | — |
+
+## Cross-cutting infrastructure
+
+Concerns that span all phases.
+
+- Layered configuration (`config.toml` + per-project overrides)
+- CI test suite with real `libs.versions.toml` fixtures
+- `docs/adr/` for accepted decisions
+- `docs/proposals/` for pending proposals
+- Pluggable rules architecture for catalog health and deprecation checks
+- English as the canonical language for all repo content (see [ADR-0005](adr/0005-language-convention-english-in-repo.md))
+
+## Decisions made
+
+See [docs/adr/](adr/) for the full list of accepted architectural
+decisions. The most consequential ones for newcomers:
+
+- [ADR-0001](adr/0001-python-over-bash.md) — Python as the single language
+- [ADR-0002](adr/0002-markdown-as-canonical-output-format.md) — Markdown as the canonical report format
+- [ADR-0003](adr/0003-bundled-plus-remote-deprecation-kb.md) — How the deprecation knowledge base is distributed
+- [ADR-0004](adr/0004-risk-score-opt-in-with-disclaimer.md) — Risk score is opt-in by default
+- [ADR-0005](adr/0005-language-convention-english-in-repo.md) — All repo content is in English
+- [ADR-0006](adr/0006-pragmatic-clean-architecture.md) — Pragmatic Clean Architecture for the Python CLI
+- [ADR-0007](adr/0007-tooling-stack.md) — Tooling stack
+
+## How to evolve this roadmap
+
+- New ideas start as proposals in `docs/proposals/` (see the
+  [template](proposals/README.md))
+- A proposal moves into a phase here once it is accepted
+- Items can be reordered or moved between phases as priorities shift
+- Rejected items are kept (with status updated) so the rationale is
+  preserved for the future
