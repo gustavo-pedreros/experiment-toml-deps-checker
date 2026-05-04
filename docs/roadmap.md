@@ -48,7 +48,7 @@ Features that materially change the value of a freeze report.
 | Status | Item | Reference |
 |--------|------|-----------|
 | ✅ | CVE scan via GitHub Advisory Database + OSS Index | [RFC-0001](proposals/0001-cve-scan.md) |
-| 🚧 | Play Store compliance check | [RFC-0002](proposals/0002-play-store-compliance.md) |
+| ✅ | Play Store compliance check | [RFC-0002](proposals/0002-play-store-compliance.md) |
 | ✅ | Diff between freezes (with first-run handling) | [RFC-0003](proposals/0003-freeze-diff.md) |
 | 📋 | Changelog scraper for major upgrades | [RFC-0004](proposals/0004-changelog-scraper.md) |
 
@@ -59,7 +59,7 @@ Android teams at scale.
 
 | Status | Item | Reference |
 |--------|------|-----------|
-| 📋 | Toolchain compatibility matrix (Kotlin / Compose / AGP / KSP / Hilt) | [RFC-0005](proposals/0005-toolchain-compatibility-matrix.md) |
+| 🚧 | Toolchain compatibility matrix (Kotlin / Compose / AGP / KSP / Hilt) | [RFC-0005](proposals/0005-toolchain-compatibility-matrix.md) |
 | 📋 | Library health & deprecation prediction (hybrid KB + POM relocation) | [RFC-0006](proposals/0006-library-health-and-deprecation.md) |
 | 📋 | Module usage map (opt-in, expensive but high-signal) | [RFC-0007](proposals/0007-module-usage-map.md) |
 

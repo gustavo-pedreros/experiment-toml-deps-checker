@@ -1,0 +1,50 @@
+schema_version: 1
+last_updated: "2026-05-04"
+
+# AGP ↔ Gradle minimum version requirements.
+#
+# For a given AGP version, the checker finds the highest agp_min that is
+# <= the detected AGP version and enforces the corresponding min_gradle.
+#
+# Source: https://developer.android.com/build/releases/gradle-plugin#updating-gradle
+
+requirements:
+  - agp_min: "8.9.0"
+    min_gradle: "8.11"
+    note: "AGP 8.9 requires Gradle 8.11 or higher"
+  - agp_min: "8.8.0"
+    min_gradle: "8.10"
+    note: "AGP 8.8 requires Gradle 8.10 or higher"
+  - agp_min: "8.7.0"
+    min_gradle: "8.9"
+    note: "AGP 8.7 requires Gradle 8.9 or higher"
+  - agp_min: "8.5.0"
+    min_gradle: "8.7"
+    note: "AGP 8.5–8.6 requires Gradle 8.7 or higher"
+  - agp_min: "8.3.0"
+    min_gradle: "8.4"
+    note: "AGP 8.3–8.4 requires Gradle 8.4 or higher"
+  - agp_min: "8.2.0"
+    min_gradle: "8.2"
+    note: "AGP 8.2 requires Gradle 8.2 or higher"
+  - agp_min: "8.1.0"
+    min_gradle: "8.1"
+    note: "AGP 8.1 requires Gradle 8.1 or higher"
+  - agp_min: "8.0.0"
+    min_gradle: "8.0"
+    note: "AGP 8.0 requires Gradle 8.0 or higher"
+  - agp_min: "7.4.0"
+    min_gradle: "7.5"
+    note: "AGP 7.4 requires Gradle 7.5 or higher"
+  - agp_min: "7.3.0"
+    min_gradle: "7.4"
+    note: "AGP 7.3 requires Gradle 7.4 or higher"
+  - agp_min: "7.2.0"
+    min_gradle: "7.3"
+    note: "AGP 7.2 requires Gradle 7.3 or higher"
+  - agp_min: "7.1.0"
+    min_gradle: "7.2"
+    note: "AGP 7.1 requires Gradle 7.2 or higher"
+  - agp_min: "7.0.0"
+    min_gradle: "7.0"
+    note: "AGP 7.0 requires Gradle 7.0 or higher"

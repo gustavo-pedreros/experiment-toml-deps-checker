@@ -12,7 +12,14 @@ from gradle_deps_monitor.domain import FreezeReport, Severity
 from gradle_deps_monitor.domain.advisory import AdvisorySeverity
 from gradle_deps_monitor.domain.compliance import ComplianceSeverity
 from gradle_deps_monitor.domain.diff import FreezeDiff
+from gradle_deps_monitor.domain.toolchain import ToolchainSeverity
 from gradle_deps_monitor.domain.version import Stability
+
+_TOOLCHAIN_STYLE: dict[ToolchainSeverity, str] = {
+    ToolchainSeverity.ERROR: "bold red",
+    ToolchainSeverity.WARNING: "bold yellow",
+    ToolchainSeverity.INFO: "green",
+}
 
 _COMPLIANCE_STYLE: dict[ComplianceSeverity, str] = {
     ComplianceSeverity.ERROR: "bold red",
@@ -151,6 +158,34 @@ def print_summary(
                 f"  [{cf_style}]{cf_label}[/{cf_style}]  "
                 f"[dim]{cf.rule_id}[/dim]  {cf.message}{migration}"
             )
+
+    # --- Toolchain compatibility ---
+    if report.toolchain_findings:
+        con.print()
+        tc_errors = sum(
+            1 for tf in report.toolchain_findings if tf.severity == ToolchainSeverity.ERROR
+        )
+        tc_warnings = sum(
+            1 for tf in report.toolchain_findings if tf.severity == ToolchainSeverity.WARNING
+        )
+        tc_parts: list[str] = []
+        if tc_errors:
+            tc_parts.append(f"[bold red]{tc_errors} error(s)[/bold red]")
+        if tc_warnings:
+            tc_parts.append(f"[bold yellow]{tc_warnings} warning(s)[/bold yellow]")
+        tc_label = ", ".join(tc_parts) if tc_parts else "informational"
+        con.print(
+            f"[bold]Toolchain Compatibility[/bold] — "
+            f"{len(report.toolchain_findings)} finding(s): {tc_label}"
+        )
+        for tf in report.toolchain_findings:
+            tf_style = _TOOLCHAIN_STYLE.get(tf.severity, "")
+            tf_label = tf.severity.value.upper()
+            con.print(
+                f"  [{tf_style}]{tf_label}[/{tf_style}]  [dim]{tf.rule_id}[/dim]  {tf.message}"
+            )
+            if tf.recommendation:
+                con.print(f"    [dim]→ {tf.recommendation}[/dim]")
 
     # --- Written files ---
     if written_files:

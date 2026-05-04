@@ -9,6 +9,7 @@ from gradle_deps_monitor.domain.advisory import LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Catalog
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding
+from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class FreezeReport:
     health_findings: tuple[Finding, ...] = field(default_factory=tuple)
     security_advisories: tuple[LibraryAdvisory, ...] = field(default_factory=tuple)
     compliance_findings: tuple[ComplianceFinding, ...] = field(default_factory=tuple)
+    toolchain_findings: tuple[ToolchainFinding, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         if self.generated_at.tzinfo is None:
@@ -56,3 +58,13 @@ class FreezeReport:
     def has_compliance_warnings(self) -> bool:
         """``True`` when any compliance finding is WARNING severity."""
         return any(f.severity == ComplianceSeverity.WARNING for f in self.compliance_findings)
+
+    @property
+    def has_toolchain_errors(self) -> bool:
+        """``True`` when any toolchain finding is ERROR severity."""
+        return any(f.severity == ToolchainSeverity.ERROR for f in self.toolchain_findings)
+
+    @property
+    def has_toolchain_warnings(self) -> bool:
+        """``True`` when any toolchain finding is WARNING severity."""
+        return any(f.severity == ToolchainSeverity.WARNING for f in self.toolchain_findings)
