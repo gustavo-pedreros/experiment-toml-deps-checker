@@ -12,7 +12,7 @@ import typer
 
 from gradle_deps_monitor import __version__, bootstrap
 from gradle_deps_monitor.application.ports.catalog_parser import CatalogParseError
-from gradle_deps_monitor.presentation.console import print_summary
+from gradle_deps_monitor.presentation.console import print_diff_summary, print_summary
 
 app = typer.Typer(
     name="gradle-deps-monitor",
@@ -73,3 +73,52 @@ def check(
         raise typer.Exit(code=1) from exc
 
     print_summary(report, written_files)
+
+
+@app.command()
+def diff(
+    after: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to the newer freeze.json report.",
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            resolve_path=True,
+        ),
+    ],
+    prev: Annotated[
+        Path | None,
+        typer.Option(
+            "--prev",
+            "-p",
+            help="Path to the older freeze.json report. Omit to establish a baseline.",
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            resolve_path=True,
+        ),
+    ] = None,
+    output_dir: Annotated[
+        Path,
+        typer.Option(
+            "--out",
+            "-o",
+            help="Directory where diff reports are written (created if absent).",
+        ),
+    ] = Path("reports"),
+) -> None:
+    """Diff two freeze reports and write a comparative summary.
+
+    Pass only AFTER to establish a baseline (first-run scenario).
+    Pass --prev BEFORE to compare two existing reports.
+    """
+    try:
+        freeze_diff, written_files = bootstrap.create_diff_command().run(after, prev, output_dir)
+    except (FileNotFoundError, ValueError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    print_diff_summary(freeze_diff, written_files)

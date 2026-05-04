@@ -8,16 +8,24 @@ the import-linter contracts in ``pyproject.toml``.
 
 from __future__ import annotations
 
+from gradle_deps_monitor.application.compute_freeze_diff import ComputeFreezeDiff
 from gradle_deps_monitor.application.generate_freeze_report import GenerateFreezeReport
 from gradle_deps_monitor.checks.runner import run_all as _run_health_checks
+from gradle_deps_monitor.infrastructure.loaders.json_snapshot_loader import JsonSnapshotLoader
 from gradle_deps_monitor.infrastructure.parsing.toml_catalog_parser import TomlCatalogParser
+from gradle_deps_monitor.infrastructure.writers.diff_json_writer import DiffJsonWriter
+from gradle_deps_monitor.infrastructure.writers.diff_markdown_writer import DiffMarkdownWriter
+from gradle_deps_monitor.infrastructure.writers.diff_slack_writer import DiffSlackWriter
 from gradle_deps_monitor.infrastructure.writers.json_writer import JsonWriter
 from gradle_deps_monitor.infrastructure.writers.markdown_writer import MarkdownWriter
 from gradle_deps_monitor.infrastructure.writers.slack_writer import SlackWriter
 from gradle_deps_monitor.presentation.commands.check_command import CheckCommand
+from gradle_deps_monitor.presentation.commands.diff_command import DiffCommand
 
-# Default stem for all report output files (e.g. "freeze.md", "freeze.json").
+# Default stem for freeze report output files.
 _REPORT_STEM = "freeze"
+# Default stem for diff report output files.
+_DIFF_STEM = "freeze-diff"
 
 
 def create_check_command() -> CheckCommand:
@@ -38,5 +46,26 @@ def create_check_command() -> CheckCommand:
             (f"{_REPORT_STEM}.md", MarkdownWriter()),
             (f"{_REPORT_STEM}.json", JsonWriter()),
             (f"{_REPORT_STEM}-slack.json", SlackWriter()),
+        ],
+    )
+
+
+def create_diff_command() -> DiffCommand:
+    """Return a fully wired :class:`~...presentation.commands.diff_command.DiffCommand`.
+
+    Concrete adapters created here:
+
+    - :class:`~...infrastructure.loaders.json_snapshot_loader.JsonSnapshotLoader`
+    - :class:`~...infrastructure.writers.diff_markdown_writer.DiffMarkdownWriter`
+    - :class:`~...infrastructure.writers.diff_json_writer.DiffJsonWriter`
+    - :class:`~...infrastructure.writers.diff_slack_writer.DiffSlackWriter`
+    """
+    return DiffCommand(
+        use_case=ComputeFreezeDiff(),
+        loader=JsonSnapshotLoader(),
+        writers=[
+            (f"{_DIFF_STEM}.md", DiffMarkdownWriter()),
+            (f"{_DIFF_STEM}.json", DiffJsonWriter()),
+            (f"{_DIFF_STEM}-slack.json", DiffSlackWriter()),
         ],
     )
