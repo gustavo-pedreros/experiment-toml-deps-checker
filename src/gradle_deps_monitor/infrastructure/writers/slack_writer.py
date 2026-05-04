@@ -8,6 +8,7 @@ from typing import Any
 
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisory
+from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding, Severity
 
 # Maximum number of non-stable library entries shown in the Slack message.
@@ -63,6 +64,11 @@ def _build_payload(report: FreezeReport) -> dict[str, Any]:
     if security_block:
         blocks.append({"type": "divider"})
         blocks.append(security_block)
+
+    compliance_block = _compliance_block(list(report.compliance_findings))
+    if compliance_block:
+        blocks.append({"type": "divider"})
+        blocks.append(compliance_block)
 
     return {"blocks": blocks}
 
@@ -164,6 +170,35 @@ def _security_block(
 
     noun = "library" if len(vulnerable) == 1 else "libraries"
     text = f":rotating_light: *Security — {len(vulnerable)} vulnerable {noun}:*\n"
+    text += "\n".join(lines)
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+
+_COMPLIANCE_EMOJI: dict[ComplianceSeverity, str] = {
+    ComplianceSeverity.ERROR: ":red_circle:",
+    ComplianceSeverity.WARNING: ":warning:",
+    ComplianceSeverity.INFO: ":white_check_mark:",
+}
+# Maximum compliance findings shown in Slack.
+_MAX_COMPLIANCE = 8
+
+
+def _compliance_block(findings: list[ComplianceFinding]) -> dict[str, Any] | None:
+    """Return a compliance block, or ``None`` when there are no findings."""
+    if not findings:
+        return None
+
+    shown = findings[:_MAX_COMPLIANCE]
+    lines: list[str] = []
+    for f in shown:
+        emoji = _COMPLIANCE_EMOJI.get(f.severity, ":white_circle:")
+        deadline = f" (deadline: {f.deadline})" if f.deadline else ""
+        lines.append(f"{emoji} `{f.rule_id}` — {f.message}{deadline}")
+    if len(findings) > _MAX_COMPLIANCE:
+        lines.append(f"_…and {len(findings) - _MAX_COMPLIANCE} more_")
+
+    noun = "finding" if len(findings) == 1 else "findings"
+    text = f":store: *Play Store Compliance — {len(findings)} {noun}:*\n"
     text += "\n".join(lines)
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 

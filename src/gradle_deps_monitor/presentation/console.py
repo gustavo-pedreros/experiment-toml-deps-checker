@@ -10,8 +10,15 @@ from rich.table import Table
 
 from gradle_deps_monitor.domain import FreezeReport, Severity
 from gradle_deps_monitor.domain.advisory import AdvisorySeverity
+from gradle_deps_monitor.domain.compliance import ComplianceSeverity
 from gradle_deps_monitor.domain.diff import FreezeDiff
 from gradle_deps_monitor.domain.version import Stability
+
+_COMPLIANCE_STYLE: dict[ComplianceSeverity, str] = {
+    ComplianceSeverity.ERROR: "bold red",
+    ComplianceSeverity.WARNING: "bold yellow",
+    ComplianceSeverity.INFO: "green",
+}
 
 _ADVISORY_STYLE: dict[AdvisorySeverity, str] = {
     AdvisorySeverity.CRITICAL: "bold red",
@@ -116,6 +123,34 @@ def print_summary(
                     f"  [{style}]{label}[/{style}]  [cyan]{la.alias}[/cyan]"
                     f"  {la.version}  [dim]({len(la.advisories)} advisory)[/dim]"
                 )
+
+    # --- Play Store compliance ---
+    if report.compliance_findings:
+        con.print()
+        violations = sum(
+            1 for cf in report.compliance_findings if cf.severity == ComplianceSeverity.ERROR
+        )
+        comp_warnings = sum(
+            1 for cf in report.compliance_findings if cf.severity == ComplianceSeverity.WARNING
+        )
+        comp_parts: list[str] = []
+        if violations:
+            comp_parts.append(f"[bold red]{violations} violation(s)[/bold red]")
+        if comp_warnings:
+            comp_parts.append(f"[bold yellow]{comp_warnings} warning(s)[/bold yellow]")
+        comp_label = ", ".join(comp_parts) if comp_parts else "informational"
+        con.print(
+            f"[bold]Play Store Compliance[/bold] — "
+            f"{len(report.compliance_findings)} finding(s): {comp_label}"
+        )
+        for cf in report.compliance_findings:
+            cf_style = _COMPLIANCE_STYLE.get(cf.severity, "")
+            cf_label = cf.severity.value.upper()
+            migration = f"  → [cyan]{cf.migration}[/cyan]" if cf.migration else ""
+            con.print(
+                f"  [{cf_style}]{cf_label}[/{cf_style}]  "
+                f"[dim]{cf.rule_id}[/dim]  {cf.message}{migration}"
+            )
 
     # --- Written files ---
     if written_files:

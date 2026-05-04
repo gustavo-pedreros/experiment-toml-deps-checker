@@ -1,6 +1,6 @@
 # RFC-0002: Play Store compliance check
 
-**Status:** Proposed
+**Status:** In Progress — bundled KB + deprecated library detection + targetSdk check (Step 15)
 **Created:** 2026-05-03
 **Related JTBDs:** JTBD-1
 **Depends on:** none

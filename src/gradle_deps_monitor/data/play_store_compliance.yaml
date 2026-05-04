@@ -1,0 +1,148 @@
+# Bundled Play Store compliance knowledge base.
+#
+# Update this file when Google publishes new requirements or deprecations.
+# Last reviewed: 2026-05-04
+#
+# deprecated_libraries:
+#   coordinate: Maven "group:artifact" to match (exact, no version).
+#   rule_id:    Stable identifier used in reports.
+#   message:    Short one-line description.
+#   detail:     Longer explanation / recommendation.
+#   deadline:   ISO 8601 date when the deprecation became (or becomes) effective,
+#               or null if no hard deadline exists.
+#   migration:  Suggested replacement coordinate, or null.
+#
+# sdk_requirements:
+#   rule_id:     Stable identifier.
+#   target_sdk:  Minimum Android API level required.
+#   deadline:    ISO 8601 date from which the requirement is enforced.
+#   applies_to:  "new_apps" | "existing_apps"
+#   note:        Human-readable explanation.
+
+deprecated_libraries:
+
+  - coordinate: "com.google.android.gms:play-services-safetynet"
+    rule_id: "PLAY-DEP-001"
+    message: "SafetyNet Attestation API is deprecated"
+    detail: >
+      Google deprecated SafetyNet Attestation on January 31, 2025.
+      Migrate to the Play Integrity API before publishing updates.
+    deadline: "2025-01-31"
+    migration: "com.google.android.play:integrity"
+
+  - coordinate: "com.google.android.gms:play-services-gcm"
+    rule_id: "PLAY-DEP-002"
+    message: "Google Cloud Messaging (GCM) is shut down"
+    detail: >
+      GCM was permanently shut down on May 29, 2019.
+      Migrate to Firebase Cloud Messaging (FCM).
+    deadline: "2019-05-29"
+    migration: "com.google.firebase:firebase-messaging"
+
+  - coordinate: "com.firebase:firebase-jobdispatcher"
+    rule_id: "PLAY-DEP-003"
+    message: "Firebase JobDispatcher is deprecated"
+    detail: >
+      Firebase JobDispatcher reached end-of-life.
+      Migrate to WorkManager (androidx.work:work-runtime).
+    deadline: "2020-06-01"
+    migration: "androidx.work:work-runtime"
+
+  - coordinate: "com.firebase:firebase-jobdispatcher-with-gcm-dep"
+    rule_id: "PLAY-DEP-004"
+    message: "Firebase JobDispatcher (GCM variant) is deprecated"
+    detail: >
+      Firebase JobDispatcher reached end-of-life.
+      Migrate to WorkManager (androidx.work:work-runtime).
+    deadline: "2020-06-01"
+    migration: "androidx.work:work-runtime"
+
+  - coordinate: "com.google.firebase:firebase-core"
+    rule_id: "PLAY-DEP-005"
+    message: "firebase-core is no longer needed"
+    detail: >
+      The firebase-core artifact is deprecated. Analytics is automatically
+      included in other Firebase SDKs. Remove this dependency.
+    deadline: null
+    migration: null
+
+  - coordinate: "com.crashlytics.sdk.android:crashlytics"
+    rule_id: "PLAY-DEP-006"
+    message: "Legacy Fabric/Crashlytics SDK is deprecated"
+    detail: >
+      The legacy Fabric Crashlytics SDK reached end-of-life on May 4, 2021.
+      Migrate to the Firebase Crashlytics SDK.
+    deadline: "2021-05-04"
+    migration: "com.google.firebase:firebase-crashlytics"
+
+  - coordinate: "com.android.support:appcompat-v7"
+    rule_id: "PLAY-DEP-007"
+    message: "Android Support Library is superseded by AndroidX"
+    detail: >
+      The Android Support Library (com.android.support:*) is no longer
+      maintained. Migrate to the equivalent AndroidX artifact
+      (androidx.appcompat:appcompat).
+    deadline: "2020-01-01"
+    migration: "androidx.appcompat:appcompat"
+
+  - coordinate: "com.android.support:support-v4"
+    rule_id: "PLAY-DEP-008"
+    message: "Android Support Library is superseded by AndroidX"
+    detail: >
+      The Android Support Library (com.android.support:*) is no longer
+      maintained. Migrate to the equivalent AndroidX artifacts.
+    deadline: "2020-01-01"
+    migration: null
+
+  - coordinate: "com.android.support:design"
+    rule_id: "PLAY-DEP-009"
+    message: "Android Support Library is superseded by AndroidX"
+    detail: >
+      The Android Support Library (com.android.support:*) is no longer
+      maintained. Migrate to com.google.android.material:material.
+    deadline: "2020-01-01"
+    migration: "com.google.android.material:material"
+
+  - coordinate: "com.google.android.gms:play-services-auth-api-phone"
+    rule_id: "PLAY-DEP-010"
+    message: "SMS Retriever API is deprecated"
+    detail: >
+      The SMS Retriever API (play-services-auth-api-phone) for one-tap
+      SMS verification is deprecated. Migrate to the SMS User Consent API
+      or consider passkeys / other verification methods.
+    deadline: null
+    migration: null
+
+sdk_requirements:
+
+  - rule_id: "PLAY-SDK-001"
+    target_sdk: 34
+    deadline: "2024-08-31"
+    applies_to: "new_apps"
+    note: >
+      New apps submitted to Google Play after August 31, 2024 must target
+      Android 14 (API level 34) or higher.
+
+  - rule_id: "PLAY-SDK-002"
+    target_sdk: 34
+    deadline: "2024-11-01"
+    applies_to: "existing_apps"
+    note: >
+      Existing apps updated on Google Play after November 1, 2024 must
+      target Android 14 (API level 34) or higher.
+
+  - rule_id: "PLAY-SDK-003"
+    target_sdk: 35
+    deadline: "2025-08-31"
+    applies_to: "new_apps"
+    note: >
+      New apps submitted to Google Play after August 31, 2025 must target
+      Android 15 (API level 35) or higher.
+
+  - rule_id: "PLAY-SDK-004"
+    target_sdk: 35
+    deadline: "2025-11-01"
+    applies_to: "existing_apps"
+    note: >
+      Existing apps updated on Google Play after November 1, 2025 must
+      target Android 15 (API level 35) or higher.

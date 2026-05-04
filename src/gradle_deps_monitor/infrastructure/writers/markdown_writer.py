@@ -7,6 +7,7 @@ from pathlib import Path
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
+from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding, Severity
 
 
@@ -44,6 +45,7 @@ def _render(report: FreezeReport) -> str:
         _bundles_section(bundles),
         _health_section(list(report.health_findings)),
         _security_section(list(report.vulnerable_libraries)),
+        _compliance_section(list(report.compliance_findings)),
     ]
     return "\n\n".join(s for s in sections if s) + "\n"
 
@@ -131,6 +133,33 @@ def _security_section(vulnerable: list[LibraryAdvisory]) -> str:
         "versions pinned in this catalog.\n\n"
         "| Alias | Version | Severity | Advisory | Link |\n"
         "|---|---|---|---|---|\n" + "\n".join(rows)
+    )
+
+
+_COMPLIANCE_SEVERITY_ICON: dict[ComplianceSeverity, str] = {
+    ComplianceSeverity.ERROR: "🔴",
+    ComplianceSeverity.WARNING: "⚠️",
+    ComplianceSeverity.INFO: "✅",
+}
+
+
+def _compliance_section(findings: list[ComplianceFinding]) -> str:
+    if not findings:
+        return ""
+    rows: list[str] = []
+    for f in findings:
+        icon = _COMPLIANCE_SEVERITY_ICON.get(f.severity, "")
+        deadline = f" (deadline: {f.deadline})" if f.deadline else ""
+        migration = f" → `{f.migration}`" if f.migration else ""
+        rows.append(
+            f"| {icon} {f.severity.upper()} | `{f.rule_id}` | {f.message}{deadline}{migration} |"
+        )
+    noun = "finding" if len(findings) == 1 else "findings"
+    return (
+        f"## Play Store Compliance ({len(findings)} {noun})\n\n"
+        "> Checked against the bundled Play Store compliance knowledge base.\n\n"
+        "| Severity | Rule | Details |\n"
+        "|---|---|---|\n" + "\n".join(rows)
     )
 
 

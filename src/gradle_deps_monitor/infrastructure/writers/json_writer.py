@@ -9,6 +9,7 @@ from typing import Any
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import Advisory, LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
+from gradle_deps_monitor.domain.compliance import ComplianceFinding
 from gradle_deps_monitor.domain.finding import Finding
 
 
@@ -55,6 +56,11 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
             "scanned": len(report.security_advisories) > 0,
             "vulnerable_count": len(report.vulnerable_libraries),
             "libraries": [_library_advisory(la) for la in report.vulnerable_libraries],
+        },
+        "compliance": {
+            "finding_count": len(report.compliance_findings),
+            "has_violations": report.has_compliance_violations,
+            "findings": [_compliance_finding(f) for f in report.compliance_findings],
         },
     }
 
@@ -106,6 +112,21 @@ def _advisory(a: Advisory) -> dict[str, Any]:
         result["cve_id"] = a.cve_id
     if a.fixed_version:
         result["fixed_version"] = a.fixed_version
+    return result
+
+
+def _compliance_finding(f: ComplianceFinding) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "rule_id": f.rule_id,
+        "severity": f.severity.value,
+        "message": f.message,
+    }
+    if f.detail:
+        result["detail"] = f.detail
+    if f.deadline:
+        result["deadline"] = f.deadline
+    if f.migration:
+        result["migration"] = f.migration
     return result
 
 
