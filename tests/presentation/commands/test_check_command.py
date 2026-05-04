@@ -62,8 +62,18 @@ def empty_report(tmp_path: Path) -> FreezeReport:
 
 def test_run_returns_report(empty_report: FreezeReport, tmp_path: Path) -> None:
     cmd = CheckCommand(use_case=_FixedUseCase(empty_report), writers=[])
-    result = cmd.run(_FAKE_CATALOG_PATH, tmp_path / "out")
-    assert result is empty_report
+    report, _ = cmd.run(_FAKE_CATALOG_PATH, tmp_path / "out")
+    assert report is empty_report
+
+
+def test_run_returns_written_file_paths(empty_report: FreezeReport, tmp_path: Path) -> None:
+    out = tmp_path / "reports"
+    cmd = CheckCommand(
+        use_case=_FixedUseCase(empty_report),
+        writers=[("freeze.md", _CapturingWriter()), ("freeze.json", _CapturingWriter())],
+    )
+    _, written = cmd.run(_FAKE_CATALOG_PATH, out)
+    assert written == (out / "freeze.md", out / "freeze.json")
 
 
 def test_run_forwards_catalog_path_to_use_case(empty_report: FreezeReport, tmp_path: Path) -> None:
@@ -110,5 +120,6 @@ def test_run_passes_report_to_writers(empty_report: FreezeReport, tmp_path: Path
 
 def test_run_with_no_writers_succeeds(empty_report: FreezeReport, tmp_path: Path) -> None:
     cmd = CheckCommand(use_case=_FixedUseCase(empty_report), writers=[])
-    result = cmd.run(_FAKE_CATALOG_PATH, tmp_path / "out")
-    assert result is empty_report
+    report, written = cmd.run(_FAKE_CATALOG_PATH, tmp_path / "out")
+    assert report is empty_report
+    assert written == ()
