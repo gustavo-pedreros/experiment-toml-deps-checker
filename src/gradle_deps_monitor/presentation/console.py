@@ -9,8 +9,17 @@ from rich.panel import Panel
 from rich.table import Table
 
 from gradle_deps_monitor.domain import FreezeReport, Severity
+from gradle_deps_monitor.domain.advisory import AdvisorySeverity
 from gradle_deps_monitor.domain.diff import FreezeDiff
 from gradle_deps_monitor.domain.version import Stability
+
+_ADVISORY_STYLE: dict[AdvisorySeverity, str] = {
+    AdvisorySeverity.CRITICAL: "bold red",
+    AdvisorySeverity.HIGH: "bold yellow",
+    AdvisorySeverity.MEDIUM: "yellow",
+    AdvisorySeverity.LOW: "blue",
+    AdvisorySeverity.UNKNOWN: "dim",
+}
 
 _SEVERITY_STYLE: dict[Severity, str] = {
     Severity.ERROR: "bold red",
@@ -80,6 +89,33 @@ def print_summary(
             )
     else:
         con.print("[green]Catalog Health[/green] — no issues found")
+
+    # --- Security advisories ---
+    if report.security_advisories:
+        con.print()
+        vulnerable = report.vulnerable_libraries
+        if not vulnerable:
+            con.print("[green]Security[/green] — no known vulnerabilities")
+        else:
+            critical = sum(1 for la in vulnerable if la.has_critical)
+            high = sum(1 for la in vulnerable if la.has_high)
+            parts: list[str] = []
+            if critical:
+                parts.append(f"[bold red]{critical} critical[/bold red]")
+            if high:
+                parts.append(f"[bold yellow]{high} high[/bold yellow]")
+            remaining = len(vulnerable) - critical - high
+            if remaining > 0:
+                parts.append(f"{remaining} other")
+            con.print(f"[bold]Security[/bold] — {len(vulnerable)} vulnerable: {', '.join(parts)}")
+            for la in sorted(vulnerable, key=lambda x: x.alias):
+                sev = la.max_severity
+                style = _ADVISORY_STYLE.get(sev, "dim") if sev else "dim"
+                label = sev.value.upper() if sev else "unknown"
+                con.print(
+                    f"  [{style}]{label}[/{style}]  [cyan]{la.alias}[/cyan]"
+                    f"  {la.version}  [dim]({len(la.advisories)} advisory)[/dim]"
+                )
 
     # --- Written files ---
     if written_files:

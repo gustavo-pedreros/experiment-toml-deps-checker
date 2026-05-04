@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from gradle_deps_monitor.domain import FreezeReport
+from gradle_deps_monitor.domain.advisory import Advisory, LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
 from gradle_deps_monitor.domain.finding import Finding
 
@@ -50,6 +51,11 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
             "finding_count": len(report.health_findings),
             "findings": [_finding(f) for f in report.health_findings],
         },
+        "security": {
+            "scanned": len(report.security_advisories) > 0,
+            "vulnerable_count": len(report.vulnerable_libraries),
+            "libraries": [_library_advisory(la) for la in report.vulnerable_libraries],
+        },
     }
 
 
@@ -77,6 +83,30 @@ def _bundle(b: Bundle) -> dict[str, Any]:
         "alias": b.alias,
         "members": sorted(b.member_aliases),
     }
+
+
+def _library_advisory(la: LibraryAdvisory) -> dict[str, Any]:
+    return {
+        "alias": la.alias,
+        "coordinate": la.coordinate,
+        "version": la.version,
+        "advisories": [_advisory(a) for a in la.advisories],
+    }
+
+
+def _advisory(a: Advisory) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "ghsa_id": a.ghsa_id,
+        "severity": a.severity.value,
+        "summary": a.summary,
+        "url": a.url,
+        "source": a.source,
+    }
+    if a.cve_id:
+        result["cve_id"] = a.cve_id
+    if a.fixed_version:
+        result["fixed_version"] = a.fixed_version
+    return result
 
 
 def _finding(f: Finding) -> dict[str, Any]:

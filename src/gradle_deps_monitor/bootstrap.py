@@ -8,11 +8,16 @@ the import-linter contracts in ``pyproject.toml``.
 
 from __future__ import annotations
 
+import os
+
 from gradle_deps_monitor.application.compute_freeze_diff import ComputeFreezeDiff
 from gradle_deps_monitor.application.generate_freeze_report import GenerateFreezeReport
 from gradle_deps_monitor.checks.runner import run_all as _run_health_checks
 from gradle_deps_monitor.infrastructure.loaders.json_snapshot_loader import JsonSnapshotLoader
 from gradle_deps_monitor.infrastructure.parsing.toml_catalog_parser import TomlCatalogParser
+from gradle_deps_monitor.infrastructure.scanners.github_advisory_scanner import (
+    GitHubAdvisoryScanner,
+)
 from gradle_deps_monitor.infrastructure.writers.diff_json_writer import DiffJsonWriter
 from gradle_deps_monitor.infrastructure.writers.diff_markdown_writer import DiffMarkdownWriter
 from gradle_deps_monitor.infrastructure.writers.diff_slack_writer import DiffSlackWriter
@@ -39,7 +44,13 @@ def create_check_command() -> CheckCommand:
     - :class:`~...infrastructure.writers.slack_writer.SlackWriter`
     """
     parser = TomlCatalogParser()
-    use_case = GenerateFreezeReport(catalog_parser=parser, health_checker=_run_health_checks)
+    gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    scanner = GitHubAdvisoryScanner(token=gh_token) if gh_token else None
+    use_case = GenerateFreezeReport(
+        catalog_parser=parser,
+        health_checker=_run_health_checks,
+        vulnerability_scanner=scanner,
+    )
     return CheckCommand(
         use_case=use_case,
         writers=[

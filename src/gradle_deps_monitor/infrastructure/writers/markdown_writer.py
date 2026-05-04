@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from gradle_deps_monitor.domain import FreezeReport
+from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
 from gradle_deps_monitor.domain.finding import Finding, Severity
 
@@ -42,6 +43,7 @@ def _render(report: FreezeReport) -> str:
         _plugins_section(plugins),
         _bundles_section(bundles),
         _health_section(list(report.health_findings)),
+        _security_section(list(report.vulnerable_libraries)),
     ]
     return "\n\n".join(s for s in sections if s) + "\n"
 
@@ -97,6 +99,39 @@ def _bundles_section(bundles: list[Bundle]) -> str:
         for b in bundles
     )
     return f"## Bundles ({len(bundles)})\n\n| Alias | Members |\n|---|---|\n{rows}"
+
+
+_ADVISORY_SEVERITY_ICON: dict[AdvisorySeverity, str] = {
+    AdvisorySeverity.CRITICAL: "🔴",
+    AdvisorySeverity.HIGH: "🟠",
+    AdvisorySeverity.MEDIUM: "🟡",
+    AdvisorySeverity.LOW: "🔵",
+    AdvisorySeverity.UNKNOWN: "⚪",
+}
+
+
+def _security_section(vulnerable: list[LibraryAdvisory]) -> str:
+    if not vulnerable:
+        return ""
+    rows: list[str] = []
+    for la in sorted(vulnerable, key=lambda x: x.alias):
+        for adv in sorted(la.advisories, key=lambda a: a.severity):
+            icon = _ADVISORY_SEVERITY_ICON.get(adv.severity, "⚪")
+            cve = f" / {adv.cve_id}" if adv.cve_id else ""
+            fixed = f" · fixed in `{adv.fixed_version}`" if adv.fixed_version else ""
+            rows.append(
+                f"| `{la.alias}` | `{la.version}` | {icon} {adv.severity.upper()}"
+                f" | {adv.ghsa_id}{cve}{fixed} — {adv.summary}"
+                f" | [advisory]({adv.url}) |"
+            )
+    noun = "library" if len(vulnerable) == 1 else "libraries"
+    return (
+        f"## Security ({len(vulnerable)} vulnerable {noun})\n\n"
+        "> ⚠️ The following libraries have known security advisories for the "
+        "versions pinned in this catalog.\n\n"
+        "| Alias | Version | Severity | Advisory | Link |\n"
+        "|---|---|---|---|---|\n" + "\n".join(rows)
+    )
 
 
 def _health_section(findings: list[Finding]) -> str:
