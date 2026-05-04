@@ -8,6 +8,7 @@ from typing import Any
 
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
+from gradle_deps_monitor.domain.finding import Finding
 
 
 class JsonWriter:
@@ -45,6 +46,10 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
             "plugins": [_plugin(p) for p in plugins],
             "bundles": [_bundle(b) for b in bundles],
         },
+        "health": {
+            "finding_count": len(report.health_findings),
+            "findings": [_finding(f) for f in report.health_findings],
+        },
     }
 
 
@@ -72,3 +77,14 @@ def _bundle(b: Bundle) -> dict[str, Any]:
         "alias": b.alias,
         "members": sorted(b.member_aliases),
     }
+
+
+def _finding(f: Finding) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "rule_id": f.rule_id,
+        "severity": f.severity.value,
+        "message": f.message,
+    }
+    if f.details:
+        result["details"] = f.details
+    return result

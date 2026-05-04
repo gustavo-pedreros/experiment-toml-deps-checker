@@ -6,6 +6,7 @@ from pathlib import Path
 
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
+from gradle_deps_monitor.domain.finding import Finding, Severity
 
 
 class MarkdownWriter:
@@ -21,6 +22,13 @@ class MarkdownWriter:
 # Rendering helpers
 # ---------------------------------------------------------------------------
 
+_SEVERITY_ICON = {
+    Severity.ERROR: "🔴",
+    Severity.WARNING: "⚠️",
+    Severity.INFO: "\U00002139️",
+    Severity.SUGGESTION: "💡",
+}
+
 
 def _render(report: FreezeReport) -> str:
     cat = report.catalog
@@ -33,6 +41,7 @@ def _render(report: FreezeReport) -> str:
         _libraries_section(libs),
         _plugins_section(plugins),
         _bundles_section(bundles),
+        _health_section(list(report.health_findings)),
     ]
     return "\n\n".join(s for s in sections if s) + "\n"
 
@@ -88,3 +97,19 @@ def _bundles_section(bundles: list[Bundle]) -> str:
         for b in bundles
     )
     return f"## Bundles ({len(bundles)})\n\n| Alias | Members |\n|---|---|\n{rows}"
+
+
+def _health_section(findings: list[Finding]) -> str:
+    if not findings:
+        return ""
+    rows = "\n".join(
+        f"| {_SEVERITY_ICON.get(f.severity, f.severity.value)} {f.severity.value} "
+        f"| `{f.rule_id}` | {f.message} |"
+        for f in findings
+    )
+    return (
+        f"## Catalog Health ({len(findings)} finding(s))\n\n"
+        "| Severity | Rule | Message |\n"
+        "|---|---|---|\n"
+        f"{rows}"
+    )

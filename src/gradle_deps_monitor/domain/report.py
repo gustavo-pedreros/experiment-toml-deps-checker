@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from gradle_deps_monitor.domain.catalog import Catalog
+from gradle_deps_monitor.domain.finding import Finding
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,7 @@ class FreezeReport:
 
     catalog: Catalog
     generated_at: datetime = field(default_factory=lambda: datetime.now(tz=UTC))
+    health_findings: tuple[Finding, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         if self.generated_at.tzinfo is None:
