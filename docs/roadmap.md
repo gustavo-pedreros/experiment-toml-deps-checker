@@ -30,16 +30,16 @@ overall shape of this phase is constrained by [ADR-0006](adr/0006-pragmatic-clea
 
 | Status | Item | Reference |
 |--------|------|-----------|
-| 📋 | Project skeleton (`pyproject.toml`, `src/` layout, CI, import-linter) | [ADR-0006](adr/0006-pragmatic-clean-architecture.md), [ADR-0007](adr/0007-tooling-stack.md) |
-| 📋 | Drop the Bash wrapper, move to a single Python entry point | [ADR-0001](adr/0001-python-over-bash.md) |
-| 📋 | Robust TOML parsing (inline versions, `[plugins]`, `[bundles]`) | — |
-| 📋 | Parallel HTTP requests via `httpx` async | — |
-| 📋 | On-disk cache with TTL | — |
-| 📋 | Markdown + JSON outputs, committable to `freeze-reports/` | [ADR-0002](adr/0002-markdown-as-canonical-output-format.md) |
-| 📋 | Slack Block Kit output | — |
-| 📋 | Console executive summary | — |
-| 📋 | JSON output schema versioned (`schema_version: 1`) | — |
-| 📋 | Catalog Health audit (pluggable rules) | [RFC-0011](proposals/0011-catalog-health-audit.md) |
+| ✅ | Project skeleton (`pyproject.toml`, `src/` layout, CI, import-linter) | [ADR-0006](adr/0006-pragmatic-clean-architecture.md), [ADR-0007](adr/0007-tooling-stack.md) |
+| ✅ | Drop the Bash wrapper, move to a single Python entry point | [ADR-0001](adr/0001-python-over-bash.md) |
+| ✅ | Robust TOML parsing (inline versions, `[plugins]`, `[bundles]`) | — |
+| ✅ | Parallel HTTP requests via `httpx` async | — |
+| ✅ | On-disk cache with TTL | — |
+| ✅ | Markdown + JSON outputs, committable to `freeze-reports/` | [ADR-0002](adr/0002-markdown-as-canonical-output-format.md) |
+| ✅ | Slack Block Kit output | — |
+| ✅ | Console executive summary | — |
+| ✅ | JSON output schema versioned (`schema_version: 1`) | — |
+| ✅ | Catalog Health audit (pluggable rules) | [RFC-0011](proposals/0011-catalog-health-audit.md) |
 
 ## Phase 2 — High-impact features for freeze workflow
 
