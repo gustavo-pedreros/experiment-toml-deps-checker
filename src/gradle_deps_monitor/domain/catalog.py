@@ -6,7 +6,7 @@ the structure of a ``libs.versions.toml`` file. No I/O; no TOML parsing.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from gradle_deps_monitor.domain.version import MavenVersion
@@ -20,6 +20,9 @@ class Library:
     group: str
     artifact: str
     version: MavenVersion
+    #: Name of the ``[versions]`` key used via ``version.ref``, or ``None``
+    #: when the version is declared inline or absent (BOM-managed).
+    version_ref: str | None = None
 
     @property
     def coordinate(self) -> str:
@@ -37,6 +40,9 @@ class Plugin:
     alias: str
     id: str
     version: MavenVersion
+    #: Name of the ``[versions]`` key used via ``version.ref``, or ``None``
+    #: when the version is declared inline or absent.
+    version_ref: str | None = None
 
     @property
     def notation(self) -> str:
@@ -59,12 +65,20 @@ class Catalog:
     :param libraries: All resolved library entries.
     :param plugins: All resolved plugin entries.
     :param bundles: All bundle entries (library alias groupings).
+    :param versions: Raw ``[versions]`` map (key → version string). Used by
+        catalog health rules; excluded from equality and hashing so that the
+        frozen dataclass can include a mutable dict without breaking ``__hash__``.
     """
 
     source_path: Path
     libraries: tuple[Library, ...]
     plugins: tuple[Plugin, ...]
     bundles: tuple[Bundle, ...]
+    versions: dict[str, str] = field(
+        default_factory=dict,
+        compare=False,
+        hash=False,
+    )
 
     def library(self, alias: str) -> Library | None:
         """Return the library with the given alias, or ``None``."""

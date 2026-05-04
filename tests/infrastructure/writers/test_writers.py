@@ -8,7 +8,15 @@ from pathlib import Path
 
 import pytest
 
-from gradle_deps_monitor.domain import Bundle, Catalog, FreezeReport, Library, Plugin
+from gradle_deps_monitor.domain import (
+    Bundle,
+    Catalog,
+    Finding,
+    FreezeReport,
+    Library,
+    Plugin,
+    Severity,
+)
 from gradle_deps_monitor.domain.version import MavenVersion
 from gradle_deps_monitor.infrastructure.writers.json_writer import JsonWriter
 from gradle_deps_monitor.infrastructure.writers.markdown_writer import MarkdownWriter
@@ -234,3 +242,91 @@ def test_json_empty_catalog(empty_report: FreezeReport, tmp_path: Path) -> None:
     assert data["catalog"]["libraries"] == []
     assert data["catalog"]["plugins"] == []
     assert data["catalog"]["bundles"] == []
+
+
+# ---------------------------------------------------------------------------
+# Health findings — Markdown
+# ---------------------------------------------------------------------------
+
+_FINDING = Finding(
+    rule_id="catalog.missing-plugins",
+    severity=Severity.WARNING,
+    message="No [plugins] section found",
+    details="Add a [plugins] section.",
+)
+
+
+@pytest.fixture()
+def report_with_findings(full_report: FreezeReport) -> FreezeReport:
+    from dataclasses import replace
+
+    return replace(full_report, health_findings=(_FINDING,))
+
+
+def test_markdown_contains_health_section_when_findings_present(
+    report_with_findings: FreezeReport, tmp_path: Path
+) -> None:
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(report_with_findings, dest)
+    assert "## Catalog Health" in dest.read_text(encoding="utf-8")
+
+
+def test_markdown_health_section_contains_rule_id(
+    report_with_findings: FreezeReport, tmp_path: Path
+) -> None:
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(report_with_findings, dest)
+    assert "catalog.missing-plugins" in dest.read_text(encoding="utf-8")
+
+
+def test_markdown_omits_health_section_when_no_findings(
+    full_report: FreezeReport, tmp_path: Path
+) -> None:
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(full_report, dest)
+    assert "## Catalog Health" not in dest.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Health findings — JSON
+# ---------------------------------------------------------------------------
+
+
+def test_json_health_section_present(full_report: FreezeReport, tmp_path: Path) -> None:
+    dest = tmp_path / "freeze.json"
+    JsonWriter().write(full_report, dest)
+    data = json.loads(dest.read_text(encoding="utf-8"))
+    assert "health" in data
+    assert data["health"]["finding_count"] == 0
+    assert data["health"]["findings"] == []
+
+
+def test_json_health_finding_fields(report_with_findings: FreezeReport, tmp_path: Path) -> None:
+    dest = tmp_path / "freeze.json"
+    JsonWriter().write(report_with_findings, dest)
+    data = json.loads(dest.read_text(encoding="utf-8"))
+    finding = data["health"]["findings"][0]
+    assert finding["rule_id"] == "catalog.missing-plugins"
+    assert finding["severity"] == "warning"
+    assert finding["message"] == "No [plugins] section found"
+    assert finding["details"] == "Add a [plugins] section."
+
+
+def test_json_finding_omits_details_when_empty(full_report: FreezeReport, tmp_path: Path) -> None:
+    from dataclasses import replace
+
+    no_details = Finding(rule_id="catalog.x", severity=Severity.INFO, message="m")
+    report = replace(full_report, health_findings=(no_details,))
+    dest = tmp_path / "freeze.json"
+    JsonWriter().write(report, dest)
+    data = json.loads(dest.read_text(encoding="utf-8"))
+    assert "details" not in data["health"]["findings"][0]
+
+
+def test_json_health_finding_count_matches_list(
+    report_with_findings: FreezeReport, tmp_path: Path
+) -> None:
+    dest = tmp_path / "freeze.json"
+    JsonWriter().write(report_with_findings, dest)
+    data = json.loads(dest.read_text(encoding="utf-8"))
+    assert data["health"]["finding_count"] == len(data["health"]["findings"])

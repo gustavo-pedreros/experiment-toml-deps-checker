@@ -13,7 +13,14 @@ import pytest
 
 from gradle_deps_monitor.application.generate_freeze_report import GenerateFreezeReport
 from gradle_deps_monitor.application.ports.catalog_parser import CatalogParseError
-from gradle_deps_monitor.domain import Catalog, FreezeReport, Library, MavenVersion
+from gradle_deps_monitor.domain import (
+    Catalog,
+    Finding,
+    FreezeReport,
+    Library,
+    MavenVersion,
+    Severity,
+)
 
 # ---------------------------------------------------------------------------
 # Stubs
@@ -108,3 +115,47 @@ def test_execute_propagates_parse_error() -> None:
     use_case = GenerateFreezeReport(_FailParser())
     with pytest.raises(CatalogParseError, match="simulated parse failure"):
         use_case.execute(Path("/some/path"))
+
+
+# ---------------------------------------------------------------------------
+# Health checker injection
+# ---------------------------------------------------------------------------
+
+_FINDING = Finding(rule_id="catalog.test", severity=Severity.INFO, message="test finding")
+
+
+class _FixedChecker:
+    """Always returns a fixed tuple of findings."""
+
+    def __init__(self, findings: tuple[Finding, ...]) -> None:
+        self._findings = findings
+
+    def __call__(self, catalog: Catalog) -> tuple[Finding, ...]:
+        return self._findings
+
+
+def test_execute_populates_health_findings_when_checker_provided(
+    empty_catalog: Catalog,
+) -> None:
+    checker = _FixedChecker((_FINDING,))
+    use_case = GenerateFreezeReport(_OkParser(empty_catalog), health_checker=checker)
+    result = use_case.execute(Path("/some/path"))
+    assert result.health_findings == (_FINDING,)
+
+
+def test_execute_health_findings_empty_without_checker(empty_catalog: Catalog) -> None:
+    use_case = GenerateFreezeReport(_OkParser(empty_catalog))
+    result = use_case.execute(Path("/some/path"))
+    assert result.health_findings == ()
+
+
+def test_execute_passes_parsed_catalog_to_checker(empty_catalog: Catalog) -> None:
+    received: list[Catalog] = []
+
+    def _recorder(catalog: Catalog) -> tuple[Finding, ...]:
+        received.append(catalog)
+        return ()
+
+    use_case = GenerateFreezeReport(_OkParser(empty_catalog), health_checker=_recorder)
+    use_case.execute(Path("/some/path"))
+    assert received == [empty_catalog]

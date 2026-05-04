@@ -9,6 +9,7 @@ the import-linter contracts in ``pyproject.toml``.
 from __future__ import annotations
 
 from gradle_deps_monitor.application.generate_freeze_report import GenerateFreezeReport
+from gradle_deps_monitor.checks.runner import run_all as _run_health_checks
 from gradle_deps_monitor.infrastructure.parsing.toml_catalog_parser import TomlCatalogParser
 from gradle_deps_monitor.infrastructure.writers.json_writer import JsonWriter
 from gradle_deps_monitor.infrastructure.writers.markdown_writer import MarkdownWriter
@@ -28,7 +29,7 @@ def create_check_command() -> CheckCommand:
     - :class:`~...infrastructure.writers.json_writer.JsonWriter`
     """
     parser = TomlCatalogParser()
-    use_case = GenerateFreezeReport(catalog_parser=parser)
+    use_case = GenerateFreezeReport(catalog_parser=parser, health_checker=_run_health_checks)
     return CheckCommand(
         use_case=use_case,
         writers=[

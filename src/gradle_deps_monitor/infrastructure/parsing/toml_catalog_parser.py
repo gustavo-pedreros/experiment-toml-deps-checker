@@ -41,6 +41,7 @@ class TomlCatalogParser:
             libraries=tuple(libraries),
             plugins=tuple(plugins),
             bundles=tuple(bundles),
+            versions=dict(versions),
         )
 
     # ------------------------------------------------------------------
@@ -78,8 +79,18 @@ class TomlCatalogParser:
                     f"[libraries] '{alias}': expected a table, got {type(entry).__name__}"
                 )
             group, artifact = _parse_coordinate(alias, entry)
-            version = _resolve_version(alias, entry.get("version"), versions, "[libraries]")
-            libraries.append(Library(alias=alias, group=group, artifact=artifact, version=version))
+            version, version_ref = _resolve_version(
+                alias, entry.get("version"), versions, "[libraries]"
+            )
+            libraries.append(
+                Library(
+                    alias=alias,
+                    group=group,
+                    artifact=artifact,
+                    version=version,
+                    version_ref=version_ref,
+                )
+            )
         return libraries
 
     def _parse_plugins(
@@ -96,8 +107,12 @@ class TomlCatalogParser:
             plugin_id = entry.get("id")
             if not isinstance(plugin_id, str):
                 raise CatalogParseError(f"[plugins] '{alias}': missing or invalid 'id' field")
-            version = _resolve_version(alias, entry.get("version"), versions, "[plugins]")
-            plugins.append(Plugin(alias=alias, id=plugin_id, version=version))
+            version, version_ref = _resolve_version(
+                alias, entry.get("version"), versions, "[plugins]"
+            )
+            plugins.append(
+                Plugin(alias=alias, id=plugin_id, version=version, version_ref=version_ref)
+            )
         return plugins
 
     @staticmethod
@@ -141,16 +156,19 @@ def _resolve_version(
     version_field: Any,
     versions: dict[str, str],
     section: str,
-) -> MavenVersion:
-    """Resolve a TOML version field to a :class:`MavenVersion`.
+) -> tuple[MavenVersion, str | None]:
+    """Resolve a TOML version field to a ``(MavenVersion, version_ref)`` pair.
 
     The field can be absent (BOM-managed), a literal string, or a table
     with a ``ref`` key pointing to ``[versions]``.
+
+    Returns the resolved :class:`MavenVersion` and the name of the version
+    key used (``version_ref``), or ``None`` when the version is inline or absent.
     """
     if version_field is None:
-        return MavenVersion("")
+        return MavenVersion(""), None
     if isinstance(version_field, str):
-        return MavenVersion(version_field)
+        return MavenVersion(version_field), None
     if isinstance(version_field, dict):
         ref: str | None = version_field.get("ref")
         if not isinstance(ref, str):
@@ -160,7 +178,7 @@ def _resolve_version(
             raise CatalogParseError(
                 f"{section} '{alias}': version.ref '{ref}' not found in [versions]"
             )
-        return MavenVersion(resolved)
+        return MavenVersion(resolved), ref
     raise CatalogParseError(
         f"{section} '{alias}': unexpected version type '{type(version_field).__name__}'"
     )
