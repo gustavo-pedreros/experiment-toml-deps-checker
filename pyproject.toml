@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [
+    { name = "Gustavo Pedreros", email = "gustavo.pedreros@gmail.com" },
     { name = "Paul Ayala" },
 ]
 keywords = ["android", "gradle", "dependencies", "version-catalog", "toml", "freeze"]
@@ -60,11 +61,6 @@ packages = ["src/gradle_deps_monitor"]
 line-length = 100
 target-version = "py311"
 src = ["src", "tests"]
-extend-exclude = [
-    # Legacy script kept as reference until feature parity is reached;
-    # not subject to the new tooling rules.
-    "version-stats.py",
-]
 
 [tool.ruff.lint]
 select = [

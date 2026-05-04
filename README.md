@@ -1,120 +1,173 @@
-# Gradle Deps Monitor 🔍
+# gradle-deps-monitor
 
-Un script automatizado para verificar y comparar las versiones de dependencias Maven en proyectos Android/Gradle contra las últimas versiones disponibles en Maven Central y Google Maven.
+**Freeze-time technical due-diligence report for Android / Gradle projects.**
 
-## 🚀 Características
+Analyses a `libs.versions.toml` version catalog, checks every dependency against Maven Central and Google Maven, audits catalog health, and writes structured reports — Markdown, JSON, and Slack Block Kit — ready to commit or post automatically via CI.
 
-- ✅ Analiza archivos `libs.versions.toml` de Gradle
-- 🔍 Consulta automáticamente Maven Central y Google Maven
-- 📊 Categoriza dependencias por estado de actualización:
-  - 🔴 Diferencia Major (actualización importante requerida)
-  - 🟡 Diferencia Minor o Patch > 5 (actualización recomendada)
-  - 🟢 Actualizado (diferencia mínima o igual)
-  - ⚫ Estado desconocido (no se pudo verificar)
-- 🏷️ Distingue entre dependencias de Google y Maven Central
-- 💾 Genera reporte JSON detallado
-- 🐍 Manejo automático de entorno virtual Python
+---
 
-## 📋 Prerrequisitos
+## Features
 
-- Python 3.6+
-- Bash
-- Acceso a internet para consultas Maven
+- **Version status** — compares pinned versions against the latest release on Maven Central / Google Maven, flagging stable, release-candidate, beta, alpha, and dev versions
+- **Catalog health audit** — 8 pluggable rules that surface structural problems: duplicate libraries, unresolved `version.ref` keys, orphan version entries, inconsistent alias naming, missing plugins/bundles, and more
+- **Multiple output formats** — Markdown (human-readable), JSON (machine-readable, schema-versioned), and Slack Block Kit (webhook-ready)
+- **Rich console summary** — colour-coded executive summary printed at the end of every run
+- **On-disk HTTP cache** — avoids redundant Maven registry calls; configurable TTL
+- **Zero Bash dependency** — single Python CLI, no wrapper scripts
 
-## 🛠️ Instalación
+---
 
-1. Clona este repositorio:
-```bash
-git clone https://github.com/pfranccino/gradle-deps-monitor.git
-cd gradle-deps-monitor
-```
+## Quick start
 
-2. Dale permisos de ejecución al script:
-```bash
-chmod +x check-dependencies.sh
-```
+### Requirements
 
-## 📖 Uso
+- Python 3.11+
+- Access to Maven Central and Google Maven (internet)
 
-Ejecuta el script proporcionando la ruta a tu directorio Gradle que contiene `libs.versions.toml`:
+### Install
 
 ```bash
-./check-dependencies.sh /ruta/al/directorio/gradle
+pip install gradle-deps-monitor
 ```
 
-### Ejemplo:
+Or, for local development:
+
 ```bash
-./check-dependencies.sh ./app/gradle
+git clone https://github.com/gustavo-pedreros/toml-deps-checker.git
+cd toml-deps-checker
+pip install -e ".[dev]"
 ```
 
-## 📊 Salida
+### Run
 
-El script genera un archivo `dependency_status.json` con información detallada de cada dependencia:
-
-```json
-{
-  "com.squareup.retrofit2:retrofit": {
-    "url": "https://central.sonatype.com/artifact/com.squareup.retrofit2/retrofit",
-    "version_used": "2.9.0",
-    "latest_version": "2.11.0",
-    "timestamp": "2024-01-15T10:30:00",
-    "status": "🟡",
-    "type": "maven"
-  },
-  "androidx.core:core-ktx": {
-    "url": "https://maven.google.com/web/index.html#androidx.core",
-    "version_used": "1.10.1",
-    "latest_version": "1.12.0",
-    "timestamp": "2024-01-15T10:30:00",
-    "status": "🟡",
-    "type": "google"
-  }
-}
+```bash
+gradle-deps-monitor check /path/to/gradle
 ```
 
-## 🏗️ Estructura del proyecto
+`/path/to/gradle` is the directory that contains `libs.versions.toml` (e.g. `app/gradle` or just `gradle`).
+
+By default, reports are written to `./reports/`. Use `--out` to change the destination:
+
+```bash
+gradle-deps-monitor check /path/to/gradle --out freeze-reports/2026-05-04
+```
+
+---
+
+## Output
+
+### Console
 
 ```
-├── check-dependencies.sh    # Script principal de Bash
-├── version-stats.py        # Script de Python para análisis
-├── README.md              # Este archivo
-└── dependency_status.json # Archivo de salida (generado)
+╭─ Gradle Dependency Freeze Report ─╮
+│ Generated  2026-05-04T10:00:00    │
+│ Libraries  42                      │
+│ Plugins    6                       │
+│ Bundles    3                       │
+╰────────────────────────────────────╯
+
+Catalog Health — no issues found
+
+Reports written → freeze-reports/2026-05-04
+  • freeze.md
+  • freeze.json
+  • freeze-slack.json
 ```
 
-## ⚙️ Cómo funciona
+### Files written
 
-1. **Validación**: Verifica que existe el directorio y el archivo `libs.versions.toml`
-2. **Entorno virtual**: Crea y activa un entorno virtual Python
-3. **Instalación**: Instala las dependencias Python necesarias (`requests`)
-4. **Análisis**: 
-   - Parsea el archivo `libs.versions.toml`
-   - Extrae información de dependencias
-   - Consulta Maven Central y/o Google Maven por las últimas versiones
-5. **Comparación**: Evalúa el estado de cada dependencia
-6. **Reporte**: Genera un archivo JSON con los resultados
+| File | Format | Purpose |
+|------|--------|---------|
+| `freeze.md` | Markdown | Human-readable report; commit to `freeze-reports/` |
+| `freeze.json` | JSON (`schema_version: 1`) | CI parsing, dashboards |
+| `freeze-slack.json` | Slack Block Kit | Post via incoming webhook |
 
-## 🔧 Configuración
+---
 
-### Tipos de dependencias soportadas
+## Catalog health rules
 
-- **Google/Android**: `androidx.*`, `com.google.*`, `com.android.*`, etc.
-- **Maven Central**: Todas las demás dependencias públicas
+| Rule ID | Severity | Description |
+|---------|----------|-------------|
+| `HDX-001` | error | Duplicate library (`group:artifact` appears more than once) |
+| `HDX-002` | error | Unresolved `version.ref` (points to a missing `[versions]` key) |
+| `HDX-003` | warning | Inconsistent alias naming (mix of `camelCase` and `kebab-case`) |
+| `HDX-004` | warning | No `[plugins]` block in a non-empty catalog |
+| `HDX-005` | warning | Orphan version key (declared in `[versions]` but never referenced) |
+| `HDX-006` | info | Inline version literals (prefer `version.ref` for deduplication) |
+| `HDX-007` | info | No `[bundles]` block (multi-library catalog) |
+| `HDX-008` | suggestion | Duplicate version values (different keys share the same version string) |
 
-### Criterios de estado
+---
 
-- 🔴 **Major**: Cambio en versión mayor (ej: 1.x.x → 2.x.x)
-- 🟡 **Minor/Patch**: Cambio en versión menor o parche > 5
-- 🟢 **Actualizado**: Versión igual o diferencia mínima
-- ⚫ **Desconocido**: No se pudo determinar la versión
+## CI integration (Bitrise / GitHub Actions)
 
-## 🤝 Contribuir
+```yaml
+- name: Freeze report
+  run: |
+    gradle-deps-monitor check gradle --out freeze-reports/$(date +%Y-%m-%d)
+```
 
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
+Post the generated `freeze-slack.json` to your channel with any Slack webhook step.
 
-## 🐛 Reportar problemas
+---
 
-Si encuentras algún bug o tienes una sugerencia, por favor abre un [issue](https://github.com/pfranccino/gradle-deps-monitor/issues).
+## Project structure
+
+```
+src/gradle_deps_monitor/
+├── domain/          # Core entities: Catalog, Library, Plugin, MavenVersion, Finding
+├── application/     # Use cases and port interfaces
+├── checks/          # Catalog health rules (pluggable)
+├── infrastructure/  # TOML parser, HTTP registry clients, writers, cache
+├── presentation/    # CLI commands, Rich console
+├── bootstrap.py     # Composition root (wires everything together)
+└── cli.py           # Typer entry point
+```
+
+The architecture follows [ADR-0006](docs/adr/0006-pragmatic-clean-architecture.md) (Pragmatic Clean Architecture with import-linter enforcement).
+
+---
+
+## Development
+
+```bash
+# Lint + format
+ruff check . && ruff format .
+
+# Type check
+mypy src/
+
+# Layer enforcement
+lint-imports
+
+# Tests
+pytest
+
+# All at once (same as CI)
+ruff check . && ruff format --check . && mypy src/ && lint-imports && pytest
+```
+
+---
+
+## Roadmap
+
+See [docs/roadmap.md](docs/roadmap.md).  
+Phase 1 (foundation) is complete. Phase 2 focuses on freeze diff, CVE scanning, and Play Store compliance.
+
+---
+
+## Contributing
+
+See [docs/CONTRIBUTING-AI.md](docs/CONTRIBUTING-AI.md) for the AI-assisted development workflow used in this project.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+---
+
+## Acknowledgements
+
+This project started from an early prototype by [Paul Ayala](https://github.com/pfranccino) that proved the concept was worth pursuing. The current architecture and implementation are a full rewrite.
