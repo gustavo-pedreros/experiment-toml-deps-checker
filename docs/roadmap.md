@@ -47,7 +47,7 @@ Features that materially change the value of a freeze report.
 
 | Status | Item | Reference |
 |--------|------|-----------|
-| 📋 | CVE scan via GitHub Advisory Database + OSS Index | [RFC-0001](proposals/0001-cve-scan.md) |
+| 🚧 | CVE scan via GitHub Advisory Database + OSS Index | [RFC-0001](proposals/0001-cve-scan.md) |
 | 📋 | Play Store compliance check | [RFC-0002](proposals/0002-play-store-compliance.md) |
 | ✅ | Diff between freezes (with first-run handling) | [RFC-0003](proposals/0003-freeze-diff.md) |
 | 📋 | Changelog scraper for major upgrades | [RFC-0004](proposals/0004-changelog-scraper.md) |
