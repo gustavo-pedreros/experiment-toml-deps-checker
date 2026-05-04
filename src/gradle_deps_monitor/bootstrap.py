@@ -13,6 +13,9 @@ import os
 from gradle_deps_monitor.application.compute_freeze_diff import ComputeFreezeDiff
 from gradle_deps_monitor.application.generate_freeze_report import GenerateFreezeReport
 from gradle_deps_monitor.checks.runner import run_all as _run_health_checks
+from gradle_deps_monitor.infrastructure.checkers.play_store_compliance_checker import (
+    PlayStoreComplianceChecker,
+)
 from gradle_deps_monitor.infrastructure.loaders.json_snapshot_loader import JsonSnapshotLoader
 from gradle_deps_monitor.infrastructure.parsing.toml_catalog_parser import TomlCatalogParser
 from gradle_deps_monitor.infrastructure.scanners.composite_scanner import CompositeScanner
@@ -73,6 +76,7 @@ def create_check_command() -> CheckCommand:
         catalog_parser=parser,
         health_checker=_run_health_checks,
         vulnerability_scanner=scanner,
+        compliance_checker=PlayStoreComplianceChecker(),
     )
     return CheckCommand(
         use_case=use_case,

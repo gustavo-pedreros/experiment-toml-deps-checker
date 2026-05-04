@@ -6,10 +6,12 @@ import asyncio
 from pathlib import Path
 
 from gradle_deps_monitor.application.ports.catalog_parser import CatalogParser
+from gradle_deps_monitor.application.ports.compliance_checker import ComplianceChecker
 from gradle_deps_monitor.application.ports.health_checker import HealthChecker
 from gradle_deps_monitor.application.ports.vulnerability_scanner import VulnerabilityScanner
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import LibraryAdvisory
+from gradle_deps_monitor.domain.compliance import ComplianceFinding
 
 
 class GenerateFreezeReport:
@@ -31,10 +33,12 @@ class GenerateFreezeReport:
         catalog_parser: CatalogParser,
         health_checker: HealthChecker | None = None,
         vulnerability_scanner: VulnerabilityScanner | None = None,
+        compliance_checker: ComplianceChecker | None = None,
     ) -> None:
         self._parser = catalog_parser
         self._health_checker = health_checker
         self._scanner = vulnerability_scanner
+        self._compliance_checker = compliance_checker
 
     def execute(self, catalog_path: Path) -> FreezeReport:
         """Parse *catalog_path* and return a :class:`~gradle_deps_monitor.domain.FreezeReport`.
@@ -54,8 +58,13 @@ class GenerateFreezeReport:
             libraries = tuple(catalog.libraries)
             security_advisories = asyncio.run(self._scanner.scan(libraries))
 
+        compliance_findings: tuple[ComplianceFinding, ...] = ()
+        if self._compliance_checker is not None:
+            compliance_findings = self._compliance_checker.check(catalog)
+
         return FreezeReport(
             catalog=catalog,
             health_findings=findings,
             security_advisories=security_advisories,
+            compliance_findings=compliance_findings,
         )

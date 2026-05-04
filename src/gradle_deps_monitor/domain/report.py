@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 from gradle_deps_monitor.domain.advisory import LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Catalog
+from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding
 
 
@@ -25,6 +26,7 @@ class FreezeReport:
     generated_at: datetime = field(default_factory=lambda: datetime.now(tz=UTC))
     health_findings: tuple[Finding, ...] = field(default_factory=tuple)
     security_advisories: tuple[LibraryAdvisory, ...] = field(default_factory=tuple)
+    compliance_findings: tuple[ComplianceFinding, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         if self.generated_at.tzinfo is None:
@@ -44,3 +46,13 @@ class FreezeReport:
     def has_high_vulnerabilities(self) -> bool:
         """``True`` when any library has a HIGH advisory."""
         return any(la.has_high for la in self.security_advisories)
+
+    @property
+    def has_compliance_violations(self) -> bool:
+        """``True`` when any compliance finding is ERROR severity."""
+        return any(f.severity == ComplianceSeverity.ERROR for f in self.compliance_findings)
+
+    @property
+    def has_compliance_warnings(self) -> bool:
+        """``True`` when any compliance finding is WARNING severity."""
+        return any(f.severity == ComplianceSeverity.WARNING for f in self.compliance_findings)
