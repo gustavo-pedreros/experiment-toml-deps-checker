@@ -7,7 +7,9 @@ import pytest
 from gradle_deps_monitor.domain.advisory import Advisory, AdvisorySeverity, LibraryAdvisory
 
 
-def _advisory(severity: AdvisorySeverity = AdvisorySeverity.HIGH, ghsa: str = "GHSA-test") -> Advisory:
+def _advisory(
+    severity: AdvisorySeverity = AdvisorySeverity.HIGH, ghsa: str = "GHSA-test"
+) -> Advisory:
     return Advisory(
         ghsa_id=ghsa,
         cve_id=None,
@@ -68,8 +70,10 @@ class TestAdvisory:
         assert adv_no_fix.fixed_version is None
 
     def test_immutable(self) -> None:
+        import dataclasses
+
         adv = _advisory()
-        with pytest.raises(Exception):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             adv.severity = AdvisorySeverity.LOW  # type: ignore[misc]
 
 

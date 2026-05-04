@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import httpx
@@ -232,9 +231,7 @@ class TestGitHubAdvisoryScanner:
         client = httpx.AsyncClient(transport=transport)
         scanner = GitHubAdvisoryScanner(cache_dir=tmp_cache, client=client)
 
-        libs = tuple(
-            _make_lib(f"lib-{i}", "com.example", f"lib-{i}", "1.0.0") for i in range(5)
-        )
+        libs = tuple(_make_lib(f"lib-{i}", "com.example", f"lib-{i}", "1.0.0") for i in range(5))
         results = await scanner.scan(libs)
 
         assert [r.alias for r in results] == [lib.alias for lib in libs]

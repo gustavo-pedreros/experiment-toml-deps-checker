@@ -124,8 +124,9 @@ def _security_section(vulnerable: list[LibraryAdvisory]) -> str:
                 f" | {adv.ghsa_id}{cve}{fixed} — {adv.summary}"
                 f" | [advisory]({adv.url}) |"
             )
+    noun = "library" if len(vulnerable) == 1 else "libraries"
     return (
-        f"## Security ({len(vulnerable)} vulnerable librar{'y' if len(vulnerable) == 1 else 'ies'})\n\n"
+        f"## Security ({len(vulnerable)} vulnerable {noun})\n\n"
         "> ⚠️ The following libraries have known security advisories for the "
         "versions pinned in this catalog.\n\n"
         "| Alias | Version | Severity | Advisory | Link |\n"

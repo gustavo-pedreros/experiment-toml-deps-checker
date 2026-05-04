@@ -76,9 +76,7 @@ class GitHubAdvisoryScanner:
         if self._client is not None:
             return await self._scan_with(self._client, libraries)
 
-        async with httpx.AsyncClient(
-            headers=self._auth_headers(), timeout=30.0
-        ) as client:
+        async with httpx.AsyncClient(headers=self._auth_headers(), timeout=30.0) as client:
             return await self._scan_with(client, libraries)
 
     async def _scan_with(
@@ -148,8 +146,7 @@ class GitHubAdvisoryScanner:
 
             if not response.is_success:
                 raise VulnerabilityScanError(
-                    f"GitHub Advisory API returned HTTP {response.status_code} "
-                    f"for {package_name}"
+                    f"GitHub Advisory API returned HTTP {response.status_code} for {package_name}"
                 )
 
             all_items.extend(response.json())

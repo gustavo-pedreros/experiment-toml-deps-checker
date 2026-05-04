@@ -157,14 +157,13 @@ def _security_block(
     for la in shown:
         top = la.max_severity
         emoji = _ADVISORY_EMOJI.get(top, ":white_circle:") if top else ":white_circle:"
-        adv_ids = ", ".join(
-            a.cve_id or a.ghsa_id for a in la.advisories if a.cve_id or a.ghsa_id
-        )
+        adv_ids = ", ".join(a.cve_id or a.ghsa_id for a in la.advisories if a.cve_id or a.ghsa_id)
         lines.append(f"{emoji} `{la.alias}` {la.version} — {adv_ids or 'advisory'}")
     if len(vulnerable) > _MAX_VULN:
         lines.append(f"_…and {len(vulnerable) - _MAX_VULN} more_")
 
-    text = f":rotating_light: *Security — {len(vulnerable)} vulnerable librar{'y' if len(vulnerable) == 1 else 'ies'}:*\n"
+    noun = "library" if len(vulnerable) == 1 else "libraries"
+    text = f":rotating_light: *Security — {len(vulnerable)} vulnerable {noun}:*\n"
     text += "\n".join(lines)
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
