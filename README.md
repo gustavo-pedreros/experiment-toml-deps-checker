@@ -2,7 +2,7 @@
 
 **Freeze-time technical due-diligence report for Android / Gradle projects.**
 
-Analyses a `libs.versions.toml` version catalog, checks every dependency against Maven Central and Google Maven, audits catalog health, and writes structured reports — Markdown, JSON, and Slack Block Kit — ready to commit or post automatically via CI.
+Analyses a `libs.versions.toml` version catalog, checks every dependency against Maven Central and Google Maven, audits catalog health, scans for CVEs, validates Play Store compliance, checks toolchain compatibility, and writes structured reports — Markdown, JSON, and Slack Block Kit — ready to commit or post automatically via CI.
 
 ---
 
@@ -10,6 +10,9 @@ Analyses a `libs.versions.toml` version catalog, checks every dependency against
 
 - **Version status** — compares pinned versions against the latest release on Maven Central / Google Maven, flagging stable, release-candidate, beta, alpha, and dev versions
 - **Catalog health audit** — 8 pluggable rules that surface structural problems: duplicate libraries, unresolved `version.ref` keys, orphan version entries, inconsistent alias naming, missing plugins/bundles, and more
+- **CVE scan** — queries GitHub Advisory Database and OSS Index for known vulnerabilities in every pinned library (requires `GITHUB_TOKEN` / `OSSINDEX_USER` + `OSSINDEX_API_KEY`)
+- **Play Store compliance** — detects deprecated libraries (e.g. SafetyNet → Play Integrity) and checks `targetSdk` against Google's published requirements
+- **Toolchain compatibility** — validates Kotlin ↔ Compose Compiler, Kotlin ↔ KSP, and AGP ↔ Gradle against bundled compatibility matrices; catches mismatches before they reach QA
 - **Multiple output formats** — Markdown (human-readable), JSON (machine-readable, schema-versioned), and Slack Block Kit (webhook-ready)
 - **Rich console summary** — colour-coded executive summary printed at the end of every run
 - **On-disk HTTP cache** — avoids redundant Maven registry calls; configurable TTL
@@ -99,6 +102,20 @@ Reports written → freeze-reports/2026-05-04
 
 ---
 
+## Toolchain compatibility rules
+
+Validated automatically on every run. No credentials required.
+
+| Rule ID | Check | How it works |
+|---------|-------|-------------|
+| `TOOL-KC-001` | Kotlin ↔ Compose Compiler | Kotlin 2.x: must match exactly. Kotlin 1.x: looked up in the bundled `kotlin-compose.yaml` matrix |
+| `TOOL-KSP-001` | Kotlin ↔ KSP | KSP version must start with the Kotlin version prefix (e.g. `2.1.10-1.0.29` for Kotlin `2.1.10`) |
+| `TOOL-AGP-001` | AGP ↔ Gradle wrapper | Gradle version is read from `gradle/wrapper/gradle-wrapper.properties` and compared against the `agp-gradle.yaml` matrix |
+
+The bundled matrices cover Kotlin 1.7–2.x, AGP 7.0–8.9, and all published KSP releases. Matrix files live in `src/gradle_deps_monitor/data/compatibility/` and can be updated via PR as new toolchain versions are released.
+
+---
+
 ## CI integration (Bitrise / GitHub Actions)
 
 ```yaml
@@ -152,7 +169,7 @@ ruff check . && ruff format --check . && mypy src/ && lint-imports && pytest
 ## Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md).  
-Phase 1 (foundation) is complete. Phase 2 focuses on freeze diff, CVE scanning, and Play Store compliance.
+Phase 1 (foundation) and Phase 2 (CVE scan, Play Store compliance, freeze diff) are complete. Phase 3 is in progress with the toolchain compatibility matrix (RFC-0005).
 
 ---
 

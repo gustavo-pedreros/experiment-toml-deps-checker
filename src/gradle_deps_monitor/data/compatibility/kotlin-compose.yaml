@@ -1,0 +1,66 @@
+schema_version: 1
+last_updated: "2026-05-04"
+
+# Kotlin ↔ Compose Compiler compatibility matrix.
+#
+# For Kotlin >= 2.0.0 the Compose Compiler is bundled with the Kotlin compiler
+# (kotlin-compose-compiler-plugin).  If a project still pins compose-compiler
+# separately, its version must equal the Kotlin version.
+#
+# For Kotlin < 2.0.0 each Kotlin release requires a specific Compose Compiler
+# version.  Source: https://developer.android.com/jetpack/androidx/releases/compose-kotlin
+
+compatibility:
+  # --- Kotlin 2.x (bundled compiler, version == kotlin version) ---
+  - kotlin: "2.1.20"
+    compose_compiler: "2.1.20"
+  - kotlin: "2.1.10"
+    compose_compiler: "2.1.10"
+  - kotlin: "2.1.0"
+    compose_compiler: "2.1.0"
+  - kotlin: "2.0.21"
+    compose_compiler: "2.0.21"
+  - kotlin: "2.0.20"
+    compose_compiler: "2.0.20"
+  - kotlin: "2.0.10"
+    compose_compiler: "2.0.10"
+  - kotlin: "2.0.0"
+    compose_compiler: "2.0.0"
+
+  # --- Kotlin 1.9.x ---
+  - kotlin: "1.9.25"
+    compose_compiler: "1.5.15"
+  - kotlin: "1.9.24"
+    compose_compiler: "1.5.14"
+  - kotlin: "1.9.23"
+    compose_compiler: "1.5.11"
+  - kotlin: "1.9.22"
+    compose_compiler: "1.5.8"
+  - kotlin: "1.9.21"
+    compose_compiler: "1.5.6"
+  - kotlin: "1.9.20"
+    compose_compiler: "1.5.5"
+  - kotlin: "1.9.10"
+    compose_compiler: "1.5.3"
+  - kotlin: "1.9.0"
+    compose_compiler: "1.5.0"
+
+  # --- Kotlin 1.8.x ---
+  - kotlin: "1.8.22"
+    compose_compiler: "1.4.8"
+  - kotlin: "1.8.21"
+    compose_compiler: "1.4.7"
+  - kotlin: "1.8.20"
+    compose_compiler: "1.4.6"
+  - kotlin: "1.8.10"
+    compose_compiler: "1.4.3"
+  - kotlin: "1.8.0"
+    compose_compiler: "1.4.0"
+
+  # --- Kotlin 1.7.x ---
+  - kotlin: "1.7.20"
+    compose_compiler: "1.3.2"
+  - kotlin: "1.7.10"
+    compose_compiler: "1.3.0"
+  - kotlin: "1.7.0"
+    compose_compiler: "1.2.0"

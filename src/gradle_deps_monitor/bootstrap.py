@@ -16,6 +16,9 @@ from gradle_deps_monitor.checks.runner import run_all as _run_health_checks
 from gradle_deps_monitor.infrastructure.checkers.play_store_compliance_checker import (
     PlayStoreComplianceChecker,
 )
+from gradle_deps_monitor.infrastructure.checkers.toolchain_compatibility_checker import (
+    ToolchainCompatibilityChecker,
+)
 from gradle_deps_monitor.infrastructure.loaders.json_snapshot_loader import JsonSnapshotLoader
 from gradle_deps_monitor.infrastructure.parsing.toml_catalog_parser import TomlCatalogParser
 from gradle_deps_monitor.infrastructure.scanners.composite_scanner import CompositeScanner
@@ -77,6 +80,7 @@ def create_check_command() -> CheckCommand:
         health_checker=_run_health_checks,
         vulnerability_scanner=scanner,
         compliance_checker=PlayStoreComplianceChecker(),
+        toolchain_checker=ToolchainCompatibilityChecker(),
     )
     return CheckCommand(
         use_case=use_case,

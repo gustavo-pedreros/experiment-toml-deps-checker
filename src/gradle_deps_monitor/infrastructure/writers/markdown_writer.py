@@ -9,6 +9,7 @@ from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisor
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding, Severity
+from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
 
 class MarkdownWriter:
@@ -46,6 +47,7 @@ def _render(report: FreezeReport) -> str:
         _health_section(list(report.health_findings)),
         _security_section(list(report.vulnerable_libraries)),
         _compliance_section(list(report.compliance_findings)),
+        _toolchain_section(list(report.toolchain_findings)),
     ]
     return "\n\n".join(s for s in sections if s) + "\n"
 
@@ -158,6 +160,30 @@ def _compliance_section(findings: list[ComplianceFinding]) -> str:
     return (
         f"## Play Store Compliance ({len(findings)} {noun})\n\n"
         "> Checked against the bundled Play Store compliance knowledge base.\n\n"
+        "| Severity | Rule | Details |\n"
+        "|---|---|---|\n" + "\n".join(rows)
+    )
+
+
+_TOOLCHAIN_SEVERITY_ICON: dict[ToolchainSeverity, str] = {
+    ToolchainSeverity.ERROR: "🔴",
+    ToolchainSeverity.WARNING: "⚠️",
+    ToolchainSeverity.INFO: "✅",
+}
+
+
+def _toolchain_section(findings: list[ToolchainFinding]) -> str:
+    if not findings:
+        return ""
+    rows: list[str] = []
+    for f in findings:
+        icon = _TOOLCHAIN_SEVERITY_ICON.get(f.severity, "")
+        rec = f" {f.recommendation}" if f.recommendation else ""
+        rows.append(f"| {icon} {f.severity.upper()} | `{f.rule_id}` | {f.message}{rec} |")
+    noun = "finding" if len(findings) == 1 else "findings"
+    return (
+        f"## Toolchain Compatibility ({len(findings)} {noun})\n\n"
+        "> Checked against the bundled toolchain compatibility matrices.\n\n"
         "| Severity | Rule | Details |\n"
         "|---|---|---|\n" + "\n".join(rows)
     )

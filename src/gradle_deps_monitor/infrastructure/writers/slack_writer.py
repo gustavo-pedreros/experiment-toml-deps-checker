@@ -10,6 +10,7 @@ from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisory
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding, Severity
+from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
 # Maximum number of non-stable library entries shown in the Slack message.
 _MAX_NON_STABLE = 10
@@ -69,6 +70,11 @@ def _build_payload(report: FreezeReport) -> dict[str, Any]:
     if compliance_block:
         blocks.append({"type": "divider"})
         blocks.append(compliance_block)
+
+    toolchain_block = _toolchain_block(list(report.toolchain_findings))
+    if toolchain_block:
+        blocks.append({"type": "divider"})
+        blocks.append(toolchain_block)
 
     return {"blocks": blocks}
 
@@ -199,6 +205,34 @@ def _compliance_block(findings: list[ComplianceFinding]) -> dict[str, Any] | Non
 
     noun = "finding" if len(findings) == 1 else "findings"
     text = f":store: *Play Store Compliance — {len(findings)} {noun}:*\n"
+    text += "\n".join(lines)
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+
+_TOOLCHAIN_EMOJI: dict[ToolchainSeverity, str] = {
+    ToolchainSeverity.ERROR: ":red_circle:",
+    ToolchainSeverity.WARNING: ":warning:",
+    ToolchainSeverity.INFO: ":white_check_mark:",
+}
+# Maximum toolchain findings shown in Slack.
+_MAX_TOOLCHAIN = 8
+
+
+def _toolchain_block(findings: list[ToolchainFinding]) -> dict[str, Any] | None:
+    """Return a toolchain block, or ``None`` when there are no findings."""
+    if not findings:
+        return None
+
+    shown = findings[:_MAX_TOOLCHAIN]
+    lines: list[str] = []
+    for f in shown:
+        emoji = _TOOLCHAIN_EMOJI.get(f.severity, ":white_circle:")
+        lines.append(f"{emoji} `{f.rule_id}` — {f.message}")
+    if len(findings) > _MAX_TOOLCHAIN:
+        lines.append(f"_…and {len(findings) - _MAX_TOOLCHAIN} more_")
+
+    noun = "finding" if len(findings) == 1 else "findings"
+    text = f":wrench: *Toolchain Compatibility — {len(findings)} {noun}:*\n"
     text += "\n".join(lines)
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 

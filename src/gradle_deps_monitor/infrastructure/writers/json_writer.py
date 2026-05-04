@@ -11,6 +11,7 @@ from gradle_deps_monitor.domain.advisory import Advisory, LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
 from gradle_deps_monitor.domain.compliance import ComplianceFinding
 from gradle_deps_monitor.domain.finding import Finding
+from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 
 
 class JsonWriter:
@@ -61,6 +62,11 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
             "finding_count": len(report.compliance_findings),
             "has_violations": report.has_compliance_violations,
             "findings": [_compliance_finding(f) for f in report.compliance_findings],
+        },
+        "toolchain": {
+            "finding_count": len(report.toolchain_findings),
+            "has_errors": report.has_toolchain_errors,
+            "findings": [_toolchain_finding(f) for f in report.toolchain_findings],
         },
     }
 
@@ -127,6 +133,19 @@ def _compliance_finding(f: ComplianceFinding) -> dict[str, Any]:
         result["deadline"] = f.deadline
     if f.migration:
         result["migration"] = f.migration
+    return result
+
+
+def _toolchain_finding(f: ToolchainFinding) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "rule_id": f.rule_id,
+        "severity": f.severity.value,
+        "message": f.message,
+    }
+    if f.detail:
+        result["detail"] = f.detail
+    if f.recommendation:
+        result["recommendation"] = f.recommendation
     return result
 
 

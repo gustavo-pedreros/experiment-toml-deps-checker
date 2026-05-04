@@ -1,6 +1,6 @@
 # RFC-0005: Toolchain compatibility matrix
 
-**Status:** Proposed
+**Status:** In Progress — TOOL-KC-001 (Kotlin↔Compose), TOOL-KSP-001 (Kotlin↔KSP), TOOL-AGP-001 (AGP↔Gradle) (Step 16)
 **Created:** 2026-05-03
 **Related JTBDs:** JTBD-4
 **Depends on:** none
