@@ -28,16 +28,6 @@ def test_help_lists_check_command() -> None:
     assert "check" in result.stdout
 
 
-def test_check_command_accepts_existing_directory(tmp_path: Path) -> None:
-    catalog_dir = tmp_path / "gradle"
-    catalog_dir.mkdir()
-
-    result = runner.invoke(app, ["check", str(catalog_dir)])
-
-    assert result.exit_code == 0
-    assert "not yet implemented" in result.stdout
-
-
 def test_check_command_rejects_missing_directory(tmp_path: Path) -> None:
     missing = tmp_path / "does-not-exist"
 

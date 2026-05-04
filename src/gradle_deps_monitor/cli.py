@@ -1,9 +1,8 @@
 """Typer entry point for the gradle-deps-monitor CLI.
 
 Wires Typer commands to use cases via the composition root in
-:mod:`gradle_deps_monitor.bootstrap`. Phase 1 work in progress: command
-handlers will be moved to :mod:`gradle_deps_monitor.presentation.commands`
-once their use cases are implemented.
+:mod:`gradle_deps_monitor.bootstrap`. Command handler logic lives in
+:mod:`gradle_deps_monitor.presentation.commands`.
 """
 
 from pathlib import Path
@@ -11,7 +10,8 @@ from typing import Annotated
 
 import typer
 
-from gradle_deps_monitor import __version__
+from gradle_deps_monitor import __version__, bootstrap
+from gradle_deps_monitor.application.ports.catalog_parser import CatalogParseError
 
 app = typer.Typer(
     name="gradle-deps-monitor",
@@ -55,11 +55,23 @@ def check(
             resolve_path=True,
         ),
     ],
+    output_dir: Annotated[
+        Path,
+        typer.Option(
+            "--out",
+            "-o",
+            help="Directory where reports are written (created if absent).",
+        ),
+    ] = Path("reports"),
 ) -> None:
-    """Generate a freeze report for the given Gradle catalog directory.
+    """Generate a freeze report for the given Gradle catalog directory."""
+    try:
+        report = bootstrap.create_check_command().run(catalog_path, output_dir)
+    except CatalogParseError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
 
-    Phase 1 work in progress: this command is not yet wired to the analysis
-    pipeline. Future steps will add TOML parsing, version registry queries,
-    and report generation.
-    """
-    typer.echo(f"check: not yet implemented (received: {catalog_path})")
+    typer.echo(f"Freeze report written to {output_dir}")
+    typer.echo(f"  Libraries : {report.catalog.library_count}")
+    typer.echo(f"  Plugins   : {report.catalog.plugin_count}")
+    typer.echo(f"  Bundles   : {len(report.catalog.bundles)}")
