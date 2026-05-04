@@ -44,7 +44,7 @@ class CompositeScanner:
             )
 
         # Run all scanners concurrently.
-        all_results: tuple[tuple[LibraryAdvisory, ...], ...] = await asyncio.gather(
+        all_results: list[tuple[LibraryAdvisory, ...]] = await asyncio.gather(
             *[scanner.scan(libraries) for scanner in self._scanners]
         )
 

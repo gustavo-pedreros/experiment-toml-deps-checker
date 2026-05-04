@@ -116,7 +116,7 @@ class OssIndexScanner:
             purl = _purl(lib)
             cached = self._cache.get(f"{_CACHE_PREFIX}:{purl}", default=_MISS)
             if cached is not _MISS:
-                raw_list: list[dict[str, Any]] = cached  # type: ignore[assignment]
+                raw_list: list[dict[str, Any]] = cached
                 advisory_map[purl] = _parse_component_vulns(raw_list)
             else:
                 uncached_purls.append(purl)
