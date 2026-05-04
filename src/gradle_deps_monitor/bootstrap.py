@@ -15,9 +15,11 @@ from gradle_deps_monitor.application.generate_freeze_report import GenerateFreez
 from gradle_deps_monitor.checks.runner import run_all as _run_health_checks
 from gradle_deps_monitor.infrastructure.loaders.json_snapshot_loader import JsonSnapshotLoader
 from gradle_deps_monitor.infrastructure.parsing.toml_catalog_parser import TomlCatalogParser
+from gradle_deps_monitor.infrastructure.scanners.composite_scanner import CompositeScanner
 from gradle_deps_monitor.infrastructure.scanners.github_advisory_scanner import (
     GitHubAdvisoryScanner,
 )
+from gradle_deps_monitor.infrastructure.scanners.oss_index_scanner import OssIndexScanner
 from gradle_deps_monitor.infrastructure.writers.diff_json_writer import DiffJsonWriter
 from gradle_deps_monitor.infrastructure.writers.diff_markdown_writer import DiffMarkdownWriter
 from gradle_deps_monitor.infrastructure.writers.diff_slack_writer import DiffSlackWriter
@@ -33,6 +35,28 @@ _REPORT_STEM = "freeze"
 _DIFF_STEM = "freeze-diff"
 
 
+def _build_scanner() -> CompositeScanner | GitHubAdvisoryScanner | OssIndexScanner | None:
+    """Return the best available vulnerability scanner based on env vars.
+
+    Priority:
+    1. Both GitHub token AND OSS Index credentials → :class:`CompositeScanner`
+    2. GitHub token only → :class:`GitHubAdvisoryScanner`
+    3. OSS Index credentials only → :class:`OssIndexScanner`
+    4. No credentials → ``None`` (security section omitted from reports)
+    """
+    gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    oss_user = os.environ.get("OSSINDEX_USER")
+    oss_key = os.environ.get("OSSINDEX_API_KEY")
+
+    gh_scanner = GitHubAdvisoryScanner(token=gh_token) if gh_token else None
+    has_oss_creds = bool(oss_user and oss_key)
+    oss_scanner = OssIndexScanner(username=oss_user, api_key=oss_key) if has_oss_creds else None
+
+    if gh_scanner and oss_scanner:
+        return CompositeScanner(scanners=(gh_scanner, oss_scanner))
+    return gh_scanner or oss_scanner
+
+
 def create_check_command() -> CheckCommand:
     """Return a fully wired :class:`~...presentation.commands.check_command.CheckCommand`.
 
@@ -44,8 +68,7 @@ def create_check_command() -> CheckCommand:
     - :class:`~...infrastructure.writers.slack_writer.SlackWriter`
     """
     parser = TomlCatalogParser()
-    gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    scanner = GitHubAdvisoryScanner(token=gh_token) if gh_token else None
+    scanner = _build_scanner()
     use_case = GenerateFreezeReport(
         catalog_parser=parser,
         health_checker=_run_health_checks,
