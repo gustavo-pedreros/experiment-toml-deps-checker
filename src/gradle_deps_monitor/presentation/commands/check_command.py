@@ -31,16 +31,20 @@ class CheckCommand:
         self._use_case = use_case
         self._writers = list(writers)
 
-    def run(self, catalog_path: Path, output_dir: Path) -> FreezeReport:
+    def run(self, catalog_path: Path, output_dir: Path) -> tuple[FreezeReport, tuple[Path, ...]]:
         """Execute the use case and write all reports to *output_dir*.
 
         :param catalog_path: Directory or file path forwarded to the parser.
         :param output_dir: Directory where output files are written (created
             if absent by the individual writers).
-        :returns: The generated :class:`~gradle_deps_monitor.domain.FreezeReport`.
+        :returns: A ``(report, written_files)`` tuple — the generated report
+            and the absolute paths of every file that was written.
         :raises CatalogParseError: Propagated from the use case / parser.
         """
         report = self._use_case.execute(catalog_path)
+        written: list[Path] = []
         for filename, writer in self._writers:
-            writer.write(report, output_dir / filename)
-        return report
+            dest = output_dir / filename
+            writer.write(report, dest)
+            written.append(dest)
+        return report, tuple(written)

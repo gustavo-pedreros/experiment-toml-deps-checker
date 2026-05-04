@@ -109,7 +109,7 @@ def test_check_prints_output_path(tmp_path: Path) -> None:
     gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
     out = tmp_path / "reports"
     result = runner.invoke(app, ["check", str(gradle_dir), "--out", str(out)])
-    assert "Freeze report written to" in result.stdout
+    assert "Reports written" in result.stdout
 
 
 def test_check_prints_library_count(tmp_path: Path) -> None:
