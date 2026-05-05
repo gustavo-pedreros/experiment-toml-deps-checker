@@ -12,6 +12,7 @@ from gradle_deps_monitor.domain import FreezeReport, Severity
 from gradle_deps_monitor.domain.advisory import AdvisorySeverity
 from gradle_deps_monitor.domain.compliance import ComplianceSeverity
 from gradle_deps_monitor.domain.diff import FreezeDiff
+from gradle_deps_monitor.domain.library_health import LibraryHealthSeverity
 from gradle_deps_monitor.domain.toolchain import ToolchainSeverity
 from gradle_deps_monitor.domain.version import Stability
 
@@ -19,6 +20,12 @@ _TOOLCHAIN_STYLE: dict[ToolchainSeverity, str] = {
     ToolchainSeverity.ERROR: "bold red",
     ToolchainSeverity.WARNING: "bold yellow",
     ToolchainSeverity.INFO: "green",
+}
+
+_LIBRARY_HEALTH_STYLE: dict[LibraryHealthSeverity, str] = {
+    LibraryHealthSeverity.HIGH: "bold red",
+    LibraryHealthSeverity.MEDIUM: "bold yellow",
+    LibraryHealthSeverity.LOW: "blue",
 }
 
 _COMPLIANCE_STYLE: dict[ComplianceSeverity, str] = {
@@ -186,6 +193,37 @@ def print_summary(
             )
             if tf.recommendation:
                 con.print(f"    [dim]→ {tf.recommendation}[/dim]")
+
+    # --- Library health ---
+    if report.library_health_findings:
+        con.print()
+        lh_high = sum(
+            1 for lh in report.library_health_findings if lh.severity == LibraryHealthSeverity.HIGH
+        )
+        lh_medium = sum(
+            1
+            for lh in report.library_health_findings
+            if lh.severity == LibraryHealthSeverity.MEDIUM
+        )
+        lh_parts: list[str] = []
+        if lh_high:
+            lh_parts.append(f"[bold red]{lh_high} high[/bold red]")
+        if lh_medium:
+            lh_parts.append(f"[bold yellow]{lh_medium} medium[/bold yellow]")
+        lh_label = ", ".join(lh_parts) if lh_parts else "informational"
+        con.print(
+            f"[bold]Library Health[/bold] — "
+            f"{len(report.library_health_findings)} finding(s): {lh_label}"
+        )
+        for lh in sorted(report.library_health_findings, key=lambda f: (f.severity, f.alias)):
+            lh_style = _LIBRARY_HEALTH_STYLE.get(lh.severity, "")
+            lh_sev_label = lh.severity.value.upper()
+            replacement = f"  → [cyan]{lh.replacement}[/cyan]" if lh.replacement else ""
+            con.print(
+                f"  [{lh_style}]{lh_sev_label}[/{lh_style}]  "
+                f"[cyan]{lh.alias}[/cyan]  [dim]({lh.signal.upper()})[/dim]"
+                f"  {lh.message}{replacement}"
+            )
 
     # --- Written files ---
     if written_files:

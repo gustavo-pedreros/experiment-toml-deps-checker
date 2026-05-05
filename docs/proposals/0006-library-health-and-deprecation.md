@@ -1,6 +1,6 @@
 # RFC-0006: Library health and deprecation prediction
 
-**Status:** Proposed
+**Status:** In progress
 **Created:** 2026-05-03
 **Related JTBDs:** JTBD-3
 **Depends on:** [ADR-0003](../adr/0003-bundled-plus-remote-deprecation-kb.md)

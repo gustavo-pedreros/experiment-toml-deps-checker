@@ -10,6 +10,7 @@ from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisory
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding, Severity
+from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
 # Maximum number of non-stable library entries shown in the Slack message.
@@ -75,6 +76,11 @@ def _build_payload(report: FreezeReport) -> dict[str, Any]:
     if toolchain_block:
         blocks.append({"type": "divider"})
         blocks.append(toolchain_block)
+
+    library_health_block = _library_health_block(list(report.library_health_findings))
+    if library_health_block:
+        blocks.append({"type": "divider"})
+        blocks.append(library_health_block)
 
     return {"blocks": blocks}
 
@@ -233,6 +239,35 @@ def _toolchain_block(findings: list[ToolchainFinding]) -> dict[str, Any] | None:
 
     noun = "finding" if len(findings) == 1 else "findings"
     text = f":wrench: *Toolchain Compatibility — {len(findings)} {noun}:*\n"
+    text += "\n".join(lines)
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+
+_LIBRARY_HEALTH_EMOJI: dict[LibraryHealthSeverity, str] = {
+    LibraryHealthSeverity.HIGH: ":red_circle:",
+    LibraryHealthSeverity.MEDIUM: ":large_yellow_circle:",
+    LibraryHealthSeverity.LOW: ":large_blue_circle:",
+}
+# Maximum library health findings shown in Slack.
+_MAX_LIBRARY_HEALTH = 8
+
+
+def _library_health_block(findings: list[LibraryHealthFinding]) -> dict[str, Any] | None:
+    """Return a library health block, or ``None`` when there are no findings."""
+    if not findings:
+        return None
+
+    shown = sorted(findings, key=lambda f: (f.severity, f.alias))[:_MAX_LIBRARY_HEALTH]
+    lines: list[str] = []
+    for f in shown:
+        emoji = _LIBRARY_HEALTH_EMOJI.get(f.severity, ":white_circle:")
+        replacement = f" → `{f.replacement}`" if f.replacement else ""
+        lines.append(f"{emoji} `{f.alias}` ({f.signal.upper()}) — {f.message}{replacement}")
+    if len(findings) > _MAX_LIBRARY_HEALTH:
+        lines.append(f"_…and {len(findings) - _MAX_LIBRARY_HEALTH} more_")
+
+    noun = "finding" if len(findings) == 1 else "findings"
+    text = f":pill: *Library Health — {len(findings)} {noun}:*\n"
     text += "\n".join(lines)
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 

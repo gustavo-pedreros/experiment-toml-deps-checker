@@ -2,7 +2,7 @@
 
 **Freeze-time technical due-diligence report for Android / Gradle projects.**
 
-Analyses a `libs.versions.toml` version catalog, checks every dependency against Maven Central and Google Maven, audits catalog health, scans for CVEs, validates Play Store compliance, checks toolchain compatibility, and writes structured reports — Markdown, JSON, and Slack Block Kit — ready to commit or post automatically via CI.
+Analyses a `libs.versions.toml` version catalog, checks every dependency against Maven Central and Google Maven, audits catalog health, scans for CVEs, validates Play Store compliance, checks toolchain compatibility, detects deprecated and abandoned libraries, and writes structured reports — Markdown, JSON, and Slack Block Kit — ready to commit or post automatically via CI.
 
 ---
 
@@ -13,6 +13,7 @@ Analyses a `libs.versions.toml` version catalog, checks every dependency against
 - **CVE scan** — queries GitHub Advisory Database and OSS Index for known vulnerabilities in every pinned library (requires `GITHUB_TOKEN` / `OSSINDEX_USER` + `OSSINDEX_API_KEY`)
 - **Play Store compliance** — detects deprecated libraries (e.g. SafetyNet → Play Integrity) and checks `targetSdk` against Google's published requirements
 - **Toolchain compatibility** — validates Kotlin ↔ Compose Compiler, Kotlin ↔ KSP, and AGP ↔ Gradle against bundled compatibility matrices; catches mismatches before they reach QA
+- **Library health** — detects deprecated, relocated, and abandoned libraries via a curated knowledge base (26+ Android-specific entries), Maven POM `<relocation>` tag detection, and an inactivity heuristic based on `maven-metadata.xml` (no credentials required)
 - **Multiple output formats** — Markdown (human-readable), JSON (machine-readable, schema-versioned), and Slack Block Kit (webhook-ready)
 - **Rich console summary** — colour-coded executive summary printed at the end of every run
 - **On-disk HTTP cache** — avoids redundant Maven registry calls; configurable TTL
@@ -116,6 +117,21 @@ The bundled matrices cover Kotlin 1.7–2.x, AGP 7.0–8.9, and all published KS
 
 ---
 
+## Library health detection
+
+Three signals are combined on every run. No credentials required.
+
+| Signal | Source | Examples |
+|--------|--------|---------|
+| **Curated KB** | Bundled `library_health_kb.yaml` (26+ entries) | ButterKnife, Dagger-Android, RxJava 1.x/2.x, legacy Fabric SDK, Android Support Library, Android Arch → AndroidX |
+| **POM relocation** | Maven POM `<distributionManagement><relocation>` tag | Detects any library that published a redirect on Maven Central |
+| **Inactivity** | `maven-metadata.xml` `<lastUpdated>` field | MEDIUM (≥ 730 days, ~24 months), HIGH (≥ 1095 days, ~36 months — likely abandoned) |
+
+Google-hosted libraries (`androidx.*`, `com.google.*`, etc.) are excluded from the inactivity check.
+The curated KB lives in `src/gradle_deps_monitor/data/library_health_kb.yaml` and can be extended via PR.
+
+---
+
 ## CI integration (Bitrise / GitHub Actions)
 
 ```yaml
@@ -169,7 +185,7 @@ ruff check . && ruff format --check . && mypy src/ && lint-imports && pytest
 ## Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md).  
-Phase 1 (foundation) and Phase 2 (CVE scan, Play Store compliance, freeze diff) are complete. Phase 3 is in progress with the toolchain compatibility matrix (RFC-0005).
+Phase 1 (foundation) and Phase 2 (CVE scan, Play Store compliance, freeze diff) are complete. Phase 3 is in progress: toolchain compatibility matrix (RFC-0005) is done; library health & deprecation detection (RFC-0006) is in progress.
 
 ---
 

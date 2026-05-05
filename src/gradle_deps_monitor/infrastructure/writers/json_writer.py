@@ -11,6 +11,7 @@ from gradle_deps_monitor.domain.advisory import Advisory, LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
 from gradle_deps_monitor.domain.compliance import ComplianceFinding
 from gradle_deps_monitor.domain.finding import Finding
+from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 
 
@@ -67,6 +68,11 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
             "finding_count": len(report.toolchain_findings),
             "has_errors": report.has_toolchain_errors,
             "findings": [_toolchain_finding(f) for f in report.toolchain_findings],
+        },
+        "library_health": {
+            "finding_count": len(report.library_health_findings),
+            "has_deprecated": report.has_deprecated_libraries,
+            "findings": [_library_health_finding(f) for f in report.library_health_findings],
         },
     }
 
@@ -146,6 +152,24 @@ def _toolchain_finding(f: ToolchainFinding) -> dict[str, Any]:
         result["detail"] = f.detail
     if f.recommendation:
         result["recommendation"] = f.recommendation
+    return result
+
+
+def _library_health_finding(f: LibraryHealthFinding) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "alias": f.alias,
+        "coordinate": f.coordinate,
+        "version": f.version,
+        "signal": f.signal.value,
+        "severity": f.severity.value,
+        "message": f.message,
+    }
+    if f.replacement:
+        result["replacement"] = f.replacement
+    if f.migration_url:
+        result["migration_url"] = f.migration_url
+    if f.days_since_release is not None:
+        result["days_since_release"] = f.days_since_release
     return result
 
 
