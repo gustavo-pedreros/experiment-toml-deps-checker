@@ -185,7 +185,7 @@ ruff check . && ruff format --check . && mypy src/ && lint-imports && pytest
 ## Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md).  
-Phase 1 (foundation) and Phase 2 (CVE scan, Play Store compliance, freeze diff) are complete. Phase 3 is in progress: toolchain compatibility matrix (RFC-0005) is done; library health & deprecation detection (RFC-0006) is in progress.
+Phase 1 (foundation) and Phase 2 (CVE scan, Play Store compliance, freeze diff) are complete. Phase 3 is in progress: toolchain compatibility matrix (RFC-0005) and library health & deprecation detection (RFC-0006) are shipped; module usage map (RFC-0007) is next.
 
 ---
 

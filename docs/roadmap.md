@@ -60,7 +60,7 @@ Android teams at scale.
 | Status | Item | Reference |
 |--------|------|-----------|
 | ✅ | Toolchain compatibility matrix (Kotlin / Compose / AGP / KSP / Hilt) | [RFC-0005](proposals/0005-toolchain-compatibility-matrix.md) |
-| 🚧 | Library health & deprecation prediction (hybrid KB + POM relocation) | [RFC-0006](proposals/0006-library-health-and-deprecation.md) |
+| ✅ | Library health & deprecation prediction (hybrid KB + POM relocation) | [RFC-0006](proposals/0006-library-health-and-deprecation.md) |
 | 📋 | Module usage map (opt-in, expensive but high-signal) | [RFC-0007](proposals/0007-module-usage-map.md) |
 
 ## Phase 4 — Polish and consolidation
