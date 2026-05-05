@@ -64,10 +64,23 @@ def check(
             help="Directory where reports are written (created if absent).",
         ),
     ] = Path("reports"),
+    module_usage: Annotated[
+        bool,
+        typer.Option(
+            "--module-usage",
+            "-m",
+            help=(
+                "Scan build.gradle(.kts) files and add a module usage map to reports "
+                "(opt-in; slower on large projects)."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Generate a freeze report for the given Gradle catalog directory."""
     try:
-        report, written_files = bootstrap.create_check_command().run(catalog_path, output_dir)
+        report, written_files = bootstrap.create_check_command(module_usage=module_usage).run(
+            catalog_path, output_dir
+        )
     except CatalogParseError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc

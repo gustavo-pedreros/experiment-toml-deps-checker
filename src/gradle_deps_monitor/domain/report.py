@@ -15,6 +15,7 @@ from gradle_deps_monitor.domain.library_health import (
     LibraryHealthFinding,
     LibraryHealthSeverity,
 )
+from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
 
@@ -37,6 +38,7 @@ class FreezeReport:
     toolchain_findings: tuple[ToolchainFinding, ...] = field(default_factory=tuple)
     library_health_findings: tuple[LibraryHealthFinding, ...] = field(default_factory=tuple)
     changelog_entries: tuple[ChangelogEntry, ...] = field(default_factory=tuple)
+    module_usage_map: ModuleUsageMap | None = field(default=None)
 
     def __post_init__(self) -> None:
         if self.generated_at.tzinfo is None:
