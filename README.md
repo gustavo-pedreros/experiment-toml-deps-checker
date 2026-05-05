@@ -14,6 +14,7 @@ Analyses a `libs.versions.toml` version catalog, checks every dependency against
 - **Play Store compliance** — detects deprecated libraries (e.g. SafetyNet → Play Integrity) and checks `targetSdk` against Google's published requirements
 - **Toolchain compatibility** — validates Kotlin ↔ Compose Compiler, Kotlin ↔ KSP, and AGP ↔ Gradle against bundled compatibility matrices; catches mismatches before they reach QA
 - **Library health** — detects deprecated, relocated, and abandoned libraries via a curated knowledge base (26+ Android-specific entries), Maven POM `<relocation>` tag detection, and an inactivity heuristic based on `maven-metadata.xml` (no credentials required)
+- **Changelog scraper** — for every library with a major upgrade available, discovers the release notes via the GitHub Releases API or a `CHANGELOG.md` fallback; applies a breaking-change heuristic (🔴 likely breaking / 🟢 clean / ⚪ unknown); `GITHUB_TOKEN` optional but increases API rate limit
 - **Multiple output formats** — Markdown (human-readable), JSON (machine-readable, schema-versioned), and Slack Block Kit (webhook-ready)
 - **Rich console summary** — colour-coded executive summary printed at the end of every run
 - **On-disk HTTP cache** — avoids redundant Maven registry calls; configurable TTL
@@ -185,7 +186,7 @@ ruff check . && ruff format --check . && mypy src/ && lint-imports && pytest
 ## Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md).  
-Phase 1 (foundation) and Phase 2 (CVE scan, Play Store compliance, freeze diff) are complete. Phase 3 is in progress: toolchain compatibility matrix (RFC-0005) and library health & deprecation detection (RFC-0006) are shipped; module usage map (RFC-0007) is next.
+Phase 1 (foundation) and Phase 2 (CVE scan, Play Store compliance, freeze diff) are complete. Phase 3 is in progress: toolchain compatibility matrix (RFC-0005), library health (RFC-0006), and changelog scraper (RFC-0004) are shipped; module usage map (RFC-0007) is next.
 
 ---
 

@@ -8,6 +8,7 @@ from typing import Any
 
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisory
+from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding, Severity
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
@@ -81,6 +82,11 @@ def _build_payload(report: FreezeReport) -> dict[str, Any]:
     if library_health_block:
         blocks.append({"type": "divider"})
         blocks.append(library_health_block)
+
+    changelog_block = _changelog_block(list(report.changelog_entries))
+    if changelog_block:
+        blocks.append({"type": "divider"})
+        blocks.append(changelog_block)
 
     return {"blocks": blocks}
 
@@ -268,6 +274,35 @@ def _library_health_block(findings: list[LibraryHealthFinding]) -> dict[str, Any
 
     noun = "finding" if len(findings) == 1 else "findings"
     text = f":pill: *Library Health — {len(findings)} {noun}:*\n"
+    text += "\n".join(lines)
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+
+_BREAKING_SIGNAL_EMOJI: dict[BreakingSignal, str] = {
+    BreakingSignal.LIKELY: ":red_circle:",
+    BreakingSignal.CLEAN: ":large_green_circle:",
+    BreakingSignal.UNKNOWN: ":white_circle:",
+}
+# Maximum changelog entries shown in Slack.
+_MAX_CHANGELOG = 8
+
+
+def _changelog_block(entries: list[ChangelogEntry]) -> dict[str, Any] | None:
+    """Return a major-upgrades block, or ``None`` when there are no entries."""
+    if not entries:
+        return None
+
+    shown = sorted(entries, key=lambda e: e.alias)[:_MAX_CHANGELOG]
+    lines: list[str] = []
+    for e in shown:
+        emoji = _BREAKING_SIGNAL_EMOJI.get(e.breaking_signal, ":white_circle:")
+        link = f" <{e.changelog_url}|release notes>" if e.changelog_url else ""
+        lines.append(f"{emoji} `{e.alias}` {e.pinned_version} → *{e.latest_version}*{link}")
+    if len(entries) > _MAX_CHANGELOG:
+        lines.append(f"_…and {len(entries) - _MAX_CHANGELOG} more_")
+
+    noun = "upgrade" if len(entries) == 1 else "upgrades"
+    text = f":arrow_up: *Major Upgrades Available — {len(entries)} {noun}:*\n"
     text += "\n".join(lines)
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 

@@ -22,6 +22,7 @@ from gradle_deps_monitor.infrastructure.checkers.play_store_compliance_checker i
 from gradle_deps_monitor.infrastructure.checkers.toolchain_compatibility_checker import (
     ToolchainCompatibilityChecker,
 )
+from gradle_deps_monitor.infrastructure.fetchers.changelog_fetcher import ChangelogFetcher
 from gradle_deps_monitor.infrastructure.loaders.json_snapshot_loader import JsonSnapshotLoader
 from gradle_deps_monitor.infrastructure.parsing.toml_catalog_parser import TomlCatalogParser
 from gradle_deps_monitor.infrastructure.scanners.composite_scanner import CompositeScanner
@@ -78,6 +79,7 @@ def create_check_command() -> CheckCommand:
     """
     parser = TomlCatalogParser()
     scanner = _build_scanner()
+    gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     use_case = GenerateFreezeReport(
         catalog_parser=parser,
         health_checker=_run_health_checks,
@@ -85,6 +87,7 @@ def create_check_command() -> CheckCommand:
         compliance_checker=PlayStoreComplianceChecker(),
         toolchain_checker=ToolchainCompatibilityChecker(),
         library_health_checker=LibraryHealthChecker(),
+        changelog_fetcher=ChangelogFetcher(github_token=gh_token),
     )
     return CheckCommand(
         use_case=use_case,

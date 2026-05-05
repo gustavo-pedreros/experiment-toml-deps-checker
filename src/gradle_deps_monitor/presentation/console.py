@@ -10,6 +10,7 @@ from rich.table import Table
 
 from gradle_deps_monitor.domain import FreezeReport, Severity
 from gradle_deps_monitor.domain.advisory import AdvisorySeverity
+from gradle_deps_monitor.domain.changelog import BreakingSignal
 from gradle_deps_monitor.domain.compliance import ComplianceSeverity
 from gradle_deps_monitor.domain.diff import FreezeDiff
 from gradle_deps_monitor.domain.library_health import LibraryHealthSeverity
@@ -223,6 +224,35 @@ def print_summary(
                 f"  [{lh_style}]{lh_sev_label}[/{lh_style}]  "
                 f"[cyan]{lh.alias}[/cyan]  [dim]({lh.signal.upper()})[/dim]"
                 f"  {lh.message}{replacement}"
+            )
+
+    # --- Major upgrades / changelog ---
+    if report.changelog_entries:
+        con.print()
+        breaking = sum(
+            1 for e in report.changelog_entries if e.breaking_signal == BreakingSignal.LIKELY
+        )
+        ch_parts: list[str] = []
+        if breaking:
+            ch_parts.append(f"[bold red]{breaking} likely breaking[/bold red]")
+        remaining = len(report.changelog_entries) - breaking
+        if remaining:
+            ch_parts.append(f"{remaining} other")
+        ch_label = ", ".join(ch_parts) if ch_parts else "no breaking signals"
+        con.print(
+            f"[bold]Major Upgrades[/bold] — {len(report.changelog_entries)} available: {ch_label}"
+        )
+        for entry in sorted(report.changelog_entries, key=lambda e: e.alias):
+            if entry.breaking_signal == BreakingSignal.LIKELY:
+                signal_str = "[bold red]BREAKING[/bold red]"
+            elif entry.breaking_signal == BreakingSignal.CLEAN:
+                signal_str = "[green]CLEAN[/green]"
+            else:
+                signal_str = "[dim]UNKNOWN[/dim]"
+            link = f"  [blue]{entry.changelog_url}[/blue]" if entry.changelog_url else ""
+            con.print(
+                f"  {signal_str}  [cyan]{entry.alias}[/cyan]"
+                f"  {entry.pinned_version} → [bold]{entry.latest_version}[/bold]{link}"
             )
 
     # --- Written files ---
