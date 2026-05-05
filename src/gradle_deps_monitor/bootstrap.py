@@ -13,6 +13,9 @@ import os
 from gradle_deps_monitor.application.compute_freeze_diff import ComputeFreezeDiff
 from gradle_deps_monitor.application.generate_freeze_report import GenerateFreezeReport
 from gradle_deps_monitor.checks.runner import run_all as _run_health_checks
+from gradle_deps_monitor.infrastructure.checkers.library_health_checker import (
+    LibraryHealthChecker,
+)
 from gradle_deps_monitor.infrastructure.checkers.play_store_compliance_checker import (
     PlayStoreComplianceChecker,
 )
@@ -81,6 +84,7 @@ def create_check_command() -> CheckCommand:
         vulnerability_scanner=scanner,
         compliance_checker=PlayStoreComplianceChecker(),
         toolchain_checker=ToolchainCompatibilityChecker(),
+        library_health_checker=LibraryHealthChecker(),
     )
     return CheckCommand(
         use_case=use_case,

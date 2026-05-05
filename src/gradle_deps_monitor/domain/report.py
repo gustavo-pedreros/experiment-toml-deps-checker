@@ -9,6 +9,11 @@ from gradle_deps_monitor.domain.advisory import LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Catalog
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding
+from gradle_deps_monitor.domain.library_health import (
+    HealthSignal,
+    LibraryHealthFinding,
+    LibraryHealthSeverity,
+)
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
 
@@ -29,6 +34,7 @@ class FreezeReport:
     security_advisories: tuple[LibraryAdvisory, ...] = field(default_factory=tuple)
     compliance_findings: tuple[ComplianceFinding, ...] = field(default_factory=tuple)
     toolchain_findings: tuple[ToolchainFinding, ...] = field(default_factory=tuple)
+    library_health_findings: tuple[LibraryHealthFinding, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         if self.generated_at.tzinfo is None:
@@ -68,3 +74,27 @@ class FreezeReport:
     def has_toolchain_warnings(self) -> bool:
         """``True`` when any toolchain finding is WARNING severity."""
         return any(f.severity == ToolchainSeverity.WARNING for f in self.toolchain_findings)
+
+    @property
+    def deprecated_libraries(self) -> tuple[LibraryHealthFinding, ...]:
+        """Findings from the curated KB or POM relocation signal."""
+        return tuple(
+            f
+            for f in self.library_health_findings
+            if f.signal in (HealthSignal.CURATED, HealthSignal.RELOCATED)
+        )
+
+    @property
+    def inactive_libraries(self) -> tuple[LibraryHealthFinding, ...]:
+        """Findings from the inactivity heuristic signal."""
+        return tuple(f for f in self.library_health_findings if f.signal == HealthSignal.INACTIVE)
+
+    @property
+    def has_deprecated_libraries(self) -> bool:
+        """``True`` when any library is flagged as deprecated or relocated."""
+        return bool(self.deprecated_libraries)
+
+    @property
+    def has_high_health_findings(self) -> bool:
+        """``True`` when any library health finding has HIGH severity."""
+        return any(f.severity == LibraryHealthSeverity.HIGH for f in self.library_health_findings)

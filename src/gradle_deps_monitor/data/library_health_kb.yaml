@@ -1,0 +1,259 @@
+schema_version: 1
+last_updated: "2026-05-04"
+
+# Curated knowledge base of deprecated / superseded Android libraries.
+#
+# Fields:
+#   id          — stable identifier used as rule_id in reports
+#   coordinate  — "group:artifact" (version-independent)
+#   severity    — "high" | "medium"
+#   reason      — one-sentence explanation shown in the report
+#   replacement — suggested replacement coordinate or description (optional)
+#   migration_url — link to official migration guide (optional)
+#   verified_at — ISO date when this entry was last confirmed accurate
+
+deprecated_libraries:
+
+  # ---------------------------------------------------------------------------
+  # View binding / UI
+  # ---------------------------------------------------------------------------
+
+  - id: "LIB-001"
+    coordinate: "com.jakewharton:butterknife"
+    severity: "high"
+    reason: "Officially deprecated by the author in 2020. ViewBinding is the built-in replacement."
+    replacement: "androidx.viewbinding (built-in, no extra dependency)"
+    migration_url: "https://github.com/JakeWharton/butterknife#dropping-butterknife"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-002"
+    coordinate: "com.jakewharton:butterknife-compiler"
+    severity: "high"
+    reason: "Part of the deprecated ButterKnife library. Migrate to ViewBinding."
+    replacement: "androidx.viewbinding (built-in, no extra dependency)"
+    migration_url: "https://github.com/JakeWharton/butterknife#dropping-butterknife"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-003"
+    coordinate: "org.jetbrains.kotlin:kotlin-android-extensions-runtime"
+    severity: "high"
+    reason: "Kotlin Android Extensions (synthetic views) is deprecated since Kotlin 1.8."
+    replacement: "androidx.viewbinding (built-in)"
+    migration_url: "https://developer.android.com/topic/libraries/view-binding/migration"
+    verified_at: "2024-01-01"
+
+  # ---------------------------------------------------------------------------
+  # Dependency injection
+  # ---------------------------------------------------------------------------
+
+  - id: "LIB-004"
+    coordinate: "com.google.dagger:dagger-android"
+    severity: "high"
+    reason: "Deprecated by Google in 2022. Hilt is the recommended DI framework for Android."
+    replacement: "com.google.dagger:hilt-android"
+    migration_url: "https://dagger.dev/hilt/migration-guide"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-005"
+    coordinate: "com.google.dagger:dagger-android-support"
+    severity: "high"
+    reason: "Deprecated by Google in 2022. Hilt is the recommended DI framework for Android."
+    replacement: "com.google.dagger:hilt-android"
+    migration_url: "https://dagger.dev/hilt/migration-guide"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-006"
+    coordinate: "com.google.dagger:dagger-android-processor"
+    severity: "high"
+    reason: "Deprecated by Google in 2022. Hilt is the recommended DI framework for Android."
+    replacement: "com.google.dagger:hilt-android-compiler"
+    migration_url: "https://dagger.dev/hilt/migration-guide"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-007"
+    coordinate: "com.squareup.dagger:dagger"
+    severity: "high"
+    reason: "Dagger 1.x is abandoned (no releases since 2016). Migrate to Hilt."
+    replacement: "com.google.dagger:hilt-android"
+    migration_url: "https://dagger.dev/hilt/"
+    verified_at: "2024-01-01"
+
+  # ---------------------------------------------------------------------------
+  # Reactive programming
+  # ---------------------------------------------------------------------------
+
+  - id: "LIB-008"
+    coordinate: "io.reactivex:rxjava"
+    severity: "high"
+    reason: "RxJava 1.x reached end-of-life in March 2018."
+    replacement: "io.reactivex.rxjava3:rxjava or org.jetbrains.kotlinx:kotlinx-coroutines-core"
+    migration_url: "https://github.com/ReactiveX/RxJava/wiki/What%27s-different-in-3.0"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-009"
+    coordinate: "io.reactivex:rxandroid"
+    severity: "high"
+    reason: "RxAndroid 1.x (paired with RxJava 1.x) is end-of-life."
+    replacement: "io.reactivex.rxjava3:rxandroid"
+    migration_url: null
+    verified_at: "2024-01-01"
+
+  - id: "LIB-010"
+    coordinate: "io.reactivex.rxjava2:rxjava"
+    severity: "medium"
+    reason: "RxJava 2.x is in maintenance-only mode since 2021. Prefer RxJava 3 or Kotlin Coroutines."
+    replacement: "io.reactivex.rxjava3:rxjava or org.jetbrains.kotlinx:kotlinx-coroutines-core"
+    migration_url: "https://github.com/ReactiveX/RxJava/wiki/What%27s-different-in-3.0"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-011"
+    coordinate: "io.reactivex.rxjava2:rxandroid"
+    severity: "medium"
+    reason: "RxAndroid 2.x is in maintenance-only mode. Prefer RxJava 3 or Kotlin Coroutines."
+    replacement: "io.reactivex.rxjava3:rxandroid"
+    migration_url: null
+    verified_at: "2024-01-01"
+
+  # ---------------------------------------------------------------------------
+  # Crash reporting / analytics (legacy Fabric SDK)
+  # ---------------------------------------------------------------------------
+
+  - id: "LIB-012"
+    coordinate: "com.crashlytics.sdk.android:crashlytics"
+    severity: "high"
+    reason: "Legacy Fabric Crashlytics SDK. Fabric was shut down in 2021."
+    replacement: "com.google.firebase:firebase-crashlytics"
+    migration_url: "https://firebase.google.com/docs/crashlytics/migrate-from-fabric"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-013"
+    coordinate: "io.fabric.sdk.android:fabric"
+    severity: "high"
+    reason: "The Fabric SDK platform was shut down in 2021."
+    replacement: "com.google.firebase:firebase-crashlytics"
+    migration_url: "https://firebase.google.com/docs/crashlytics/migrate-from-fabric"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-014"
+    coordinate: "com.google.firebase:firebase-crash"
+    severity: "high"
+    reason: "firebase-crash is deprecated and removed. Crashlytics is the replacement."
+    replacement: "com.google.firebase:firebase-crashlytics"
+    migration_url: "https://firebase.google.com/docs/crashlytics"
+    verified_at: "2024-01-01"
+
+  # ---------------------------------------------------------------------------
+  # Android Support Library → AndroidX
+  # ---------------------------------------------------------------------------
+
+  - id: "LIB-015"
+    coordinate: "com.android.support:appcompat-v7"
+    severity: "high"
+    reason: "The Android Support Library was superseded by AndroidX in 2018."
+    replacement: "androidx.appcompat:appcompat"
+    migration_url: "https://developer.android.com/jetpack/androidx/migrate"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-016"
+    coordinate: "com.android.support:recyclerview-v7"
+    severity: "high"
+    reason: "The Android Support Library was superseded by AndroidX in 2018."
+    replacement: "androidx.recyclerview:recyclerview"
+    migration_url: "https://developer.android.com/jetpack/androidx/migrate"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-017"
+    coordinate: "com.android.support:design"
+    severity: "high"
+    reason: "The Android Support Library was superseded by AndroidX in 2018."
+    replacement: "com.google.android.material:material"
+    migration_url: "https://developer.android.com/jetpack/androidx/migrate"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-018"
+    coordinate: "com.android.support:support-v4"
+    severity: "high"
+    reason: "The Android Support Library was superseded by AndroidX in 2018."
+    replacement: "androidx.legacy:legacy-support-v4"
+    migration_url: "https://developer.android.com/jetpack/androidx/migrate"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-019"
+    coordinate: "com.android.support:support-annotations"
+    severity: "high"
+    reason: "The Android Support Library was superseded by AndroidX in 2018."
+    replacement: "androidx.annotation:annotation"
+    migration_url: "https://developer.android.com/jetpack/androidx/migrate"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-020"
+    coordinate: "com.android.support:multidex"
+    severity: "high"
+    reason: "The Android Support Library was superseded by AndroidX in 2018."
+    replacement: "androidx.multidex:multidex"
+    migration_url: "https://developer.android.com/jetpack/androidx/migrate"
+    verified_at: "2024-01-01"
+
+  # ---------------------------------------------------------------------------
+  # Android Test Support Library → AndroidX Test
+  # ---------------------------------------------------------------------------
+
+  - id: "LIB-021"
+    coordinate: "com.android.support.test:runner"
+    severity: "high"
+    reason: "Android Test Support Library was superseded by AndroidX Test."
+    replacement: "androidx.test:runner"
+    migration_url: "https://developer.android.com/training/testing/instrumented-tests/androidx-test-libraries/runner"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-022"
+    coordinate: "com.android.support.test.espresso:espresso-core"
+    severity: "high"
+    reason: "Android Test Support Library was superseded by AndroidX Test."
+    replacement: "androidx.test.espresso:espresso-core"
+    migration_url: "https://developer.android.com/training/testing"
+    verified_at: "2024-01-01"
+
+  # ---------------------------------------------------------------------------
+  # Android Architecture Components (pre-AndroidX)
+  # ---------------------------------------------------------------------------
+
+  - id: "LIB-023"
+    coordinate: "android.arch.lifecycle:extensions"
+    severity: "high"
+    reason: "android.arch.* artifacts were relocated to AndroidX Lifecycle."
+    replacement: "androidx.lifecycle:lifecycle-extensions"
+    migration_url: "https://developer.android.com/jetpack/androidx/migrate"
+    verified_at: "2024-01-01"
+
+  - id: "LIB-024"
+    coordinate: "android.arch.persistence.room:runtime"
+    severity: "high"
+    reason: "android.arch.* artifacts were relocated to AndroidX Room."
+    replacement: "androidx.room:room-runtime"
+    migration_url: "https://developer.android.com/jetpack/androidx/migrate"
+    verified_at: "2024-01-01"
+
+  # ---------------------------------------------------------------------------
+  # EventBus (group rename)
+  # ---------------------------------------------------------------------------
+
+  - id: "LIB-025"
+    coordinate: "de.greenrobot:eventbus"
+    severity: "high"
+    reason: "EventBus moved to a new Maven group ID in version 3.0 (2016)."
+    replacement: "org.greenrobot:eventbus"
+    migration_url: "https://greenrobot.org/eventbus/documentation/how-to-get-started/"
+    verified_at: "2024-01-01"
+
+  # ---------------------------------------------------------------------------
+  # Date/Time
+  # ---------------------------------------------------------------------------
+
+  - id: "LIB-026"
+    coordinate: "net.danlew:android.joda"
+    severity: "medium"
+    reason: "Joda-Time for Android is in maintenance mode. java.time is available natively from API 26."
+    replacement: "com.jakewharton.threetenabp:threetenabp (API < 26) or java.time (API 26+)"
+    migration_url: null
+    verified_at: "2024-01-01"

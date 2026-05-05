@@ -9,6 +9,7 @@ from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisor
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding, Severity
+from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
 
@@ -48,6 +49,7 @@ def _render(report: FreezeReport) -> str:
         _security_section(list(report.vulnerable_libraries)),
         _compliance_section(list(report.compliance_findings)),
         _toolchain_section(list(report.toolchain_findings)),
+        _library_health_section(list(report.library_health_findings)),
     ]
     return "\n\n".join(s for s in sections if s) + "\n"
 
@@ -202,4 +204,33 @@ def _health_section(findings: list[Finding]) -> str:
         "| Severity | Rule | Message |\n"
         "|---|---|---|\n"
         f"{rows}"
+    )
+
+
+_LIBRARY_HEALTH_SEVERITY_ICON: dict[LibraryHealthSeverity, str] = {
+    LibraryHealthSeverity.HIGH: "🔴",
+    LibraryHealthSeverity.MEDIUM: "🟡",
+    LibraryHealthSeverity.LOW: "🔵",
+}
+
+
+def _library_health_section(findings: list[LibraryHealthFinding]) -> str:
+    if not findings:
+        return ""
+    rows: list[str] = []
+    for f in sorted(findings, key=lambda x: (x.severity, x.alias)):
+        icon = _LIBRARY_HEALTH_SEVERITY_ICON.get(f.severity, "⚪")
+        replacement = f" → `{f.replacement}`" if f.replacement else ""
+        migration = f" ([migration]({f.migration_url}))" if f.migration_url else ""
+        rows.append(
+            f"| {icon} {f.severity.upper()} | `{f.alias}` | `{f.coordinate}` "
+            f"| `{f.version}` | {f.signal.upper()} | {f.message}{replacement}{migration} |"
+        )
+    noun = "finding" if len(findings) == 1 else "findings"
+    return (
+        f"## Library Health ({len(findings)} {noun})\n\n"
+        "> Detected via curated knowledge base, Maven POM relocation tags, "
+        "and inactivity heuristics.\n\n"
+        "| Severity | Alias | Coordinate | Version | Signal | Details |\n"
+        "|---|---|---|---|---|---|\n" + "\n".join(rows)
     )
