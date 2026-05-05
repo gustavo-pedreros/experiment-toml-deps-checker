@@ -1,6 +1,6 @@
 # RFC-0003: Diff between freeze reports
 
-**Status:** Proposed
+**Status:** Shipped — domain, use case, JSON loader (Step 11) + diff writers, CLI command, Rich console (Step 12)
 **Created:** 2026-05-03
 **Related JTBDs:** JTBD-5
 **Depends on:** Markdown / JSON output (Phase 1)
