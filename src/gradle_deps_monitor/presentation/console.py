@@ -255,6 +255,22 @@ def print_summary(
                 f"  {entry.pinned_version} → [bold]{entry.latest_version}[/bold]{link}"
             )
 
+    # --- Module usage map ---
+    if report.module_usage_map is not None:
+        um = report.module_usage_map
+        in_use = um.libraries_in_use()
+        con.print()
+        con.print(
+            f"[bold]Module Usage Map[/bold] — "
+            f"{um.modules_scanned} modules scanned, "
+            f"{len(in_use)} libraries referenced"
+        )
+        for u in sorted(in_use, key=lambda x: -x.direct_count)[:5]:
+            api_note = f"  [dim]({u.api_count} via api)[/dim]" if u.api_count else ""
+            con.print(f"  [cyan]{u.alias}[/cyan] — {u.direct_count} direct{api_note}")
+        if len(in_use) > 5:
+            con.print(f"  [dim]…and {len(in_use) - 5} more (see report)[/dim]")
+
     # --- Written files ---
     if written_files:
         con.print()

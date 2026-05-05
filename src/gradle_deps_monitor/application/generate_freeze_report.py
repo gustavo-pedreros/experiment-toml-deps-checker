@@ -10,6 +10,7 @@ from gradle_deps_monitor.application.ports.changelog_fetcher import ChangelogFet
 from gradle_deps_monitor.application.ports.compliance_checker import ComplianceChecker
 from gradle_deps_monitor.application.ports.health_checker import HealthChecker
 from gradle_deps_monitor.application.ports.library_health_checker import LibraryHealthChecker
+from gradle_deps_monitor.application.ports.module_usage_scanner import ModuleUsageScanner
 from gradle_deps_monitor.application.ports.toolchain_checker import ToolchainChecker
 from gradle_deps_monitor.application.ports.vulnerability_scanner import VulnerabilityScanner
 from gradle_deps_monitor.domain import FreezeReport
@@ -17,6 +18,7 @@ from gradle_deps_monitor.domain.advisory import LibraryAdvisory
 from gradle_deps_monitor.domain.changelog import ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
+from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 
 
@@ -43,6 +45,7 @@ class GenerateFreezeReport:
         toolchain_checker: ToolchainChecker | None = None,
         library_health_checker: LibraryHealthChecker | None = None,
         changelog_fetcher: ChangelogFetcher | None = None,
+        module_usage_scanner: ModuleUsageScanner | None = None,
     ) -> None:
         self._parser = catalog_parser
         self._health_checker = health_checker
@@ -51,6 +54,7 @@ class GenerateFreezeReport:
         self._toolchain_checker = toolchain_checker
         self._library_health_checker = library_health_checker
         self._changelog_fetcher = changelog_fetcher
+        self._module_usage_scanner = module_usage_scanner
 
     def execute(self, catalog_path: Path) -> FreezeReport:
         """Parse *catalog_path* and return a :class:`~gradle_deps_monitor.domain.FreezeReport`.
@@ -88,6 +92,10 @@ class GenerateFreezeReport:
             libraries = tuple(catalog.libraries)
             changelog_entries = asyncio.run(self._changelog_fetcher.fetch(libraries))
 
+        module_usage_map: ModuleUsageMap | None = None
+        if self._module_usage_scanner is not None:
+            module_usage_map = self._module_usage_scanner.scan(catalog_path, catalog)
+
         return FreezeReport(
             catalog=catalog,
             health_findings=findings,
@@ -96,4 +104,5 @@ class GenerateFreezeReport:
             toolchain_findings=toolchain_findings,
             library_health_findings=library_health_findings,
             changelog_entries=changelog_entries,
+            module_usage_map=module_usage_map,
         )

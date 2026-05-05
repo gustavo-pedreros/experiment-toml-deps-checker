@@ -13,6 +13,7 @@ from gradle_deps_monitor.domain.changelog import ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding
 from gradle_deps_monitor.domain.finding import Finding
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
+from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 
 
@@ -80,6 +81,7 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
             "has_breaking": report.has_breaking_upgrades,
             "entries": [_changelog_entry(e) for e in report.changelog_entries],
         },
+        "module_usage_map": _module_usage_map(report.module_usage_map),
     }
 
 
@@ -192,6 +194,32 @@ def _changelog_entry(e: ChangelogEntry) -> dict[str, Any]:
     if e.snippet:
         result["snippet"] = e.snippet
     return result
+
+
+def _module_usage_map(usage_map: ModuleUsageMap | None) -> dict[str, Any] | None:
+    if usage_map is None:
+        return None
+    return {
+        "modules_scanned": usage_map.modules_scanned,
+        "library_usages": [
+            {
+                "alias": u.alias,
+                "coordinate": u.coordinate,
+                "implementation_count": len(u.implementation_modules),
+                "api_count": u.api_count,
+                "test_count": len(u.test_modules),
+                "direct_count": u.direct_count,
+                "implementation_modules": list(u.implementation_modules),
+                "api_modules": list(u.api_modules),
+                "test_modules": list(u.test_modules),
+            }
+            for u in usage_map.libraries_in_use()
+        ],
+        "top_modules": [
+            {"module_path": m.module_path, "direct_dep_count": m.direct_dep_count}
+            for m in usage_map.top_modules(10)
+        ],
+    }
 
 
 def _finding(f: Finding) -> dict[str, Any]:

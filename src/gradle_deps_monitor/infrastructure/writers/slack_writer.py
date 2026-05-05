@@ -12,6 +12,7 @@ from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding, Severity
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
+from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
 # Maximum number of non-stable library entries shown in the Slack message.
@@ -87,6 +88,11 @@ def _build_payload(report: FreezeReport) -> dict[str, Any]:
     if changelog_block:
         blocks.append({"type": "divider"})
         blocks.append(changelog_block)
+
+    module_block = _module_usage_block(report.module_usage_map)
+    if module_block:
+        blocks.append({"type": "divider"})
+        blocks.append(module_block)
 
     return {"blocks": blocks}
 
@@ -304,6 +310,38 @@ def _changelog_block(entries: list[ChangelogEntry]) -> dict[str, Any] | None:
     noun = "upgrade" if len(entries) == 1 else "upgrades"
     text = f":arrow_up: *Major Upgrades Available — {len(entries)} {noun}:*\n"
     text += "\n".join(lines)
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+
+# Maximum module usage entries shown in Slack.
+_MAX_MODULE_USAGE = 8
+
+
+def _module_usage_block(usage_map: ModuleUsageMap | None) -> dict[str, Any] | None:
+    """Return a module usage summary block, or ``None`` when scan was not run."""
+    if usage_map is None:
+        return None
+
+    in_use = list(usage_map.libraries_in_use())
+    top_mods = list(usage_map.top_modules(5))
+
+    lib_lines = [
+        f"• `{u.alias}` — {u.direct_count} direct"
+        + (f", {u.api_count} via api" if u.api_count else "")
+        for u in sorted(in_use, key=lambda x: -x.direct_count)[:_MAX_MODULE_USAGE]
+    ]
+    if len(in_use) > _MAX_MODULE_USAGE:
+        lib_lines.append(f"_…and {len(in_use) - _MAX_MODULE_USAGE} more_")
+
+    mod_lines = [f"• `{m.module_path}` — {m.direct_dep_count} deps" for m in top_mods]
+
+    text = (
+        f":world_map: *Module Usage Map — {usage_map.modules_scanned} modules scanned:*\n"
+        + "\n".join(lib_lines)
+    )
+    if mod_lines:
+        text += "\n\n*Top modules by dep count:*\n" + "\n".join(mod_lines)
+
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
 

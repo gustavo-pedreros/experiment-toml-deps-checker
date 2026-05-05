@@ -11,6 +11,7 @@ from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding, Severity
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
+from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
 
@@ -52,6 +53,7 @@ def _render(report: FreezeReport) -> str:
         _toolchain_section(list(report.toolchain_findings)),
         _library_health_section(list(report.library_health_findings)),
         _changelog_section(list(report.changelog_entries)),
+        _module_usage_section(report.module_usage_map),
     ]
     return "\n\n".join(s for s in sections if s) + "\n"
 
@@ -264,4 +266,53 @@ def _library_health_section(findings: list[LibraryHealthFinding]) -> str:
         "and inactivity heuristics.\n\n"
         "| Severity | Alias | Coordinate | Version | Signal | Details |\n"
         "|---|---|---|---|---|---|\n" + "\n".join(rows)
+    )
+
+
+_MODULE_USAGE_TOP_N = 10
+
+
+def _module_usage_section(usage_map: ModuleUsageMap | None) -> str:
+    if usage_map is None:
+        return ""
+    in_use = list(usage_map.libraries_in_use())
+    if not in_use:
+        return (
+            f"## Module Usage Map ({usage_map.modules_scanned} modules scanned)\n\n"
+            "> No catalog libraries were referenced in the scanned build files."
+        )
+
+    # --- per-library table (only libraries with at least one usage) ---
+    lib_rows = "\n".join(
+        f"| `{u.alias}` | `{u.coordinate}` "
+        f"| {len(u.implementation_modules)} "
+        f"| {u.api_count} "
+        f"| {u.test_only_count} |"
+        for u in sorted(in_use, key=lambda x: (-x.direct_count, x.alias))
+    )
+    lib_table = (
+        "### Libraries with usage\n\n"
+        "| Alias | Coordinate | impl | api | test only |\n"
+        "|---|---|---|---|---|\n"
+        f"{lib_rows}"
+    )
+
+    # --- top-N modules table ---
+    top = list(usage_map.top_modules(_MODULE_USAGE_TOP_N))
+    mod_rows = "\n".join(f"| `{m.module_path}` | {m.direct_dep_count} |" for m in top)
+    top_label = f"Top {len(top)}" if len(top) == _MODULE_USAGE_TOP_N else f"{len(top)}"
+    mod_table = (
+        f"### {top_label} modules by direct dependency count\n\n"
+        "| Module | Direct deps |\n"
+        "|---|---|\n"
+        f"{mod_rows}"
+    )
+
+    scanned = usage_map.modules_scanned
+    return (
+        f"## Module Usage Map ({scanned} {'module' if scanned == 1 else 'modules'} scanned)\n\n"
+        "> Static analysis of `build.gradle(.kts)` files. "
+        "Only the dotted-accessor form (`libs.foo.bar`) is matched.\n\n"
+        f"{lib_table}\n\n"
+        f"{mod_table}"
     )

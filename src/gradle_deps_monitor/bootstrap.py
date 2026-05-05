@@ -29,6 +29,7 @@ from gradle_deps_monitor.infrastructure.scanners.composite_scanner import Compos
 from gradle_deps_monitor.infrastructure.scanners.github_advisory_scanner import (
     GitHubAdvisoryScanner,
 )
+from gradle_deps_monitor.infrastructure.scanners.gradle_module_scanner import GradleModuleScanner
 from gradle_deps_monitor.infrastructure.scanners.oss_index_scanner import OssIndexScanner
 from gradle_deps_monitor.infrastructure.writers.diff_json_writer import DiffJsonWriter
 from gradle_deps_monitor.infrastructure.writers.diff_markdown_writer import DiffMarkdownWriter
@@ -67,8 +68,13 @@ def _build_scanner() -> CompositeScanner | GitHubAdvisoryScanner | OssIndexScann
     return gh_scanner or oss_scanner
 
 
-def create_check_command() -> CheckCommand:
+def create_check_command(*, module_usage: bool = False) -> CheckCommand:
     """Return a fully wired :class:`~...presentation.commands.check_command.CheckCommand`.
+
+    :param module_usage: When ``True``, wire a
+        :class:`~...infrastructure.scanners.gradle_module_scanner.GradleModuleScanner`
+        into the use case so that module usage data is included in reports.
+        Defaults to ``False`` (opt-in, slower on large projects).
 
     Concrete adapters created here:
 
@@ -88,6 +94,7 @@ def create_check_command() -> CheckCommand:
         toolchain_checker=ToolchainCompatibilityChecker(),
         library_health_checker=LibraryHealthChecker(),
         changelog_fetcher=ChangelogFetcher(github_token=gh_token),
+        module_usage_scanner=GradleModuleScanner() if module_usage else None,
     )
     return CheckCommand(
         use_case=use_case,
