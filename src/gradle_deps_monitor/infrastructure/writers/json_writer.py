@@ -9,6 +9,7 @@ from typing import Any
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import Advisory, LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
+from gradle_deps_monitor.domain.changelog import ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding
 from gradle_deps_monitor.domain.finding import Finding
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
@@ -73,6 +74,11 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
             "finding_count": len(report.library_health_findings),
             "has_deprecated": report.has_deprecated_libraries,
             "findings": [_library_health_finding(f) for f in report.library_health_findings],
+        },
+        "major_upgrades": {
+            "upgrade_count": len(report.changelog_entries),
+            "has_breaking": report.has_breaking_upgrades,
+            "entries": [_changelog_entry(e) for e in report.changelog_entries],
         },
     }
 
@@ -170,6 +176,21 @@ def _library_health_finding(f: LibraryHealthFinding) -> dict[str, Any]:
         result["migration_url"] = f.migration_url
     if f.days_since_release is not None:
         result["days_since_release"] = f.days_since_release
+    return result
+
+
+def _changelog_entry(e: ChangelogEntry) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "alias": e.alias,
+        "coordinate": e.coordinate,
+        "pinned_version": e.pinned_version,
+        "latest_version": e.latest_version,
+        "breaking_signal": e.breaking_signal.value,
+    }
+    if e.changelog_url:
+        result["changelog_url"] = e.changelog_url
+    if e.snippet:
+        result["snippet"] = e.snippet
     return result
 
 

@@ -7,6 +7,7 @@ from pathlib import Path
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
+from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding, Severity
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
@@ -50,6 +51,7 @@ def _render(report: FreezeReport) -> str:
         _compliance_section(list(report.compliance_findings)),
         _toolchain_section(list(report.toolchain_findings)),
         _library_health_section(list(report.library_health_findings)),
+        _changelog_section(list(report.changelog_entries)),
     ]
     return "\n\n".join(s for s in sections if s) + "\n"
 
@@ -204,6 +206,35 @@ def _health_section(findings: list[Finding]) -> str:
         "| Severity | Rule | Message |\n"
         "|---|---|---|\n"
         f"{rows}"
+    )
+
+
+_BREAKING_SIGNAL_ICON: dict[BreakingSignal, str] = {
+    BreakingSignal.LIKELY: "🔴",
+    BreakingSignal.CLEAN: "🟢",
+    BreakingSignal.UNKNOWN: "⚪",
+}
+
+
+def _changelog_section(entries: list[ChangelogEntry]) -> str:
+    if not entries:
+        return ""
+    rows: list[str] = []
+    for e in sorted(entries, key=lambda x: x.alias):
+        icon = _BREAKING_SIGNAL_ICON.get(e.breaking_signal, "⚪")
+        link = f" [release notes]({e.changelog_url})" if e.changelog_url else ""
+        snippet = f" — _{e.snippet}_" if e.snippet else ""
+        rows.append(
+            f"| `{e.alias}` | `{e.coordinate}` | `{e.pinned_version}` "
+            f"| `{e.latest_version}` | {icon} {e.breaking_signal.upper()}"
+            f" |{link}{snippet} |"
+        )
+    noun = "upgrade" if len(entries) == 1 else "upgrades"
+    return (
+        f"## Major Upgrades ({len(entries)} {noun} available)\n\n"
+        "> Breaking-change signal is a heuristic based on release note keywords.\n\n"
+        "| Alias | Coordinate | Pinned | Latest | Breaking? | Notes |\n"
+        "|---|---|---|---|---|---|\n" + "\n".join(rows)
     )
 
 

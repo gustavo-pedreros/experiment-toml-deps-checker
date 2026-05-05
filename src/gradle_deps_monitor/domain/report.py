@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 from gradle_deps_monitor.domain.advisory import LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Catalog
+from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding
 from gradle_deps_monitor.domain.library_health import (
@@ -35,6 +36,7 @@ class FreezeReport:
     compliance_findings: tuple[ComplianceFinding, ...] = field(default_factory=tuple)
     toolchain_findings: tuple[ToolchainFinding, ...] = field(default_factory=tuple)
     library_health_findings: tuple[LibraryHealthFinding, ...] = field(default_factory=tuple)
+    changelog_entries: tuple[ChangelogEntry, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         if self.generated_at.tzinfo is None:
@@ -98,3 +100,15 @@ class FreezeReport:
     def has_high_health_findings(self) -> bool:
         """``True`` when any library health finding has HIGH severity."""
         return any(f.severity == LibraryHealthSeverity.HIGH for f in self.library_health_findings)
+
+    @property
+    def breaking_upgrades(self) -> tuple[ChangelogEntry, ...]:
+        """Changelog entries where breaking changes are likely."""
+        return tuple(
+            e for e in self.changelog_entries if e.breaking_signal == BreakingSignal.LIKELY
+        )
+
+    @property
+    def has_breaking_upgrades(self) -> bool:
+        """``True`` when at least one major upgrade has breaking changes likely."""
+        return bool(self.breaking_upgrades)

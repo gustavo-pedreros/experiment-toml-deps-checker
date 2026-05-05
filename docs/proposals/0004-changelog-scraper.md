@@ -1,6 +1,6 @@
 # RFC-0004: Changelog scraping for major upgrades
 
-**Status:** Proposed
+**Status:** In progress
 **Created:** 2026-05-03
 **Related JTBDs:** JTBD-6
 **Depends on:** none
