@@ -1,6 +1,6 @@
 # RFC-0004: Changelog scraping for major upgrades
 
-**Status:** In progress
+**Status:** Shipped — GitHub Releases API + CHANGELOG.md fallback + breaking-change heuristic (Step 18)
 **Created:** 2026-05-03
 **Related JTBDs:** JTBD-6
 **Depends on:** none
