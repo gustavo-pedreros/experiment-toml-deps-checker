@@ -1,6 +1,6 @@
 # RFC-0011: Catalog health audit
 
-**Status:** Proposed
+**Status:** Shipped — 8 pluggable catalog health rules (Step 8)
 **Created:** 2026-05-03
 **Related JTBDs:** JTBD-3
 **Depends on:** none
