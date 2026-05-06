@@ -52,3 +52,4 @@ List both positive and negative consequences honestly.
 - [ADR-0005](0005-language-convention-english-in-repo.md) — Repo content is in English regardless of contributor language
 - [ADR-0006](0006-pragmatic-clean-architecture.md) — Pragmatic Clean Architecture for the Python CLI
 - [ADR-0007](0007-tooling-stack.md) — Tooling stack (Python 3.11+, ruff, pytest, mypy, typer, pipx/uv)
+- [ADR-0008](0008-json-schema-semver.md) — JSON output `schema_version` follows SemVer (`x.y.z`)

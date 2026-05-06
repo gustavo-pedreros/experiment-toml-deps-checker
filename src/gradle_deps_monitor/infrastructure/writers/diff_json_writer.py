@@ -14,11 +14,15 @@ from gradle_deps_monitor.domain.diff import (
     VersionBump,
 )
 
+# Schema version for the freeze-diff.json output. Follows SemVer per ADR-0008,
+# bumped independently from the freeze.json schema version.
+SCHEMA_VERSION = "1.0.0"
+
 
 class DiffJsonWriter:
     """Writes a :class:`~gradle_deps_monitor.domain.diff.FreezeDiff` as pretty-printed JSON.
 
-    Schema version: ``"diff-1"``.
+    Schema version: see :data:`SCHEMA_VERSION` (currently ``"1.0.0"``).
     """
 
     def write(self, diff: FreezeDiff, dest: Path) -> None:
@@ -41,7 +45,7 @@ def _serialise(diff: FreezeDiff) -> dict[str, Any]:
     )
 
     return {
-        "schema_version": "diff-1",
+        "schema_version": SCHEMA_VERSION,
         "before_generated_at": before_ts,
         "after_generated_at": diff.after_generated_at.isoformat(timespec="seconds"),
         "is_baseline": diff.is_baseline,

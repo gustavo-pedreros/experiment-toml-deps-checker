@@ -10,6 +10,13 @@ venv.bak/
 # Legacy script output (pre-migration)
 dependency_status.json
 
+# Tool output written by `gradle-deps-monitor check` and `... diff`
+# (committable freeze reports live under `freeze-reports/`, not `reports/`)
+reports/
+
+# Local agent / tooling sandboxes
+.claude/
+
 # Python bytecode and compiled artifacts
 __pycache__/
 *.py[cod]

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Read the roadmap
+    url: https://github.com/gustavo-pedreros/toml-deps-checker/blob/main/docs/roadmap.md
+    about: See what is shipped, in progress, and on the backlog before opening an issue.
+  - name: Browse the proposals
+    url: https://github.com/gustavo-pedreros/toml-deps-checker/blob/main/docs/proposals/README.md
+    about: Significant changes start as a proposal under docs/proposals/.

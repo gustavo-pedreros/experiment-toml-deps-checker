@@ -14,7 +14,14 @@ from gradle_deps_monitor.application.ports.snapshot_loader import (
     PluginSnapshot,
 )
 
-_SUPPORTED_SCHEMA_VERSIONS = {"1"}
+# Compatibility window for ``schema_version``.
+#
+# Per ADR-0008, the JSON schema follows SemVer. The loader accepts any MINOR
+# bump within ``_SUPPORTED_MAJOR`` and tolerates unknown additive fields. The
+# legacy literal ``"1"`` is also accepted to keep older committed reports
+# loadable.
+_SUPPORTED_MAJOR = "1"
+_LEGACY_VERSIONS = {"1"}
 
 
 class JsonSnapshotLoader:
@@ -47,12 +54,21 @@ class JsonSnapshotLoader:
 # ---------------------------------------------------------------------------
 
 
+def _is_supported_schema(schema: object) -> bool:
+    if not isinstance(schema, str) or not schema:
+        return False
+    if schema in _LEGACY_VERSIONS:
+        return True
+    head = schema.split(".", 1)[0]
+    return head == _SUPPORTED_MAJOR
+
+
 def _parse(data: dict[str, Any], path: Path) -> FreezeSnapshot:
     schema = data.get("schema_version", "")
-    if schema not in _SUPPORTED_SCHEMA_VERSIONS:
+    if not _is_supported_schema(schema):
         raise ValueError(
             f"Unsupported schema_version {schema!r} in {path}. "
-            f"Supported: {sorted(_SUPPORTED_SCHEMA_VERSIONS)}"
+            f"Supported: {_SUPPORTED_MAJOR}.x.y (or legacy {sorted(_LEGACY_VERSIONS)})"
         )
 
     try:

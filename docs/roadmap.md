@@ -65,11 +65,31 @@ Android teams at scale.
 
 ## Phase 4 — Polish and consolidation
 
+Phase 4 closes the gaps discovered while integrating Phases 1–3
+end-to-end: dead infrastructure adapters, hard-coded config, BoM
+families treated as independent libraries, the empty compliance
+dimension in the risk score, and the visual inconsistency across
+sections.
+
 | Status | Item | Reference |
 |--------|------|-----------|
 | ✅ | Risk score (opt-in, transparent breakdown, configurable weights) | [RFC-0008](proposals/0008-risk-score.md) |
 | ✅ | License audit | [RFC-0009](proposals/0009-license-audit.md) |
-| 📋 | HTML export | [RFC-0010](proposals/0010-html-export.md) |
+| 📋 | Layered configuration (`gradle-deps-monitor.toml`) | [RFC-0012](proposals/0012-layered-configuration.md) |
+| 📋 | Version status as first-class data | [RFC-0013](proposals/0013-version-status-first-class.md) |
+| 📋 | Maven BoM (Bill of Materials) support | [RFC-0014](proposals/0014-maven-bom-support.md) |
+| 📋 | Compliance per-library attribution | [RFC-0015](proposals/0015-compliance-per-library-attribution.md) |
+| 📋 | Unified report style (severity + row layout) | [RFC-0016](proposals/0016-unified-report-style.md) |
+
+## Backlog
+
+Items accepted into the roadmap but deferred until Phase 4 closes.
+Ordering inside the backlog is not yet fixed; items here may be
+re-promoted into a later phase or split into sub-RFCs.
+
+| Status | Item | Reference |
+|--------|------|-----------|
+| 📋 | HTML export (incorporates risk & freeze trend rendering) | [RFC-0010](proposals/0010-html-export.md) |
 | 💭 | Tag annotation auto-generation | — |
 | 💭 | Trend dashboard across freeze history | — |
 
@@ -77,7 +97,9 @@ Android teams at scale.
 
 Concerns that span all phases.
 
-- Layered configuration (`config.toml` + per-project overrides)
+- Layered configuration (`gradle-deps-monitor.toml` + per-project
+  overrides) — promoted to Phase 4 as
+  [RFC-0012](proposals/0012-layered-configuration.md)
 - CI test suite with real `libs.versions.toml` fixtures
 - `docs/adr/` for accepted decisions
 - `docs/proposals/` for pending proposals
@@ -96,6 +118,7 @@ decisions. The most consequential ones for newcomers:
 - [ADR-0005](adr/0005-language-convention-english-in-repo.md) — All repo content is in English
 - [ADR-0006](adr/0006-pragmatic-clean-architecture.md) — Pragmatic Clean Architecture for the Python CLI
 - [ADR-0007](adr/0007-tooling-stack.md) — Tooling stack
+- [ADR-0008](adr/0008-json-schema-semver.md) — JSON output `schema_version` follows SemVer (`x.y.z`)
 
 ## How to evolve this roadmap
 

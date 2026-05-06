@@ -74,3 +74,12 @@ How will we know this proposal achieved its goal once shipped?
 | [0009](0009-license-audit.md) | License audit | Proposed | 2 |
 | [0010](0010-html-export.md) | HTML export | Proposed | 5 |
 | [0011](0011-catalog-health-audit.md) | Catalog health audit | Proposed | 3 |
+| [0012](0012-layered-configuration.md) | Layered configuration (`gradle-deps-monitor.toml`) | Proposed | cross-cutting |
+| [0013](0013-version-status-first-class.md) | Version status as first-class data | Proposed | 1, 6 |
+| [0014](0014-maven-bom-support.md) | Maven BoM (Bill of Materials) support | Proposed | 1, 3, 6 |
+| [0015](0015-compliance-per-library-attribution.md) | Compliance per-library attribution | Proposed | 2, 6 |
+| [0016](0016-unified-report-style.md) | Unified report style (severity + row layout) | Proposed | 5 |
+
+> Lifecycle status (Accepted, In progress, Shipped) is tracked in
+> [`docs/roadmap.md`](../roadmap.md). The "Status" column above
+> reflects the state at authoring time.
