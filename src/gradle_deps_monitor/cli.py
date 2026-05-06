@@ -75,12 +75,24 @@ def check(
             ),
         ),
     ] = False,
+    risk_score: Annotated[
+        bool,
+        typer.Option(
+            "--risk-score",
+            "-r",
+            help=(
+                "Compute a 0-100 composite risk score per library and include a ranked "
+                "breakdown in reports (opt-in; experimental — see ADR-0004)."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Generate a freeze report for the given Gradle catalog directory."""
     try:
-        report, written_files = bootstrap.create_check_command(module_usage=module_usage).run(
-            catalog_path, output_dir
-        )
+        report, written_files = bootstrap.create_check_command(
+            module_usage=module_usage,
+            risk_score=risk_score,
+        ).run(catalog_path, output_dir)
     except CatalogParseError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc

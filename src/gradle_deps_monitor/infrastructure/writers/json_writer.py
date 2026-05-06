@@ -15,6 +15,7 @@ from gradle_deps_monitor.domain.finding import Finding
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
 from gradle_deps_monitor.domain.license import LicenseAudit
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
+from gradle_deps_monitor.domain.risk_score import RiskScoreReport
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 
 
@@ -84,6 +85,7 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
         },
         "module_usage_map": _module_usage_map(report.module_usage_map),
         "license_audit": _license_audit(report.license_audit),
+        "risk_score": _risk_score(report.risk_score_report),
     }
 
 
@@ -233,6 +235,50 @@ def _finding(f: Finding) -> dict[str, Any]:
     if f.details:
         result["details"] = f.details
     return result
+
+
+def _risk_score(rsr: RiskScoreReport | None) -> dict[str, Any] | None:
+    if rsr is None:
+        return None
+    return {
+        "libraries_scored": rsr.libraries_scored,
+        "avg_score": round(rsr.avg_score, 1),
+        "max_score": rsr.max_score,
+        "critical_count": rsr.critical_count,
+        "high_count": rsr.high_count,
+        "weights": {
+            "outdatedness": rsr.weights.outdatedness,
+            "cve": rsr.weights.cve,
+            "abandonment": rsr.weights.abandonment,
+            "blast_radius": rsr.weights.blast_radius,
+            "compliance": rsr.weights.compliance,
+            "license": rsr.weights.license,
+        },
+        "thresholds": {
+            "critical": rsr.thresholds.critical,
+            "high": rsr.thresholds.high,
+            "medium": rsr.thresholds.medium,
+        },
+        "top_libraries": [
+            {
+                "alias": lib.alias,
+                "coordinate": lib.coordinate,
+                "version": lib.version,
+                "total_score": lib.total_score,
+                "level": lib.level.value,
+                "breakdown": [
+                    {
+                        "dimension": d.name,
+                        "score": d.score,
+                        "cap": d.cap,
+                        "detail": d.detail,
+                    }
+                    for d in lib.breakdown
+                ],
+            }
+            for lib in rsr.top
+        ],
+    }
 
 
 def _license_audit(audit: LicenseAudit | None) -> dict[str, Any] | None:

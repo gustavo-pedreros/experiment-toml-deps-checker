@@ -15,6 +15,7 @@ from gradle_deps_monitor.domain.compliance import ComplianceSeverity
 from gradle_deps_monitor.domain.diff import FreezeDiff
 from gradle_deps_monitor.domain.library_health import LibraryHealthSeverity
 from gradle_deps_monitor.domain.license import LicenseTier
+from gradle_deps_monitor.domain.risk_score import RiskLevel, RiskScoreReport
 from gradle_deps_monitor.domain.toolchain import ToolchainSeverity
 from gradle_deps_monitor.domain.version import Stability
 
@@ -316,6 +317,10 @@ def print_summary(
                     "permissive[/dim]"
                 )
 
+    # --- Risk score ---
+    if report.risk_score_report is not None:
+        _print_risk_score(report.risk_score_report, con)
+
     # --- Written files ---
     if written_files:
         con.print()
@@ -323,6 +328,53 @@ def print_summary(
         con.print(f"[bold]Reports written[/bold] → [blue]{out_dir}[/blue]")
         for path in written_files:
             con.print(f"  [dim]•[/dim] {path.name}")
+
+
+_RISK_LEVEL_STYLE: dict[RiskLevel, str] = {
+    RiskLevel.CRITICAL: "bold red",
+    RiskLevel.HIGH: "bold yellow",
+    RiskLevel.MEDIUM: "yellow",
+    RiskLevel.LOW: "blue",
+    RiskLevel.NONE: "dim",
+}
+
+
+def _print_risk_score(rsr: RiskScoreReport, con: Console) -> None:
+    con.print()
+    top = rsr.top
+    if not top:
+        con.print(
+            f"[green]Risk Score[/green] — "
+            f"{rsr.libraries_scored} libraries scored, no risk signals detected"
+        )
+        return
+
+    critical = rsr.critical_count
+    high = rsr.high_count
+    rs_parts: list[str] = []
+    if critical:
+        rs_parts.append(f"[bold red]{critical} critical[/bold red]")
+    if high:
+        rs_parts.append(f"[bold yellow]{high} high[/bold yellow]")
+    remaining = len(rsr.scored_libraries) - critical - high
+    if remaining > 0:
+        rs_parts.append(f"{remaining} other")
+    con.print(
+        f"[bold]Risk Score[/bold] (experimental) — "
+        f"{len(rsr.scored_libraries)} libraries with non-zero score"
+        + (f": {', '.join(rs_parts)}" if rs_parts else "")
+        + f"  [dim]avg {rsr.avg_score:.1f} · max {rsr.max_score}[/dim]"
+    )
+    for lib in top[:5]:
+        rs_style = _RISK_LEVEL_STYLE.get(lib.level, "")
+        rs_label = lib.level.value.upper()
+        con.print(
+            f"  [{rs_style}]{lib.total_score:3d}[/{rs_style}]  "
+            f"[{rs_style}]{rs_label}[/{rs_style}]  "
+            f"[cyan]{lib.alias}[/cyan]  [dim]{lib.version}[/dim]"
+        )
+    if len(rsr.scored_libraries) > 5:
+        con.print(f"  [dim]…and {len(rsr.scored_libraries) - 5} more (see report)[/dim]")
 
 
 def print_diff_summary(

@@ -15,6 +15,9 @@ Analyses a `libs.versions.toml` version catalog, checks every dependency against
 - **Toolchain compatibility** — validates Kotlin ↔ Compose Compiler, Kotlin ↔ KSP, and AGP ↔ Gradle against bundled compatibility matrices; catches mismatches before they reach QA
 - **Library health** — detects deprecated, relocated, and abandoned libraries via a curated knowledge base (26+ Android-specific entries), Maven POM `<relocation>` tag detection, and an inactivity heuristic based on `maven-metadata.xml` (no credentials required)
 - **Changelog scraper** — for every library with a major upgrade available, discovers the release notes via the GitHub Releases API or a `CHANGELOG.md` fallback; applies a breaking-change heuristic (🔴 likely breaking / 🟢 clean / ⚪ unknown); `GITHUB_TOKEN` optional but increases API rate limit
+- **Module usage map** _(opt-in: `--module-usage`)_ — static analysis of `build.gradle(.kts)` files; shows how many modules use each library via `implementation`, `api`, or test configurations; identifies the heaviest dependency modules
+- **License audit** — fetches Maven POM `<licenses>` metadata for every pinned library and classifies licenses into tiers (Permissive / Weak copyleft / Strong copyleft / Unknown); flags GPL/AGPL dependencies automatically, with Google Maven fallback for `androidx`/`com.google.*` groups
+- **Risk score** _(opt-in: `--risk-score`)_ — composite 0-100 score per library derived from six dimensions: outdatedness, CVE severity, abandonment, blast radius, compliance, and license tier; top-10 breakdown shown in all report formats with configurable weights and thresholds (experimental — see ADR-0004)
 - **Multiple output formats** — Markdown (human-readable), JSON (machine-readable, schema-versioned), and Slack Block Kit (webhook-ready)
 - **Rich console summary** — colour-coded executive summary printed at the end of every run
 - **On-disk HTTP cache** — avoids redundant Maven registry calls; configurable TTL
@@ -55,6 +58,21 @@ By default, reports are written to `./reports/`. Use `--out` to change the desti
 
 ```bash
 gradle-deps-monitor check /path/to/gradle --out freeze-reports/2026-05-04
+```
+
+#### Opt-in features
+
+Two features are disabled by default because they require extra work (file scanning or score computation):
+
+```bash
+# Include a module usage map (scans all build.gradle(.kts) files)
+gradle-deps-monitor check /path/to/gradle --module-usage
+
+# Include a composite risk score per library (experimental)
+gradle-deps-monitor check /path/to/gradle --risk-score
+
+# Both at once
+gradle-deps-monitor check /path/to/gradle --module-usage --risk-score
 ```
 
 ---
@@ -186,7 +204,7 @@ ruff check . && ruff format --check . && mypy src/ && lint-imports && pytest
 ## Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md).  
-Phase 1 (foundation) and Phase 2 (CVE scan, Play Store compliance, freeze diff) are complete. Phase 3 is in progress: toolchain compatibility matrix (RFC-0005), library health (RFC-0006), and changelog scraper (RFC-0004) are shipped; module usage map (RFC-0007) is next.
+Phases 1–3 are fully shipped. Phase 4 (polish and consolidation) is in progress: license audit (RFC-0009) and risk score (RFC-0008) are shipped; HTML export (RFC-0010) is next.
 
 ---
 

@@ -1,6 +1,6 @@
 # RFC-0008: Risk score
 
-**Status:** Proposed
+**Status:** Shipped
 **Created:** 2026-05-03
 **Related JTBDs:** JTBD-6
 **Depends on:** RFC-0001 (CVE), RFC-0002 (compliance), RFC-0006
