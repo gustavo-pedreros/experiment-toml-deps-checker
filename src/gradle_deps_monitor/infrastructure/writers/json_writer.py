@@ -13,6 +13,7 @@ from gradle_deps_monitor.domain.changelog import ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding
 from gradle_deps_monitor.domain.finding import Finding
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
+from gradle_deps_monitor.domain.license import LicenseAudit
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 
@@ -82,6 +83,7 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
             "entries": [_changelog_entry(e) for e in report.changelog_entries],
         },
         "module_usage_map": _module_usage_map(report.module_usage_map),
+        "license_audit": _license_audit(report.license_audit),
     }
 
 
@@ -231,3 +233,25 @@ def _finding(f: Finding) -> dict[str, Any]:
     if f.details:
         result["details"] = f.details
     return result
+
+
+def _license_audit(audit: LicenseAudit | None) -> dict[str, Any] | None:
+    if audit is None:
+        return None
+    return {
+        "libraries_audited": audit.libraries_audited,
+        "flagged_count": audit.flagged_count,
+        "permissive_count": audit.permissive_count,
+        "has_violations": audit.has_violations,
+        "findings": [
+            {
+                "alias": f.alias,
+                "coordinate": f.coordinate,
+                "version": f.version,
+                "tier": f.tier.value,
+                "license_name": f.license_name,
+                "license_url": f.license_url,
+            }
+            for f in audit.findings
+        ],
+    }

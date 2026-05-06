@@ -12,6 +12,7 @@ from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding, Severity
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
+from gradle_deps_monitor.domain.license import LicenseAudit, LicenseTier
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
@@ -93,6 +94,11 @@ def _build_payload(report: FreezeReport) -> dict[str, Any]:
     if module_block:
         blocks.append({"type": "divider"})
         blocks.append(module_block)
+
+    license_block = _license_block(report.license_audit)
+    if license_block:
+        blocks.append({"type": "divider"})
+        blocks.append(license_block)
 
     return {"blocks": blocks}
 
@@ -342,6 +348,50 @@ def _module_usage_block(usage_map: ModuleUsageMap | None) -> dict[str, Any] | No
     if mod_lines:
         text += "\n\n*Top modules by dep count:*\n" + "\n".join(mod_lines)
 
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+
+_LICENSE_TIER_EMOJI: dict[LicenseTier, str] = {
+    LicenseTier.PERMISSIVE: ":white_check_mark:",
+    LicenseTier.WEAK_COPYLEFT: ":warning:",
+    LicenseTier.STRONG_COPYLEFT: ":red_circle:",
+    LicenseTier.UNKNOWN: ":question:",
+}
+# Maximum license findings shown in Slack.
+_MAX_LICENSE = 8
+
+
+def _license_block(audit: LicenseAudit | None) -> dict[str, Any] | None:
+    """Return a license audit block, or ``None`` when no audit was run."""
+    if audit is None:
+        return None
+
+    if not audit.findings:
+        text = (
+            f":scales: *License Audit — {audit.libraries_audited} "
+            f"{'library' if audit.libraries_audited == 1 else 'libraries'} audited, "
+            "all permissive*"
+        )
+        return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+    shown = audit.findings[:_MAX_LICENSE]
+    lines: list[str] = []
+    for f in shown:
+        emoji = _LICENSE_TIER_EMOJI.get(f.tier, ":question:")
+        lic = f.license_name or "_not declared_"
+        lines.append(f"{emoji} `{f.alias}` — {lic} ({f.tier.value.replace('_', ' ')})")
+    if audit.flagged_count > _MAX_LICENSE:
+        lines.append(f"_…and {audit.flagged_count - _MAX_LICENSE} more_")
+    if audit.permissive_count > 0:
+        lines.append(
+            f":white_check_mark: {audit.permissive_count} "
+            f"{'library' if audit.permissive_count == 1 else 'libraries'} permissive"
+        )
+
+    text = (
+        f":scales: *License Audit — {audit.flagged_count} flagged "
+        f"({audit.libraries_audited} total):*\n" + "\n".join(lines)
+    )
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
 
