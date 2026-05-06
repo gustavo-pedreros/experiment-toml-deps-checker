@@ -285,12 +285,8 @@ def print_summary(
             violations = sum(
                 1 for lf in lic_audit.findings if lf.tier == LicenseTier.STRONG_COPYLEFT
             )
-            weak = sum(
-                1 for lf in lic_audit.findings if lf.tier == LicenseTier.WEAK_COPYLEFT
-            )
-            unknown = sum(
-                1 for lf in lic_audit.findings if lf.tier == LicenseTier.UNKNOWN
-            )
+            weak = sum(1 for lf in lic_audit.findings if lf.tier == LicenseTier.WEAK_COPYLEFT)
+            unknown = sum(1 for lf in lic_audit.findings if lf.tier == LicenseTier.UNKNOWN)
             lic_parts: list[str] = []
             if violations:
                 lic_parts.append(f"[bold red]{violations} strong copyleft[/bold red]")
@@ -312,9 +308,7 @@ def print_summary(
                 lic_name = lf.license_name or "not declared"
                 con.print(f"  {tier_str}  [cyan]{lf.alias}[/cyan]  [dim]{lic_name}[/dim]")
             if lic_audit.flagged_count > 5:
-                con.print(
-                    f"  [dim]…and {lic_audit.flagged_count - 5} more (see report)[/dim]"
-                )
+                con.print(f"  [dim]…and {lic_audit.flagged_count - 5} more (see report)[/dim]")
             if lic_audit.permissive_count > 0:
                 con.print(
                     f"  [dim]✅ {lic_audit.permissive_count} "
