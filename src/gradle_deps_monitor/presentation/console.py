@@ -14,6 +14,7 @@ from gradle_deps_monitor.domain.changelog import BreakingSignal
 from gradle_deps_monitor.domain.compliance import ComplianceSeverity
 from gradle_deps_monitor.domain.diff import FreezeDiff
 from gradle_deps_monitor.domain.library_health import LibraryHealthSeverity
+from gradle_deps_monitor.domain.license import LicenseTier
 from gradle_deps_monitor.domain.toolchain import ToolchainSeverity
 from gradle_deps_monitor.domain.version import Stability
 
@@ -270,6 +271,56 @@ def print_summary(
             con.print(f"  [cyan]{u.alias}[/cyan] — {u.direct_count} direct{api_note}")
         if len(in_use) > 5:
             con.print(f"  [dim]…and {len(in_use) - 5} more (see report)[/dim]")
+
+    # --- License audit ---
+    if report.license_audit is not None:
+        lic_audit = report.license_audit
+        con.print()
+        if not lic_audit.findings:
+            con.print(
+                f"[green]License Audit[/green] — "
+                f"all {lic_audit.libraries_audited} libraries use permissive licenses"
+            )
+        else:
+            violations = sum(
+                1 for lf in lic_audit.findings if lf.tier == LicenseTier.STRONG_COPYLEFT
+            )
+            weak = sum(
+                1 for lf in lic_audit.findings if lf.tier == LicenseTier.WEAK_COPYLEFT
+            )
+            unknown = sum(
+                1 for lf in lic_audit.findings if lf.tier == LicenseTier.UNKNOWN
+            )
+            lic_parts: list[str] = []
+            if violations:
+                lic_parts.append(f"[bold red]{violations} strong copyleft[/bold red]")
+            if weak:
+                lic_parts.append(f"[bold yellow]{weak} weak copyleft[/bold yellow]")
+            if unknown:
+                lic_parts.append(f"[dim]{unknown} unknown[/dim]")
+            con.print(
+                f"[bold]License Audit[/bold] — {lic_audit.flagged_count} flagged"
+                + (f": {', '.join(lic_parts)}" if lic_parts else "")
+            )
+            for lf in lic_audit.findings[:5]:
+                if lf.tier == LicenseTier.STRONG_COPYLEFT:
+                    tier_str = "[bold red]strong copyleft[/bold red]"
+                elif lf.tier == LicenseTier.WEAK_COPYLEFT:
+                    tier_str = "[bold yellow]weak copyleft[/bold yellow]"
+                else:
+                    tier_str = "[dim]unknown[/dim]"
+                lic_name = lf.license_name or "not declared"
+                con.print(f"  {tier_str}  [cyan]{lf.alias}[/cyan]  [dim]{lic_name}[/dim]")
+            if lic_audit.flagged_count > 5:
+                con.print(
+                    f"  [dim]…and {lic_audit.flagged_count - 5} more (see report)[/dim]"
+                )
+            if lic_audit.permissive_count > 0:
+                con.print(
+                    f"  [dim]✅ {lic_audit.permissive_count} "
+                    f"{'library' if lic_audit.permissive_count == 1 else 'libraries'} "
+                    "permissive[/dim]"
+                )
 
     # --- Written files ---
     if written_files:

@@ -19,6 +19,7 @@ from gradle_deps_monitor.infrastructure.checkers.library_health_checker import (
 from gradle_deps_monitor.infrastructure.checkers.play_store_compliance_checker import (
     PlayStoreComplianceChecker,
 )
+from gradle_deps_monitor.infrastructure.checkers.pom_license_checker import PomLicenseChecker
 from gradle_deps_monitor.infrastructure.checkers.toolchain_compatibility_checker import (
     ToolchainCompatibilityChecker,
 )
@@ -95,6 +96,7 @@ def create_check_command(*, module_usage: bool = False) -> CheckCommand:
         library_health_checker=LibraryHealthChecker(),
         changelog_fetcher=ChangelogFetcher(github_token=gh_token),
         module_usage_scanner=GradleModuleScanner() if module_usage else None,
+        license_checker=PomLicenseChecker(),
     )
     return CheckCommand(
         use_case=use_case,

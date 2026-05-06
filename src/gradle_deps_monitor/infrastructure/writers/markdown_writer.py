@@ -11,6 +11,7 @@ from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding, Severity
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
+from gradle_deps_monitor.domain.license import LicenseAudit, LicenseFinding, LicenseTier
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
@@ -54,6 +55,7 @@ def _render(report: FreezeReport) -> str:
         _library_health_section(list(report.library_health_findings)),
         _changelog_section(list(report.changelog_entries)),
         _module_usage_section(report.module_usage_map),
+        _license_section(report.license_audit),
     ]
     return "\n\n".join(s for s in sections if s) + "\n"
 
@@ -315,4 +317,49 @@ def _module_usage_section(usage_map: ModuleUsageMap | None) -> str:
         "Only the dotted-accessor form (`libs.foo.bar`) is matched.\n\n"
         f"{lib_table}\n\n"
         f"{mod_table}"
+    )
+
+
+_LICENSE_TIER_ICON: dict[LicenseTier, str] = {
+    LicenseTier.PERMISSIVE: "✅",
+    LicenseTier.WEAK_COPYLEFT: "⚠️",
+    LicenseTier.STRONG_COPYLEFT: "🔴",
+    LicenseTier.UNKNOWN: "❓",
+}
+
+
+def _license_section(audit: LicenseAudit | None) -> str:
+    if audit is None:
+        return ""
+
+    n = audit.libraries_audited
+    header = f"## License Audit ({n} {'library' if n == 1 else 'libraries'} audited)"
+
+    if not audit.findings:
+        permissive = audit.permissive_count
+        return (
+            f"{header}\n\n"
+            f"> ✅ All {permissive} {'library' if permissive == 1 else 'libraries'} "
+            "use permissive licenses."
+        )
+
+    rows = "\n".join(
+        f"| {_LICENSE_TIER_ICON.get(f.tier, '❓')} {f.tier.value.replace('_', ' ').title()} "
+        f"| `{f.alias}` | `{f.coordinate}` | `{f.version}` "
+        f"| {f.license_name or '_(not declared)_'} |"
+        for f in audit.findings
+    )
+    permissive_line = (
+        f"\n\n> ✅ {audit.permissive_count} other "
+        f"{'library' if audit.permissive_count == 1 else 'libraries'} use permissive licenses."
+        if audit.permissive_count > 0
+        else ""
+    )
+    return (
+        f"{header}\n\n"
+        "> License tiers: ✅ Permissive · ⚠️ Weak copyleft · 🔴 Strong copyleft · ❓ Unknown\n\n"
+        "| Tier | Alias | Coordinate | Version | License |\n"
+        "|---|---|---|---|---|\n"
+        f"{rows}"
+        f"{permissive_line}"
     )

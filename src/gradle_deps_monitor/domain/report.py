@@ -15,6 +15,7 @@ from gradle_deps_monitor.domain.library_health import (
     LibraryHealthFinding,
     LibraryHealthSeverity,
 )
+from gradle_deps_monitor.domain.license import LicenseAudit
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
@@ -39,6 +40,7 @@ class FreezeReport:
     library_health_findings: tuple[LibraryHealthFinding, ...] = field(default_factory=tuple)
     changelog_entries: tuple[ChangelogEntry, ...] = field(default_factory=tuple)
     module_usage_map: ModuleUsageMap | None = field(default=None)
+    license_audit: LicenseAudit | None = field(default=None)
 
     def __post_init__(self) -> None:
         if self.generated_at.tzinfo is None:
@@ -114,3 +116,13 @@ class FreezeReport:
     def has_breaking_upgrades(self) -> bool:
         """``True`` when at least one major upgrade has breaking changes likely."""
         return bool(self.breaking_upgrades)
+
+    @property
+    def has_license_violations(self) -> bool:
+        """``True`` when the license audit found any STRONG_COPYLEFT libraries."""
+        return self.license_audit is not None and self.license_audit.has_violations
+
+    @property
+    def has_license_warnings(self) -> bool:
+        """``True`` when the license audit found WEAK_COPYLEFT or UNKNOWN libraries."""
+        return self.license_audit is not None and self.license_audit.has_warnings
