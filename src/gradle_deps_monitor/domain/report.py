@@ -19,6 +19,7 @@ from gradle_deps_monitor.domain.license import LicenseAudit
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.risk_score import RiskScoreReport
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
+from gradle_deps_monitor.domain.version_status import LibraryVersionStatus, VersionDrift
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class FreezeReport:
     module_usage_map: ModuleUsageMap | None = field(default=None)
     license_audit: LicenseAudit | None = field(default=None)
     risk_score_report: RiskScoreReport | None = field(default=None)
+    library_version_statuses: tuple[LibraryVersionStatus, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         if self.generated_at.tzinfo is None:
@@ -128,3 +130,30 @@ class FreezeReport:
     def has_license_warnings(self) -> bool:
         """``True`` when the license audit found WEAK_COPYLEFT or UNKNOWN libraries."""
         return self.license_audit is not None and self.license_audit.has_warnings
+
+    @property
+    def outdated_libraries(self) -> tuple[LibraryVersionStatus, ...]:
+        """Libraries whose pinned version is behind the latest stable.
+
+        Excludes :attr:`VersionDrift.NONE` and :attr:`VersionDrift.UNKNOWN`.
+        """
+        return tuple(
+            s
+            for s in self.library_version_statuses
+            if s.drift in (VersionDrift.PATCH, VersionDrift.MINOR, VersionDrift.MAJOR)
+        )
+
+    @property
+    def major_outdated_count(self) -> int:
+        """Number of libraries with major-version drift."""
+        return sum(1 for s in self.library_version_statuses if s.drift == VersionDrift.MAJOR)
+
+    @property
+    def minor_outdated_count(self) -> int:
+        """Number of libraries with minor-version drift."""
+        return sum(1 for s in self.library_version_statuses if s.drift == VersionDrift.MINOR)
+
+    @property
+    def patch_outdated_count(self) -> int:
+        """Number of libraries with patch-version drift."""
+        return sum(1 for s in self.library_version_statuses if s.drift == VersionDrift.PATCH)

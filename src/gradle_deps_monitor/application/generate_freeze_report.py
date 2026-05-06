@@ -14,6 +14,7 @@ from gradle_deps_monitor.application.ports.library_health_checker import Library
 from gradle_deps_monitor.application.ports.license_checker import LicenseChecker
 from gradle_deps_monitor.application.ports.module_usage_scanner import ModuleUsageScanner
 from gradle_deps_monitor.application.ports.toolchain_checker import ToolchainChecker
+from gradle_deps_monitor.application.ports.version_status_resolver import VersionStatusResolver
 from gradle_deps_monitor.application.ports.vulnerability_scanner import VulnerabilityScanner
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import LibraryAdvisory
@@ -24,6 +25,7 @@ from gradle_deps_monitor.domain.license import LicenseAudit
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.risk_score import RiskScoreReport, RiskThresholds, RiskWeights
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
+from gradle_deps_monitor.domain.version_status import LibraryVersionStatus
 
 
 class GenerateFreezeReport:
@@ -51,6 +53,7 @@ class GenerateFreezeReport:
         changelog_fetcher: ChangelogFetcher | None = None,
         module_usage_scanner: ModuleUsageScanner | None = None,
         license_checker: LicenseChecker | None = None,
+        version_status_resolver: VersionStatusResolver | None = None,
         enable_risk_score: bool = False,
         risk_weights: RiskWeights | None = None,
         risk_thresholds: RiskThresholds | None = None,
@@ -64,6 +67,7 @@ class GenerateFreezeReport:
         self._changelog_fetcher = changelog_fetcher
         self._module_usage_scanner = module_usage_scanner
         self._license_checker = license_checker
+        self._version_status_resolver = version_status_resolver
         self._enable_risk_score = enable_risk_score
         self._risk_weights = risk_weights
         self._risk_thresholds = risk_thresholds
@@ -113,6 +117,11 @@ class GenerateFreezeReport:
             libraries = tuple(catalog.libraries)
             license_audit = asyncio.run(self._license_checker.check(libraries))
 
+        library_version_statuses: tuple[LibraryVersionStatus, ...] = ()
+        if self._version_status_resolver is not None:
+            libraries = tuple(catalog.libraries)
+            library_version_statuses = asyncio.run(self._version_status_resolver.resolve(libraries))
+
         risk_score_report: RiskScoreReport | None = None
         if self._enable_risk_score:
             risk_score_report = score_libraries(
@@ -122,6 +131,7 @@ class GenerateFreezeReport:
                 library_health_findings=library_health_findings,
                 module_usage_map=module_usage_map,
                 license_audit=license_audit,
+                version_statuses=library_version_statuses,
                 weights=self._risk_weights,
                 thresholds=self._risk_thresholds,
             )
@@ -137,4 +147,5 @@ class GenerateFreezeReport:
             module_usage_map=module_usage_map,
             license_audit=license_audit,
             risk_score_report=risk_score_report,
+            library_version_statuses=library_version_statuses,
         )

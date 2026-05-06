@@ -15,6 +15,7 @@ from gradle_deps_monitor.domain.license import LicenseAudit, LicenseTier
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.risk_score import RiskLevel, RiskScoreReport
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
+from gradle_deps_monitor.domain.version_status import LibraryVersionStatus, VersionDrift
 
 
 class MarkdownWriter:
@@ -43,10 +44,12 @@ def _render(report: FreezeReport) -> str:
     libs = sorted(cat.libraries, key=lambda lib: lib.alias)
     plugins = sorted(cat.plugins, key=lambda p: p.alias)
     bundles = sorted(cat.bundles, key=lambda b: b.alias)
+    status_by_alias = {s.alias: s for s in report.library_version_statuses}
 
     sections: list[str] = [
         _header(report),
-        _libraries_section(libs),
+        _outdated_summary_section(report),
+        _libraries_section(libs, status_by_alias),
         _plugins_section(plugins),
         _bundles_section(bundles),
         _health_section(list(report.health_findings)),
@@ -75,20 +78,58 @@ def _header(report: FreezeReport) -> str:
     )
 
 
-def _libraries_section(libs: list[Library]) -> str:
+def _libraries_section(
+    libs: list[Library],
+    status_by_alias: dict[str, LibraryVersionStatus] | None = None,
+) -> str:
     if not libs:
         return ""
+    status_by_alias = status_by_alias or {}
+
+    def _drift_cell(alias: str) -> str:
+        status = status_by_alias.get(alias)
+        if status is None or status.drift in (VersionDrift.NONE, VersionDrift.UNKNOWN):
+            return _DRIFT_LABEL[status.drift] if status else "—"
+        latest = status.latest.raw if status.latest else "?"
+        return f"{_DRIFT_LABEL[status.drift]} → `{latest}`"
+
     rows = "\n".join(
         f"| `{lib.alias}` | `{lib.group}` | `{lib.artifact}` "
-        f"| `{lib.version}` | {lib.version.stability} |"
+        f"| `{lib.version}` | {lib.version.stability} | {_drift_cell(lib.alias)} |"
         for lib in libs
     )
     return (
         f"## Libraries ({len(libs)})\n\n"
-        "| Alias | Group | Artifact | Version | Stability |\n"
-        "|---|---|---|---|---|\n"
+        "| Alias | Group | Artifact | Version | Stability | Drift |\n"
+        "|---|---|---|---|---|---|\n"
         f"{rows}"
     )
+
+
+_DRIFT_LABEL: dict[VersionDrift, str] = {
+    VersionDrift.NONE: "—",
+    VersionDrift.PATCH: "patch",
+    VersionDrift.MINOR: "minor",
+    VersionDrift.MAJOR: "**major**",
+    VersionDrift.UNKNOWN: "unknown",
+}
+
+
+def _outdated_summary_section(report: FreezeReport) -> str:
+    if not report.library_version_statuses:
+        return ""
+    total = len(report.library_version_statuses)
+    if total == 0:
+        return ""
+    parts = [
+        f"**{report.major_outdated_count}** major-behind",
+        f"**{report.minor_outdated_count}** minor-behind",
+        f"**{report.patch_outdated_count}** patch-behind",
+    ]
+    unknown = sum(1 for s in report.library_version_statuses if s.drift == VersionDrift.UNKNOWN)
+    if unknown:
+        parts.append(f"**{unknown}** unknown")
+    return "## Outdated summary\n\n" + ", ".join(parts) + f" out of {total} libraries."
 
 
 def _plugins_section(plugins: list[Plugin]) -> str:

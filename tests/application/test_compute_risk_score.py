@@ -24,6 +24,7 @@ from gradle_deps_monitor.domain.license import LicenseAudit, LicenseFinding, Lic
 from gradle_deps_monitor.domain.module_usage import LibraryUsage, ModuleSummary, ModuleUsageMap
 from gradle_deps_monitor.domain.risk_score import RiskLevel
 from gradle_deps_monitor.domain.version import MavenVersion
+from gradle_deps_monitor.domain.version_status import LibraryVersionStatus, compute_drift
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -137,31 +138,94 @@ class TestParseMajor:
 # ---------------------------------------------------------------------------
 
 
-class TestScoreOutdatedness:
+class TestScoreOutdatednessChangelogFallback:
+    """When no version-status data is available, fall back to changelog-major."""
+
     def test_no_entry_zero(self) -> None:
-        d = _score_outdatedness("unknown", {}, 25)
+        d = _score_outdatedness("unknown", {}, {}, 25)
         assert d.score == 0
         assert "up to date" in d.detail
 
     def test_same_major_zero(self) -> None:
         entry = _changelog_entry("lib", "3.1.0", "3.5.0")
-        d = _score_outdatedness("lib", {"lib": entry}, 25)
+        d = _score_outdatedness("lib", {}, {"lib": entry}, 25)
         assert d.score == 0
 
     def test_one_major_behind(self) -> None:
         entry = _changelog_entry("lib", "2.0.0", "3.0.0")
-        d = _score_outdatedness("lib", {"lib": entry}, 25)
+        d = _score_outdatedness("lib", {}, {"lib": entry}, 25)
         assert d.score == 20
 
     def test_two_majors_behind_full_cap(self) -> None:
         entry = _changelog_entry("lib", "1.0.0", "3.0.0")
-        d = _score_outdatedness("lib", {"lib": entry}, 25)
+        d = _score_outdatedness("lib", {}, {"lib": entry}, 25)
         assert d.score == 25
 
     def test_score_capped_at_cap(self) -> None:
         entry = _changelog_entry("lib", "1.0.0", "4.0.0")
-        d = _score_outdatedness("lib", {"lib": entry}, 20)
+        d = _score_outdatedness("lib", {}, {"lib": entry}, 20)
         assert d.score <= 20
+
+
+class TestScoreOutdatednessVersionStatus:
+    """When LibraryVersionStatus is available, use it (RFC-0013)."""
+
+    @staticmethod
+    def _vs(alias: str, pinned: str, latest: str | None) -> LibraryVersionStatus:
+        pinned_mv = MavenVersion(pinned)
+        latest_mv = MavenVersion(latest) if latest else None
+        return LibraryVersionStatus(
+            alias=alias,
+            coordinate=f"com.example:{alias}",
+            pinned=pinned_mv,
+            latest=latest_mv,
+            drift=compute_drift(pinned_mv, latest_mv),
+        )
+
+    def test_status_overrides_changelog(self) -> None:
+        # Changelog says 1 major behind (would score 20). Version status says
+        # patch behind (5). The version status wins.
+        entry = _changelog_entry("lib", "1.0.0", "2.0.0")
+        status = self._vs("lib", "1.2.3", "1.2.4")
+        d = _score_outdatedness("lib", {"lib": status}, {"lib": entry}, 25)
+        assert d.score == 5
+        assert "patch" in d.detail
+
+    def test_drift_none(self) -> None:
+        status = self._vs("lib", "1.2.3", "1.2.3")
+        d = _score_outdatedness("lib", {"lib": status}, {}, 25)
+        assert d.score == 0
+        assert "up to date" in d.detail
+
+    def test_drift_unknown(self) -> None:
+        status = self._vs("lib", "1.2.3", None)
+        d = _score_outdatedness("lib", {"lib": status}, {}, 25)
+        assert d.score == 0
+
+    def test_drift_patch(self) -> None:
+        status = self._vs("lib", "1.2.3", "1.2.5")
+        d = _score_outdatedness("lib", {"lib": status}, {}, 25)
+        assert d.score == 5
+
+    def test_drift_minor(self) -> None:
+        status = self._vs("lib", "1.2.3", "1.5.0")
+        d = _score_outdatedness("lib", {"lib": status}, {}, 25)
+        assert d.score == 10
+
+    def test_drift_major_one_behind(self) -> None:
+        status = self._vs("lib", "1.2.3", "2.0.0")
+        d = _score_outdatedness("lib", {"lib": status}, {}, 25)
+        assert d.score == 20
+
+    def test_drift_major_two_behind_full_cap(self) -> None:
+        status = self._vs("lib", "1.2.3", "3.0.0")
+        d = _score_outdatedness("lib", {"lib": status}, {}, 25)
+        assert d.score == 25
+
+    def test_caps_respected(self) -> None:
+        status = self._vs("lib", "1.0.0", "4.0.0")
+        d = _score_outdatedness("lib", {"lib": status}, {}, 15)
+        assert d.score == 15
 
 
 # ---------------------------------------------------------------------------

@@ -64,6 +64,11 @@ def _build_payload(report: FreezeReport) -> dict[str, Any]:
         blocks.append(non_stable_block)
         blocks.append({"type": "divider"})
 
+    outdated_block = _outdated_block(report)
+    if outdated_block:
+        blocks.append(outdated_block)
+        blocks.append({"type": "divider"})
+
     blocks.append(_health_block(list(report.health_findings)))
 
     security_block = _security_block(list(report.vulnerable_libraries), report)
@@ -147,6 +152,21 @@ def _stats_block(report: FreezeReport) -> dict[str, Any]:
             {"type": "mrkdwn", "text": f"*Bundles:*\n{len(cat.bundles)}"},
         ],
     }
+
+
+def _outdated_block(report: FreezeReport) -> dict[str, Any] | None:
+    if not report.library_version_statuses:
+        return None
+    outdated = report.outdated_libraries
+    if not outdated:
+        return None
+    text = (
+        f"*:up: Outdated libraries ({len(outdated)}):* "
+        f"{report.major_outdated_count} major, "
+        f"{report.minor_outdated_count} minor, "
+        f"{report.patch_outdated_count} patch"
+    )
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
 
 def _non_stable_block(report: FreezeReport) -> dict[str, Any] | None:
