@@ -1,6 +1,6 @@
 # RFC-0007: Module usage map
 
-**Status:** Proposed
+**Status:** Shipped — static regex scan of build.gradle(.kts) files, opt-in via `--module-usage` / `-m` (Step 19)
 **Created:** 2026-05-03
 **Related JTBDs:** JTBD-6
 **Depends on:** none
