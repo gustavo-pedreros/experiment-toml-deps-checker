@@ -1,6 +1,6 @@
 # RFC-0012: Layered configuration
 
-**Status:** Proposed
+**Status:** Shipped
 **Created:** 2026-05-06
 **Related JTBDs:** Cross-cutting infrastructure (no specific JTBD)
 **Depends on:** none

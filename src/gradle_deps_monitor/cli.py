@@ -13,6 +13,7 @@ import typer
 
 from gradle_deps_monitor import __version__, bootstrap
 from gradle_deps_monitor.application.ports.catalog_parser import CatalogParseError
+from gradle_deps_monitor.infrastructure.config.loader import ConfigError, load_config
 from gradle_deps_monitor.presentation.console import print_diff_summary, print_summary
 
 
@@ -107,9 +108,18 @@ def check(
         )
 
     try:
+        # The Gradle directory's parent is the project root by convention
+        # (e.g. ``app/gradle`` → project root ``app``). RFC-0012.
+        app_config = load_config(catalog_path.parent)
+    except ConfigError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    try:
         report, written_files = bootstrap.create_check_command(
             module_usage=module_usage,
             risk_score=risk_score,
+            app_config=app_config,
         ).run(catalog_path, output_dir)
     except CatalogParseError as exc:
         typer.echo(f"Error: {exc}", err=True)

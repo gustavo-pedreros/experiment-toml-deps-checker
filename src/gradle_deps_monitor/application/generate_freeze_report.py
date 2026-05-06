@@ -22,7 +22,7 @@ from gradle_deps_monitor.domain.compliance import ComplianceFinding
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
 from gradle_deps_monitor.domain.license import LicenseAudit
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
-from gradle_deps_monitor.domain.risk_score import RiskScoreReport
+from gradle_deps_monitor.domain.risk_score import RiskScoreReport, RiskThresholds, RiskWeights
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 
 
@@ -52,6 +52,8 @@ class GenerateFreezeReport:
         module_usage_scanner: ModuleUsageScanner | None = None,
         license_checker: LicenseChecker | None = None,
         enable_risk_score: bool = False,
+        risk_weights: RiskWeights | None = None,
+        risk_thresholds: RiskThresholds | None = None,
     ) -> None:
         self._parser = catalog_parser
         self._health_checker = health_checker
@@ -63,6 +65,8 @@ class GenerateFreezeReport:
         self._module_usage_scanner = module_usage_scanner
         self._license_checker = license_checker
         self._enable_risk_score = enable_risk_score
+        self._risk_weights = risk_weights
+        self._risk_thresholds = risk_thresholds
 
     def execute(self, catalog_path: Path) -> FreezeReport:
         """Parse *catalog_path* and return a :class:`~gradle_deps_monitor.domain.FreezeReport`.
@@ -118,6 +122,8 @@ class GenerateFreezeReport:
                 library_health_findings=library_health_findings,
                 module_usage_map=module_usage_map,
                 license_audit=license_audit,
+                weights=self._risk_weights,
+                thresholds=self._risk_thresholds,
             )
 
         return FreezeReport(

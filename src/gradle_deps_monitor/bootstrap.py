@@ -13,6 +13,7 @@ import os
 from gradle_deps_monitor.application.compute_freeze_diff import ComputeFreezeDiff
 from gradle_deps_monitor.application.generate_freeze_report import GenerateFreezeReport
 from gradle_deps_monitor.checks.runner import run_all as _run_health_checks
+from gradle_deps_monitor.domain.config import AppConfig
 from gradle_deps_monitor.infrastructure.checkers.library_health_checker import (
     LibraryHealthChecker,
 )
@@ -69,7 +70,12 @@ def _build_scanner() -> CompositeScanner | GitHubAdvisoryScanner | OssIndexScann
     return gh_scanner or oss_scanner
 
 
-def create_check_command(*, module_usage: bool = False, risk_score: bool = False) -> CheckCommand:
+def create_check_command(
+    *,
+    module_usage: bool = False,
+    risk_score: bool = False,
+    app_config: AppConfig | None = None,
+) -> CheckCommand:
     """Return a fully wired :class:`~...presentation.commands.check_command.CheckCommand`.
 
     :param module_usage: When ``True``, wire a
@@ -79,6 +85,10 @@ def create_check_command(*, module_usage: bool = False, risk_score: bool = False
     :param risk_score: When ``True``, enable the RFC-0008 composite risk score
         computation (opt-in; experimental — see ADR-0004).
         Defaults to ``False``.
+    :param app_config: RFC-0012 application configuration. When ``None``,
+        defaults are used. The ``risk_weights`` and ``risk_thresholds``
+        sections are forwarded to the risk score; other sections are
+        reserved for future RFCs.
 
     Concrete adapters created here:
 
@@ -87,6 +97,7 @@ def create_check_command(*, module_usage: bool = False, risk_score: bool = False
     - :class:`~...infrastructure.writers.json_writer.JsonWriter`
     - :class:`~...infrastructure.writers.slack_writer.SlackWriter`
     """
+    cfg = app_config or AppConfig()
     parser = TomlCatalogParser()
     scanner = _build_scanner()
     gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
@@ -101,6 +112,8 @@ def create_check_command(*, module_usage: bool = False, risk_score: bool = False
         module_usage_scanner=GradleModuleScanner() if module_usage else None,
         license_checker=PomLicenseChecker(),
         enable_risk_score=risk_score,
+        risk_weights=cfg.risk_weights,
+        risk_thresholds=cfg.risk_thresholds,
     )
     return CheckCommand(
         use_case=use_case,
