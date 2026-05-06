@@ -67,7 +67,7 @@ Android teams at scale.
 
 | Status | Item | Reference |
 |--------|------|-----------|
-| 📋 | Risk score (opt-in, transparent breakdown, configurable weights) | [RFC-0008](proposals/0008-risk-score.md) |
+| ✅ | Risk score (opt-in, transparent breakdown, configurable weights) | [RFC-0008](proposals/0008-risk-score.md) |
 | ✅ | License audit | [RFC-0009](proposals/0009-license-audit.md) |
 | 📋 | HTML export | [RFC-0010](proposals/0010-html-export.md) |
 | 💭 | Tag annotation auto-generation | — |
