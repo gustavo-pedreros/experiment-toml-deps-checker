@@ -23,6 +23,11 @@ from gradle_deps_monitor.domain.risk_score import (
     RiskThresholds,
     RiskWeights,
 )
+from gradle_deps_monitor.domain.version_status import (
+    LibraryVersionStatus,
+    VersionDrift,
+    major_delta,
+)
 
 
 def score_libraries(
@@ -32,6 +37,7 @@ def score_libraries(
     library_health_findings: tuple[LibraryHealthFinding, ...],
     module_usage_map: ModuleUsageMap | None,
     license_audit: LicenseAudit | None,
+    version_statuses: tuple[LibraryVersionStatus, ...] = (),
     weights: RiskWeights | None = None,
     thresholds: RiskThresholds | None = None,
 ) -> RiskScoreReport:
@@ -39,10 +45,17 @@ def score_libraries(
 
     :param libraries:             All catalog libraries to score.
     :param changelog_entries:     Major upgrade entries from the changelog fetcher.
+                                  Used as a fallback for outdatedness when no
+                                  version-status resolver is wired in.
     :param security_advisories:   CVE advisories from the vulnerability scanner.
     :param library_health_findings: Deprecation/inactivity findings.
     :param module_usage_map:      Optional module usage scan result.
     :param license_audit:         Optional license audit result.
+    :param version_statuses:      Per-library latest-vs-pinned drift from
+                                  RFC-0013. When non-empty, drives the
+                                  outdatedness dimension; otherwise the
+                                  scorer falls back to *changelog_entries*
+                                  (major-only) for backwards compatibility.
     :param weights:               Custom dimension caps. ``None`` uses defaults.
     :param thresholds:            Custom score band cutoffs. ``None`` uses defaults.
     :returns:                     A :class:`RiskScoreReport` sorted by total score
@@ -61,12 +74,17 @@ def score_libraries(
     if license_audit is not None:
         for lf in license_audit.findings:
             license_finding_by_alias[lf.alias] = lf
+    version_status_by_alias: dict[str, LibraryVersionStatus] = {
+        s.alias: s for s in version_statuses
+    }
 
     # Score each library -------------------------------------------------------
     scored: list[LibraryRiskScore] = []
     for lib in libraries:
         breakdown = (
-            _score_outdatedness(lib.alias, changelog_by_alias, w.outdatedness),
+            _score_outdatedness(
+                lib.alias, version_status_by_alias, changelog_by_alias, w.outdatedness
+            ),
             _score_cve(lib.alias, advisories_by_alias, w.cve),
             _score_abandonment(lib.alias, health_by_alias, w.abandonment),
             _score_blast_radius(lib.alias, module_usage_map, w.blast_radius),
@@ -110,15 +128,64 @@ def _parse_major(version: str) -> int:
 
 def _score_outdatedness(
     alias: str,
+    version_status_by_alias: dict[str, LibraryVersionStatus],
     changelog_by_alias: dict[str, ChangelogEntry],
     cap: int,
 ) -> DimensionScore:
-    """Score based on major version gap to the latest stable release.
+    """Score based on the gap to the latest stable release.
 
-    Only libraries present in *changelog_by_alias* (i.e. those with a
-    known major upgrade) contribute a non-zero score.  Libraries absent
-    from the changelog are assumed up-to-date (score=0).
+    Per RFC-0008 spec, with RFC-0013 wiring:
+
+    .. code-block:: text
+
+        NONE  / UNKNOWN drift   →  0
+        PATCH                   →  min( 5, cap)
+        MINOR                   →  min(10, cap)
+        MAJOR (1 behind)        →  min(20, cap)
+        MAJOR (≥2 behind)       →  cap
+
+    When a :class:`LibraryVersionStatus` is available it drives the
+    score. Otherwise, the function falls back to the major-only
+    *changelog_by_alias* signal so older callers keep working.
     """
+    status = version_status_by_alias.get(alias)
+    if status is not None:
+        return _score_from_version_status(status, cap)
+    return _score_from_changelog(alias, changelog_by_alias, cap)
+
+
+def _score_from_version_status(status: LibraryVersionStatus, cap: int) -> DimensionScore:
+    pinned_str = status.pinned.raw
+    latest_str = status.latest.raw if status.latest is not None else "?"
+    drift = status.drift
+
+    if drift in (VersionDrift.NONE, VersionDrift.UNKNOWN):
+        return DimensionScore("Outdatedness", 0, cap, "up to date")
+    if drift == VersionDrift.PATCH:
+        return DimensionScore(
+            "Outdatedness", min(5, cap), cap, f"1 patch behind ({pinned_str} → {latest_str})"
+        )
+    if drift == VersionDrift.MINOR:
+        return DimensionScore(
+            "Outdatedness", min(10, cap), cap, f"1 minor behind ({pinned_str} → {latest_str})"
+        )
+    # MAJOR — distinguish 1 from ≥2 majors behind for the spec's full curve
+    diff = major_delta(status.pinned, status.latest)
+    if diff <= 1:
+        return DimensionScore(
+            "Outdatedness", min(20, cap), cap, f"1 major behind ({pinned_str} → {latest_str})"
+        )
+    return DimensionScore(
+        "Outdatedness", cap, cap, f"{diff} majors behind ({pinned_str} → {latest_str})"
+    )
+
+
+def _score_from_changelog(
+    alias: str,
+    changelog_by_alias: dict[str, ChangelogEntry],
+    cap: int,
+) -> DimensionScore:
+    """Major-only fallback used when no :class:`LibraryVersionStatus` is available."""
     entry = changelog_by_alias.get(alias)
     if entry is None:
         return DimensionScore("Outdatedness", 0, cap, "up to date")

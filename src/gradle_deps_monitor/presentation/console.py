@@ -87,6 +87,20 @@ def print_summary(
     grid.add_row("Bundles", str(len(cat.bundles)))
     con.print(Panel(grid, title="[bold]Gradle Dependency Freeze Report[/bold]", expand=False))
 
+    # --- Outdated summary ---
+    if report.library_version_statuses:
+        outdated = report.outdated_libraries
+        con.print()
+        if outdated:
+            con.print(f"[bold yellow]Outdated ({len(outdated)})[/bold yellow]")
+            con.print(
+                f"  [red]{report.major_outdated_count} major[/red]  "
+                f"[yellow]{report.minor_outdated_count} minor[/yellow]  "
+                f"[dim]{report.patch_outdated_count} patch[/dim]"
+            )
+        else:
+            con.print("[green]Versions[/green] — all libraries up to date")
+
     # --- Non-stable versions ---
     non_stable = sorted(
         (lib for lib in cat.libraries if lib.version.stability is not Stability.STABLE),

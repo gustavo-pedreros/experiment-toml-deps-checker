@@ -9,6 +9,7 @@ the import-linter contracts in ``pyproject.toml``.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from gradle_deps_monitor.application.compute_freeze_diff import ComputeFreezeDiff
 from gradle_deps_monitor.application.generate_freeze_report import GenerateFreezeReport
@@ -27,6 +28,9 @@ from gradle_deps_monitor.infrastructure.checkers.toolchain_compatibility_checker
 from gradle_deps_monitor.infrastructure.fetchers.changelog_fetcher import ChangelogFetcher
 from gradle_deps_monitor.infrastructure.loaders.json_snapshot_loader import JsonSnapshotLoader
 from gradle_deps_monitor.infrastructure.parsing.toml_catalog_parser import TomlCatalogParser
+from gradle_deps_monitor.infrastructure.resolvers.maven_version_status_resolver import (
+    MavenVersionStatusResolver,
+)
 from gradle_deps_monitor.infrastructure.scanners.composite_scanner import CompositeScanner
 from gradle_deps_monitor.infrastructure.scanners.github_advisory_scanner import (
     GitHubAdvisoryScanner,
@@ -46,6 +50,12 @@ from gradle_deps_monitor.presentation.commands.diff_command import DiffCommand
 _REPORT_STEM = "freeze"
 # Default stem for diff report output files.
 _DIFF_STEM = "freeze-diff"
+
+# On-disk cache for HTTP fetches (Maven metadata, advisory queries).
+# Reusing a single root directory keeps unrelated runs from invalidating
+# each other and matches the convention used by the OSS Index and GitHub
+# Advisory adapters.
+_CACHE_ROOT = Path.home() / ".cache" / "gradle-deps-monitor"
 
 
 def _build_scanner() -> CompositeScanner | GitHubAdvisoryScanner | OssIndexScanner | None:
@@ -101,6 +111,7 @@ def create_check_command(
     parser = TomlCatalogParser()
     scanner = _build_scanner()
     gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    version_status_resolver = MavenVersionStatusResolver(cache_dir=_CACHE_ROOT / "maven")
     use_case = GenerateFreezeReport(
         catalog_parser=parser,
         health_checker=_run_health_checks,
@@ -111,6 +122,7 @@ def create_check_command(
         changelog_fetcher=ChangelogFetcher(github_token=gh_token),
         module_usage_scanner=GradleModuleScanner() if module_usage else None,
         license_checker=PomLicenseChecker(),
+        version_status_resolver=version_status_resolver,
         enable_risk_score=risk_score,
         risk_weights=cfg.risk_weights,
         risk_thresholds=cfg.risk_thresholds,

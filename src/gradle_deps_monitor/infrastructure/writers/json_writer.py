@@ -17,13 +17,14 @@ from gradle_deps_monitor.domain.license import LicenseAudit
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.risk_score import RiskScoreReport
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
+from gradle_deps_monitor.domain.version_status import LibraryVersionStatus
 
 # Schema version for the freeze.json output. Follows SemVer per ADR-0008:
 #   - MAJOR (x.0.0): breaking changes (removed/renamed fields, type changes)
 #   - MINOR (1.x.0): additive changes (new fields, new optional values)
 #   - PATCH (1.0.x): wire-format-equivalent changes
 # Consumers reading 1.x MUST tolerate unknown fields and unknown enum values.
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
 
 
 class JsonWriter:
@@ -48,6 +49,7 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
     libs = sorted(cat.libraries, key=lambda lib: lib.alias)
     plugins = sorted(cat.plugins, key=lambda p: p.alias)
     bundles = sorted(cat.bundles, key=lambda b: b.alias)
+    status_by_alias = {s.alias: s for s in report.library_version_statuses}
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -57,10 +59,11 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
             "library_count": cat.library_count,
             "plugin_count": cat.plugin_count,
             "bundle_count": len(cat.bundles),
-            "libraries": [_lib(lib) for lib in libs],
+            "libraries": [_lib(lib, status_by_alias.get(lib.alias)) for lib in libs],
             "plugins": [_plugin(p) for p in plugins],
             "bundles": [_bundle(b) for b in bundles],
         },
+        "version_status": _version_status_summary(report),
         "health": {
             "finding_count": len(report.health_findings),
             "findings": [_finding(f) for f in report.health_findings],
@@ -96,13 +99,36 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
     }
 
 
-def _lib(lib: Library) -> dict[str, Any]:
-    return {
+def _lib(lib: Library, status: LibraryVersionStatus | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "alias": lib.alias,
         "group": lib.group,
         "artifact": lib.artifact,
         "version": str(lib.version),
         "stability": lib.version.stability.value,
+    }
+    if status is not None:
+        payload["version_status"] = {
+            "latest": status.latest.raw if status.latest is not None else None,
+            "drift": status.drift.value,
+        }
+    return payload
+
+
+def _version_status_summary(report: FreezeReport) -> dict[str, Any] | None:
+    """Top-level summary of drift counts (RFC-0013).
+
+    Returns ``None`` when no version-status data is present so consumers
+    on ``schema_version`` 1.0.0 don't see a key with empty content.
+    """
+    if not report.library_version_statuses:
+        return None
+    return {
+        "library_count": len(report.library_version_statuses),
+        "outdated_count": len(report.outdated_libraries),
+        "major_outdated": report.major_outdated_count,
+        "minor_outdated": report.minor_outdated_count,
+        "patch_outdated": report.patch_outdated_count,
     }
 
 

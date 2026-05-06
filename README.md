@@ -8,7 +8,7 @@ Analyses a `libs.versions.toml` version catalog, checks every dependency against
 
 ## Features
 
-- **Pre-release detection** — flags pinned versions that are `alpha`, `beta`, `rc`, `dev`, or `SNAPSHOT`, so freeze-time reviews catch unstable pins before release. Comparison against the latest stable on Maven Central / Google Maven for every library is on the roadmap as [RFC-0013](docs/proposals/0013-version-status-first-class.md); today, latest-vs-pinned drift surfaces only via the Changelog scraper (major upgrades) and the Risk score (top-10)
+- **Version status** — for every library, resolves the latest stable release from Maven Central / Google Maven (Google-first for `androidx.*` / `com.google.*` / `com.android.*`, Central-first elsewhere) and classifies drift as `none` / `patch` / `minor` / `major`. Drives the outdatedness dimension of the risk score and powers the per-run "Outdated" summary in every output format. Also flags pinned versions that are `alpha`, `beta`, `rc`, `dev`, or `SNAPSHOT`
 - **Catalog health audit** — 8 pluggable rules that surface structural problems: duplicate libraries, unresolved `version.ref` keys, orphan version entries, inconsistent alias naming, missing plugins/bundles, and more
 - **CVE scan** — queries GitHub Advisory Database and OSS Index for known vulnerabilities in every pinned library (requires `GITHUB_TOKEN` / `OSSINDEX_USER` + `OSSINDEX_API_KEY`)
 - **Play Store compliance** — detects deprecated libraries (e.g. SafetyNet → Play Integrity) and checks `targetSdk` against Google's published requirements
@@ -125,7 +125,7 @@ Reports written → freeze-reports/2026-05-04
 | File | Format | Purpose |
 |------|--------|---------|
 | `freeze.md` | Markdown | Human-readable report; commit to `freeze-reports/` |
-| `freeze.json` | JSON (`schema_version: "1.0.0"`) | CI parsing, dashboards |
+| `freeze.json` | JSON (`schema_version: "1.1.0"`) | CI parsing, dashboards |
 | `freeze-slack.json` | Slack Block Kit | Post via incoming webhook |
 
 The JSON `schema_version` follows SemVer per [ADR-0008](docs/adr/0008-json-schema-semver.md): MINOR bumps are additive (new fields), MAJOR bumps are breaking. Consumers reading `1.x` MUST tolerate unknown fields and unknown enum values.
