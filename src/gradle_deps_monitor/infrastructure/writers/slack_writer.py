@@ -14,6 +14,7 @@ from gradle_deps_monitor.domain.finding import Finding, Severity
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
 from gradle_deps_monitor.domain.license import LicenseAudit, LicenseTier
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
+from gradle_deps_monitor.domain.risk_score import RiskLevel, RiskScoreReport
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
 # Maximum number of non-stable library entries shown in the Slack message.
@@ -99,6 +100,11 @@ def _build_payload(report: FreezeReport) -> dict[str, Any]:
     if license_block:
         blocks.append({"type": "divider"})
         blocks.append(license_block)
+
+    risk_block = _risk_score_block(report.risk_score_report)
+    if risk_block:
+        blocks.append({"type": "divider"})
+        blocks.append(risk_block)
 
     return {"blocks": blocks}
 
@@ -391,6 +397,49 @@ def _license_block(audit: LicenseAudit | None) -> dict[str, Any] | None:
     text = (
         f":scales: *License Audit — {audit.flagged_count} flagged "
         f"({audit.libraries_audited} total):*\n" + "\n".join(lines)
+    )
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+
+_RISK_LEVEL_EMOJI: dict[RiskLevel, str] = {
+    RiskLevel.CRITICAL: ":red_circle:",
+    RiskLevel.HIGH: ":large_orange_circle:",
+    RiskLevel.MEDIUM: ":large_yellow_circle:",
+    RiskLevel.LOW: ":large_blue_circle:",
+    RiskLevel.NONE: ":white_circle:",
+}
+# Maximum risk entries shown in Slack.
+_MAX_RISK = 5
+
+
+def _risk_score_block(rsr: RiskScoreReport | None) -> dict[str, Any] | None:
+    """Return a risk score summary block, or ``None`` when not enabled."""
+    if rsr is None:
+        return None
+
+    top = rsr.top[:_MAX_RISK]
+    if not top:
+        text = (
+            f":bar_chart: *Risk Score (experimental) — {rsr.libraries_scored} "
+            f"{'library' if rsr.libraries_scored == 1 else 'libraries'} scored, "
+            "no risk signals detected*"
+        )
+        return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+    lines: list[str] = []
+    for lib in top:
+        emoji = _RISK_LEVEL_EMOJI.get(lib.level, ":white_circle:")
+        level_label = lib.level.upper()
+        lines.append(f"{emoji} `{lib.alias}` {lib.version} — *{lib.total_score}* ({level_label})")
+    if len(rsr.scored_libraries) > _MAX_RISK:
+        lines.append(f"_…and {len(rsr.scored_libraries) - _MAX_RISK} more with non-zero score_")
+
+    noun = "library" if len(rsr.scored_libraries) == 1 else "libraries"
+    text = (
+        f":bar_chart: *Risk Score (experimental) — top {len(top)} of "
+        f"{len(rsr.scored_libraries)} {noun} with non-zero score:*\n"
+        + "\n".join(lines)
+        + f"\n_avg {rsr.avg_score:.1f} · max {rsr.max_score}_"
     )
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 

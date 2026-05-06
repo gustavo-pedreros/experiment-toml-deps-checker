@@ -17,6 +17,7 @@ from gradle_deps_monitor.domain.library_health import (
 )
 from gradle_deps_monitor.domain.license import LicenseAudit
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
+from gradle_deps_monitor.domain.risk_score import RiskScoreReport
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
 
@@ -41,6 +42,7 @@ class FreezeReport:
     changelog_entries: tuple[ChangelogEntry, ...] = field(default_factory=tuple)
     module_usage_map: ModuleUsageMap | None = field(default=None)
     license_audit: LicenseAudit | None = field(default=None)
+    risk_score_report: RiskScoreReport | None = field(default=None)
 
     def __post_init__(self) -> None:
         if self.generated_at.tzinfo is None:

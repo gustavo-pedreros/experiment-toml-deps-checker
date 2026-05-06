@@ -13,6 +13,7 @@ from gradle_deps_monitor.domain.finding import Finding, Severity
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
 from gradle_deps_monitor.domain.license import LicenseAudit, LicenseTier
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
+from gradle_deps_monitor.domain.risk_score import RiskLevel, RiskScoreReport
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
 
 
@@ -56,6 +57,7 @@ def _render(report: FreezeReport) -> str:
         _changelog_section(list(report.changelog_entries)),
         _module_usage_section(report.module_usage_map),
         _license_section(report.license_audit),
+        _risk_score_section(report.risk_score_report),
     ]
     return "\n\n".join(s for s in sections if s) + "\n"
 
@@ -363,3 +365,60 @@ def _license_section(audit: LicenseAudit | None) -> str:
         f"{rows}"
         f"{permissive_line}"
     )
+
+
+_RISK_LEVEL_ICON: dict[RiskLevel, str] = {
+    RiskLevel.CRITICAL: "🔴",
+    RiskLevel.HIGH: "🟠",
+    RiskLevel.MEDIUM: "🟡",
+    RiskLevel.LOW: "🔵",
+    RiskLevel.NONE: "⚪",
+}
+
+_BAR_FULL = "█"
+_BAR_EMPTY = "░"
+_BAR_WIDTH = 15
+
+
+def _bar(score: int, cap: int) -> str:
+    """Render a compact ASCII progress bar showing *score* out of *cap*."""
+    if cap == 0:
+        return _BAR_EMPTY * _BAR_WIDTH
+    filled = round(_BAR_WIDTH * score / cap)
+    return _BAR_FULL * filled + _BAR_EMPTY * (_BAR_WIDTH - filled)
+
+
+def _risk_score_section(rsr: RiskScoreReport | None) -> str:
+    if rsr is None:
+        return ""
+
+    n = rsr.libraries_scored
+    top = rsr.top
+    header = (
+        f"## Risk Score (top {len(top)} of {n} "
+        f"{'library' if n == 1 else 'libraries'} · experimental)"
+    )
+    disclaimer = (
+        "> ⚠️ **Experimental.** Scores are most meaningful when compared across "
+        "multiple freeze reports — a single number in isolation is less informative "
+        "than the trend over time."
+    )
+
+    if not top:
+        return f"{header}\n\n{disclaimer}\n\n> ✅ No risk signals detected."
+
+    blocks: list[str] = [header, "", disclaimer, ""]
+
+    for i, lib in enumerate(top, 1):
+        icon = _RISK_LEVEL_ICON.get(lib.level, "⚪")
+        blocks.append(
+            f"### #{i} `{lib.alias}` — {lib.coordinate} `{lib.version}`  "
+            f"**Score {lib.total_score}** {icon} {lib.level.upper()}"
+        )
+        rows = "\n".join(
+            f"| {d.name} | {_bar(d.score, d.cap)} | {d.score} / {d.cap} | {d.detail} |"
+            for d in lib.breakdown
+        )
+        blocks.append(f"| Dimension | Bar | Score | Detail |\n|---|---|---|---|\n{rows}")
+
+    return "\n".join(blocks)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from gradle_deps_monitor.application.compute_risk_score import score_libraries
 from gradle_deps_monitor.application.ports.catalog_parser import CatalogParser
 from gradle_deps_monitor.application.ports.changelog_fetcher import ChangelogFetcher
 from gradle_deps_monitor.application.ports.compliance_checker import ComplianceChecker
@@ -21,6 +22,7 @@ from gradle_deps_monitor.domain.compliance import ComplianceFinding
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
 from gradle_deps_monitor.domain.license import LicenseAudit
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
+from gradle_deps_monitor.domain.risk_score import RiskScoreReport
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 
 
@@ -49,6 +51,7 @@ class GenerateFreezeReport:
         changelog_fetcher: ChangelogFetcher | None = None,
         module_usage_scanner: ModuleUsageScanner | None = None,
         license_checker: LicenseChecker | None = None,
+        enable_risk_score: bool = False,
     ) -> None:
         self._parser = catalog_parser
         self._health_checker = health_checker
@@ -59,6 +62,7 @@ class GenerateFreezeReport:
         self._changelog_fetcher = changelog_fetcher
         self._module_usage_scanner = module_usage_scanner
         self._license_checker = license_checker
+        self._enable_risk_score = enable_risk_score
 
     def execute(self, catalog_path: Path) -> FreezeReport:
         """Parse *catalog_path* and return a :class:`~gradle_deps_monitor.domain.FreezeReport`.
@@ -105,6 +109,17 @@ class GenerateFreezeReport:
             libraries = tuple(catalog.libraries)
             license_audit = asyncio.run(self._license_checker.check(libraries))
 
+        risk_score_report: RiskScoreReport | None = None
+        if self._enable_risk_score:
+            risk_score_report = score_libraries(
+                libraries=tuple(catalog.libraries),
+                changelog_entries=changelog_entries,
+                security_advisories=security_advisories,
+                library_health_findings=library_health_findings,
+                module_usage_map=module_usage_map,
+                license_audit=license_audit,
+            )
+
         return FreezeReport(
             catalog=catalog,
             health_findings=findings,
@@ -115,4 +130,5 @@ class GenerateFreezeReport:
             changelog_entries=changelog_entries,
             module_usage_map=module_usage_map,
             license_audit=license_audit,
+            risk_score_report=risk_score_report,
         )
