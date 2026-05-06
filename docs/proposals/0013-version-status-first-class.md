@@ -1,6 +1,6 @@
 # RFC-0013: Version status as first-class data
 
-**Status:** Proposed
+**Status:** Shipped
 **Created:** 2026-05-06
 **Related JTBDs:** JTBD-1 (know what is outdated), JTBD-6 (rank by risk)
 **Depends on:** none directly; consumed by [RFC-0008](0008-risk-score.md)
