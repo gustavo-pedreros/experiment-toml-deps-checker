@@ -1,6 +1,6 @@
 # RFC-0009: License audit
 
-**Status:** Proposed
+**Status:** Shipped
 **Created:** 2026-05-03
 **Related JTBDs:** JTBD-2
 **Depends on:** none
