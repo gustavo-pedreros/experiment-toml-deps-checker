@@ -75,6 +75,29 @@ gradle-deps-monitor check /path/to/gradle --risk-score
 gradle-deps-monitor check /path/to/gradle --module-usage --risk-score
 ```
 
+#### Per-project configuration
+
+Drop a `gradle-deps-monitor.toml` next to your Gradle directory (i.e. at the project root) to override risk-score weights and thresholds. The file is optional; when absent, calibrated defaults apply.
+
+```toml
+# gradle-deps-monitor.toml — every section is optional.
+
+[risk_weights]   # must sum to 100
+outdatedness = 20
+cve          = 40    # bumped for fintech / regulated apps
+abandonment  = 15
+blast_radius = 10
+compliance   = 10
+license      = 5
+
+[risk_thresholds]   # must satisfy medium ≤ high ≤ critical
+critical = 80
+high     = 60
+medium   = 40
+```
+
+Resolution order: built-in defaults → `gradle-deps-monitor.toml` → environment variables → CLI flags. See [RFC-0012](docs/proposals/0012-layered-configuration.md).
+
 ---
 
 ## Output

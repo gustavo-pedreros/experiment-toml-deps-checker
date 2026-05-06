@@ -159,3 +159,48 @@ def test_execute_passes_parsed_catalog_to_checker(empty_catalog: Catalog) -> Non
     use_case = GenerateFreezeReport(_OkParser(empty_catalog), health_checker=_recorder)
     use_case.execute(Path("/some/path"))
     assert received == [empty_catalog]
+
+
+# ---------------------------------------------------------------------------
+# Risk score weight / threshold injection (RFC-0012)
+# ---------------------------------------------------------------------------
+
+
+def test_execute_propagates_risk_weights_to_score(catalog_with_libs: Catalog) -> None:
+    """Custom :class:`RiskWeights` must reach :class:`RiskScoreReport.weights`."""
+    from gradle_deps_monitor.domain.risk_score import RiskThresholds, RiskWeights
+
+    custom_weights = RiskWeights(
+        outdatedness=20,
+        cve=40,
+        abandonment=15,
+        blast_radius=10,
+        compliance=10,
+        license=5,
+    )
+    custom_thresholds = RiskThresholds(critical=80, high=60, medium=40)
+
+    use_case = GenerateFreezeReport(
+        _OkParser(catalog_with_libs),
+        enable_risk_score=True,
+        risk_weights=custom_weights,
+        risk_thresholds=custom_thresholds,
+    )
+    report = use_case.execute(Path("/some/path"))
+
+    assert report.risk_score_report is not None
+    assert report.risk_score_report.weights == custom_weights
+    assert report.risk_score_report.thresholds == custom_thresholds
+
+
+def test_execute_uses_default_weights_when_none_provided(
+    catalog_with_libs: Catalog,
+) -> None:
+    from gradle_deps_monitor.domain.risk_score import RiskThresholds, RiskWeights
+
+    use_case = GenerateFreezeReport(_OkParser(catalog_with_libs), enable_risk_score=True)
+    report = use_case.execute(Path("/some/path"))
+
+    assert report.risk_score_report is not None
+    assert report.risk_score_report.weights == RiskWeights()
+    assert report.risk_score_report.thresholds == RiskThresholds()
