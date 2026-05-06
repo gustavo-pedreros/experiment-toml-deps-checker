@@ -215,7 +215,7 @@ class TestDiffJsonWriter:
         dest = tmp_path / "diff.json"
         self._writer.write(empty_diff, dest)
         data = json.loads(dest.read_text(encoding="utf-8"))
-        assert data["schema_version"] == "diff-1"
+        assert data["schema_version"] == "1.0.0"
 
     def test_timestamps(self, tmp_path: Path, rich_diff: FreezeDiff) -> None:
         dest = tmp_path / "diff.json"

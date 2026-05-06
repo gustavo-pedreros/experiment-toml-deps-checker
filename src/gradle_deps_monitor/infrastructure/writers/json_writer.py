@@ -18,6 +18,13 @@ from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.risk_score import RiskScoreReport
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 
+# Schema version for the freeze.json output. Follows SemVer per ADR-0008:
+#   - MAJOR (x.0.0): breaking changes (removed/renamed fields, type changes)
+#   - MINOR (1.x.0): additive changes (new fields, new optional values)
+#   - PATCH (1.0.x): wire-format-equivalent changes
+# Consumers reading 1.x MUST tolerate unknown fields and unknown enum values.
+SCHEMA_VERSION = "1.0.0"
+
 
 class JsonWriter:
     """Serialises a :class:`~gradle_deps_monitor.domain.FreezeReport` to pretty-printed JSON."""
@@ -43,7 +50,7 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
     bundles = sorted(cat.bundles, key=lambda b: b.alias)
 
     return {
-        "schema_version": "1",
+        "schema_version": SCHEMA_VERSION,
         "generated_at": report.generated_at.isoformat(timespec="seconds"),
         "catalog": {
             "source_path": str(cat.source_path),

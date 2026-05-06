@@ -1,0 +1,7 @@
+# Default owner for everything in the repo.
+*                       @gustavo-pedreros
+
+# Roadmap and proposals — owner reviews any change to direction.
+/docs/roadmap.md        @gustavo-pedreros
+/docs/proposals/        @gustavo-pedreros
+/docs/adr/              @gustavo-pedreros

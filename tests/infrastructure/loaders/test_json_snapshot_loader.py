@@ -185,6 +185,28 @@ def test_load_raises_on_unsupported_schema(tmp_path: Path) -> None:
         _LOADER.load(p)
 
 
+def test_load_accepts_legacy_schema_version_one(tmp_path: Path) -> None:
+    """The pre-ADR-0008 ``"1"`` literal is still loadable for old reports."""
+    p = _write(tmp_path, {**_MINIMAL_JSON, "schema_version": "1"})
+    assert _LOADER.load(p).schema_version == "1"
+
+
+def test_load_accepts_semver_within_major_one(tmp_path: Path) -> None:
+    """Per ADR-0008, any 1.x.y version loads successfully (forwards-compat)."""
+    p = _write(tmp_path, {**_MINIMAL_JSON, "schema_version": "1.0.0"})
+    assert _LOADER.load(p).schema_version == "1.0.0"
+
+    p = _write(tmp_path, {**_MINIMAL_JSON, "schema_version": "1.5.2"})
+    assert _LOADER.load(p).schema_version == "1.5.2"
+
+
+def test_load_rejects_major_bump(tmp_path: Path) -> None:
+    """Per ADR-0008, a MAJOR bump is incompatible and must be rejected."""
+    p = _write(tmp_path, {**_MINIMAL_JSON, "schema_version": "2.0.0"})
+    with pytest.raises(ValueError, match="Unsupported schema_version"):
+        _LOADER.load(p)
+
+
 def test_load_raises_on_missing_generated_at(tmp_path: Path) -> None:
     data = {k: v for k, v in _MINIMAL_JSON.items() if k != "generated_at"}
     p = _write(tmp_path, data)

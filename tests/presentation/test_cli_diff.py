@@ -180,7 +180,7 @@ def test_diff_json_is_valid_json(tmp_path: Path) -> None:
     runner.invoke(app, ["diff", str(after), "--out", str(out)])
 
     data = json.loads((out / "freeze-diff.json").read_text(encoding="utf-8"))
-    assert data["schema_version"] == "diff-1"
+    assert data["schema_version"] == "1.0.0"
 
 
 def test_diff_slack_json_has_blocks(tmp_path: Path) -> None:
