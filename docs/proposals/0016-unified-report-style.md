@@ -1,6 +1,6 @@
 # RFC-0016: Unified report style (severity + row layout)
 
-**Status:** Proposed
+**Status:** In progress — 16a shipped, 16b pending
 **Created:** 2026-05-06
 **Related JTBDs:** JTBD-5 (readable report), cross-cutting
 **Depends on:** all shipped sections (catalog health, library
