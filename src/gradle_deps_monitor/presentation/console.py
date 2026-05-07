@@ -9,48 +9,29 @@ from rich.panel import Panel
 from rich.table import Table
 
 from gradle_deps_monitor.domain import FreezeReport, Severity
-from gradle_deps_monitor.domain.advisory import AdvisorySeverity
 from gradle_deps_monitor.domain.changelog import BreakingSignal
 from gradle_deps_monitor.domain.compliance import ComplianceSeverity
 from gradle_deps_monitor.domain.diff import FreezeDiff
 from gradle_deps_monitor.domain.library_health import LibraryHealthSeverity
 from gradle_deps_monitor.domain.license import LicenseTier
 from gradle_deps_monitor.domain.risk_score import RiskLevel, RiskScoreReport
+from gradle_deps_monitor.domain.severity import HasCommonSeverity
+from gradle_deps_monitor.domain.severity_style import style_for
 from gradle_deps_monitor.domain.toolchain import ToolchainSeverity
 from gradle_deps_monitor.domain.version import Stability
 
-_TOOLCHAIN_STYLE: dict[ToolchainSeverity, str] = {
-    ToolchainSeverity.ERROR: "bold red",
-    ToolchainSeverity.WARNING: "bold yellow",
-    ToolchainSeverity.INFO: "green",
-}
 
-_LIBRARY_HEALTH_STYLE: dict[LibraryHealthSeverity, str] = {
-    LibraryHealthSeverity.HIGH: "bold red",
-    LibraryHealthSeverity.MEDIUM: "bold yellow",
-    LibraryHealthSeverity.LOW: "blue",
-}
+def _rich_style(severity: HasCommonSeverity) -> str:
+    """Resolve any section-specific severity to its unified Rich style.
 
-_COMPLIANCE_STYLE: dict[ComplianceSeverity, str] = {
-    ComplianceSeverity.ERROR: "bold red",
-    ComplianceSeverity.WARNING: "bold yellow",
-    ComplianceSeverity.INFO: "green",
-}
+    The parameter is the structural :class:`HasCommonSeverity` protocol so the
+    helper accepts every domain severity enum without enumerating the union
+    by hand. Rendering goes through :mod:`severity_style.STYLE` so the same
+    severity displays identically in console, Markdown, and Slack
+    (RFC-0016b).
+    """
+    return style_for(severity.to_common()).rich_style
 
-_ADVISORY_STYLE: dict[AdvisorySeverity, str] = {
-    AdvisorySeverity.CRITICAL: "bold red",
-    AdvisorySeverity.HIGH: "bold yellow",
-    AdvisorySeverity.MEDIUM: "yellow",
-    AdvisorySeverity.LOW: "blue",
-    AdvisorySeverity.UNKNOWN: "dim",
-}
-
-_SEVERITY_STYLE: dict[Severity, str] = {
-    Severity.ERROR: "bold red",
-    Severity.WARNING: "bold yellow",
-    Severity.INFO: "blue",
-    Severity.SUGGESTION: "dim",
-}
 
 _SEVERITY_LABEL: dict[Severity, str] = {
     Severity.ERROR: "error",
@@ -131,7 +112,7 @@ def print_summary(
         count = len(report.health_findings)
         con.print(f"[bold]Catalog Health[/bold] — {count} finding(s)")
         for finding in report.health_findings:
-            style = _SEVERITY_STYLE.get(finding.severity, "")
+            style = _rich_style(finding.severity)
             label = _SEVERITY_LABEL.get(finding.severity, finding.severity.value)
             con.print(
                 f"  [{style}]{label}[/{style}]  [dim]{finding.rule_id}[/dim]  {finding.message}"
@@ -159,7 +140,7 @@ def print_summary(
             con.print(f"[bold]Security[/bold] — {len(vulnerable)} vulnerable: {', '.join(parts)}")
             for la in sorted(vulnerable, key=lambda x: x.alias):
                 sev = la.max_severity
-                style = _ADVISORY_STYLE.get(sev, "dim") if sev else "dim"
+                style = _rich_style(sev) if sev else "dim"
                 label = sev.value.upper() if sev else "unknown"
                 con.print(
                     f"  [{style}]{label}[/{style}]  [cyan]{la.alias}[/cyan]"
@@ -186,7 +167,7 @@ def print_summary(
             f"{len(report.compliance_findings)} finding(s): {comp_label}"
         )
         for cf in report.compliance_findings:
-            cf_style = _COMPLIANCE_STYLE.get(cf.severity, "")
+            cf_style = _rich_style(cf.severity)
             cf_label = cf.severity.value.upper()
             migration = f"  → [cyan]{cf.migration}[/cyan]" if cf.migration else ""
             con.print(
@@ -214,7 +195,7 @@ def print_summary(
             f"{len(report.toolchain_findings)} finding(s): {tc_label}"
         )
         for tf in report.toolchain_findings:
-            tf_style = _TOOLCHAIN_STYLE.get(tf.severity, "")
+            tf_style = _rich_style(tf.severity)
             tf_label = tf.severity.value.upper()
             con.print(
                 f"  [{tf_style}]{tf_label}[/{tf_style}]  [dim]{tf.rule_id}[/dim]  {tf.message}"
@@ -244,7 +225,7 @@ def print_summary(
             f"{len(report.library_health_findings)} finding(s): {lh_label}"
         )
         for lh in sorted(report.library_health_findings, key=lambda f: (f.severity, f.alias)):
-            lh_style = _LIBRARY_HEALTH_STYLE.get(lh.severity, "")
+            lh_style = _rich_style(lh.severity)
             lh_sev_label = lh.severity.value.upper()
             replacement = f"  → [cyan]{lh.replacement}[/cyan]" if lh.replacement else ""
             con.print(

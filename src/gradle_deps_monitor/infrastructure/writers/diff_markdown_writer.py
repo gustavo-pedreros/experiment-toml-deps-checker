@@ -11,13 +11,22 @@ from gradle_deps_monitor.domain.diff import (
     PluginChange,
     VersionBump,
 )
+from gradle_deps_monitor.domain.finding import Severity
+from gradle_deps_monitor.domain.severity_style import style_for
 
-_SEVERITY_ICON = {
-    "error": "🔴",
-    "warning": "⚠️",
-    "info": "\U00002139️",
-    "suggestion": "💡",
-}
+
+def _severity_icon(severity_value: str) -> str:
+    """Resolve a serialised severity string to its unified Markdown emoji.
+
+    The diff loader stores severity as a plain string; mapping it back through
+    :class:`Severity` keeps the diff writer aligned with the freeze writer
+    (RFC-0016b).
+    """
+    try:
+        return style_for(Severity(severity_value).to_common()).md_emoji
+    except ValueError:
+        return ""
+
 
 _BUMP_LABEL = {
     VersionBump.MAJOR: "major",
@@ -211,7 +220,7 @@ def _findings_table(changes: tuple[FindingChange, ...], lines: list[str]) -> Non
     lines.append("|--------|----------|------|---------|")
     for f in sorted(changes, key=lambda x: (x.status, x.rule_id)):
         icon = "🆕" if f.status == "introduced" else "✅"
-        sev_icon = _SEVERITY_ICON.get(f.severity, "")
+        sev_icon = _severity_icon(f.severity)
         lines.append(
             f"| {icon} {f.status.capitalize()}"
             f" | {sev_icon} {f.severity}"

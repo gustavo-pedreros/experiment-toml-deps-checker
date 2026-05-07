@@ -8,7 +8,7 @@ from gradle_deps_monitor.domain.advisory import AdvisorySeverity
 from gradle_deps_monitor.domain.compliance import ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Severity
 from gradle_deps_monitor.domain.library_health import LibraryHealthSeverity
-from gradle_deps_monitor.domain.severity import CommonSeverity
+from gradle_deps_monitor.domain.severity import CommonSeverity, HasCommonSeverity
 from gradle_deps_monitor.domain.toolchain import ToolchainSeverity
 
 
@@ -140,3 +140,39 @@ def test_advisory_severity_to_common(src: AdvisorySeverity, expected: CommonSeve
 def test_advisory_severity_covers_all_values() -> None:
     for s in AdvisorySeverity:
         s.to_common()
+
+
+# ---------------------------------------------------------------------------
+# HasCommonSeverity protocol — structural contract every severity satisfies.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "severity",
+    [
+        Severity.ERROR,
+        LibraryHealthSeverity.HIGH,
+        ComplianceSeverity.WARNING,
+        ToolchainSeverity.INFO,
+        AdvisorySeverity.CRITICAL,
+    ],
+)
+def test_section_severities_satisfy_has_common_severity(severity: object) -> None:
+    """Every section enum value is structurally a HasCommonSeverity.
+
+    The Protocol is the type that cross-section consumers (writers, console)
+    use to accept any severity without an enum union.
+    """
+    assert isinstance(severity, HasCommonSeverity)
+    # Even though isinstance only checks attribute presence, exercise the
+    # method to make sure the runtime invocation succeeds too.
+    assert isinstance(severity.to_common(), CommonSeverity)  # type: ignore[attr-defined]
+
+
+def test_non_severity_object_fails_protocol() -> None:
+    """An object without to_common() must not satisfy the protocol."""
+
+    class _Plain:
+        pass
+
+    assert not isinstance(_Plain(), HasCommonSeverity)

@@ -7,27 +7,21 @@ from pathlib import Path
 from typing import Any
 
 from gradle_deps_monitor.domain import FreezeReport
-from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisory
+from gradle_deps_monitor.domain.advisory import LibraryAdvisory
 from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
-from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
-from gradle_deps_monitor.domain.finding import Finding, Severity
-from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
+from gradle_deps_monitor.domain.compliance import ComplianceFinding
+from gradle_deps_monitor.domain.finding import Finding
+from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
 from gradle_deps_monitor.domain.license import LicenseAudit, LicenseTier
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.risk_score import RiskLevel, RiskScoreReport
-from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
+from gradle_deps_monitor.domain.severity_style import style_for
+from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 
 # Maximum number of non-stable library entries shown in the Slack message.
 _MAX_NON_STABLE = 10
 # Maximum number of vulnerable library entries shown in the Slack message.
 _MAX_VULN = 8
-
-_SEVERITY_EMOJI = {
-    Severity.ERROR: ":red_circle:",
-    Severity.WARNING: ":warning:",
-    Severity.INFO: ":information_source:",
-    Severity.SUGGESTION: ":bulb:",
-}
 
 
 class SlackWriter:
@@ -208,15 +202,6 @@ def _non_stable_block(report: FreezeReport) -> dict[str, Any] | None:
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
 
-_ADVISORY_EMOJI: dict[AdvisorySeverity, str] = {
-    AdvisorySeverity.CRITICAL: ":red_circle:",
-    AdvisorySeverity.HIGH: ":large_orange_circle:",
-    AdvisorySeverity.MEDIUM: ":large_yellow_circle:",
-    AdvisorySeverity.LOW: ":large_blue_circle:",
-    AdvisorySeverity.UNKNOWN: ":white_circle:",
-}
-
-
 def _security_block(
     vulnerable: list[LibraryAdvisory],
     report: FreezeReport,
@@ -239,7 +224,7 @@ def _security_block(
     lines: list[str] = []
     for la in shown:
         top = la.max_severity
-        emoji = _ADVISORY_EMOJI.get(top, ":white_circle:") if top else ":white_circle:"
+        emoji = style_for(top.to_common()).slack_emoji if top else ":white_circle:"
         adv_ids = ", ".join(a.cve_id or a.ghsa_id for a in la.advisories if a.cve_id or a.ghsa_id)
         lines.append(f"{emoji} `{la.alias}` {la.version} — {adv_ids or 'advisory'}")
     if len(vulnerable) > _MAX_VULN:
@@ -251,11 +236,6 @@ def _security_block(
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
 
-_COMPLIANCE_EMOJI: dict[ComplianceSeverity, str] = {
-    ComplianceSeverity.ERROR: ":red_circle:",
-    ComplianceSeverity.WARNING: ":warning:",
-    ComplianceSeverity.INFO: ":white_check_mark:",
-}
 # Maximum compliance findings shown in Slack.
 _MAX_COMPLIANCE = 8
 
@@ -268,7 +248,7 @@ def _compliance_block(findings: list[ComplianceFinding]) -> dict[str, Any] | Non
     shown = findings[:_MAX_COMPLIANCE]
     lines: list[str] = []
     for f in shown:
-        emoji = _COMPLIANCE_EMOJI.get(f.severity, ":white_circle:")
+        emoji = style_for(f.severity.to_common()).slack_emoji
         deadline = f" (deadline: {f.deadline})" if f.deadline else ""
         # RFC-0015: surface the library alias when the finding is attributed,
         # so reviewers know which catalog entry to bump.
@@ -283,11 +263,6 @@ def _compliance_block(findings: list[ComplianceFinding]) -> dict[str, Any] | Non
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
 
-_TOOLCHAIN_EMOJI: dict[ToolchainSeverity, str] = {
-    ToolchainSeverity.ERROR: ":red_circle:",
-    ToolchainSeverity.WARNING: ":warning:",
-    ToolchainSeverity.INFO: ":white_check_mark:",
-}
 # Maximum toolchain findings shown in Slack.
 _MAX_TOOLCHAIN = 8
 
@@ -300,7 +275,7 @@ def _toolchain_block(findings: list[ToolchainFinding]) -> dict[str, Any] | None:
     shown = findings[:_MAX_TOOLCHAIN]
     lines: list[str] = []
     for f in shown:
-        emoji = _TOOLCHAIN_EMOJI.get(f.severity, ":white_circle:")
+        emoji = style_for(f.severity.to_common()).slack_emoji
         lines.append(f"{emoji} `{f.rule_id}` — {f.message}")
     if len(findings) > _MAX_TOOLCHAIN:
         lines.append(f"_…and {len(findings) - _MAX_TOOLCHAIN} more_")
@@ -311,11 +286,6 @@ def _toolchain_block(findings: list[ToolchainFinding]) -> dict[str, Any] | None:
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
 
-_LIBRARY_HEALTH_EMOJI: dict[LibraryHealthSeverity, str] = {
-    LibraryHealthSeverity.HIGH: ":red_circle:",
-    LibraryHealthSeverity.MEDIUM: ":large_yellow_circle:",
-    LibraryHealthSeverity.LOW: ":large_blue_circle:",
-}
 # Maximum library health findings shown in Slack.
 _MAX_LIBRARY_HEALTH = 8
 
@@ -328,7 +298,7 @@ def _library_health_block(findings: list[LibraryHealthFinding]) -> dict[str, Any
     shown = sorted(findings, key=lambda f: (f.severity, f.alias))[:_MAX_LIBRARY_HEALTH]
     lines: list[str] = []
     for f in shown:
-        emoji = _LIBRARY_HEALTH_EMOJI.get(f.severity, ":white_circle:")
+        emoji = style_for(f.severity.to_common()).slack_emoji
         replacement = f" → `{f.replacement}`" if f.replacement else ""
         lines.append(f"{emoji} `{f.alias}` ({f.signal.upper()}) — {f.message}{replacement}")
     if len(findings) > _MAX_LIBRARY_HEALTH:
@@ -498,6 +468,9 @@ def _health_block(findings: list[Finding]) -> dict[str, Any]:
             },
         }
 
-    lines = [f"{_SEVERITY_EMOJI.get(f.severity, '')} `{f.rule_id}` — {f.message}" for f in findings]
+    lines = [
+        f"{style_for(f.severity.to_common()).slack_emoji} `{f.rule_id}` — {f.message}"
+        for f in findings
+    ]
     text = f"*:stethoscope: Catalog Health — {len(findings)} finding(s):*\n" + "\n".join(lines)
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}

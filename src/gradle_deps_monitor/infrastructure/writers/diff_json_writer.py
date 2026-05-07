@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 from typing import Any
@@ -13,10 +14,13 @@ from gradle_deps_monitor.domain.diff import (
     PluginChange,
     VersionBump,
 )
+from gradle_deps_monitor.domain.finding import Severity
 
 # Schema version for the freeze-diff.json output. Follows SemVer per ADR-0008,
 # bumped independently from the freeze.json schema version.
-SCHEMA_VERSION = "1.0.0"
+# 1.0.0 → 1.1.0: additive ``common_severity`` field on finding_change entries
+# (RFC-0016b).
+SCHEMA_VERSION = "1.1.0"
 
 
 class DiffJsonWriter:
@@ -125,8 +129,14 @@ def _plugin_change(c: PluginChange) -> dict[str, Any]:
 
 
 def _finding_change(f: FindingChange) -> dict[str, Any]:
-    return {
+    result: dict[str, Any] = {
         "rule_id": f.rule_id,
         "severity": f.severity,
         "message": f.message,
     }
+    # RFC-0016b (diff schema additive): expose the cross-section severity
+    # mapping for downstream tooling. Unknown values are silently dropped so
+    # forward-incompatible diffs still load.
+    with contextlib.suppress(ValueError):
+        result["common_severity"] = Severity(f.severity).to_common().value
+    return result

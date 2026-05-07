@@ -1,4 +1,4 @@
-"""SeverityStyle — central style mapping for cross-section rendering (RFC-0016a).
+"""SeverityStyle — central style mapping for cross-section rendering (RFC-0016).
 
 Each :class:`~gradle_deps_monitor.domain.severity.CommonSeverity` value resolves
 to a single :class:`SeverityStyle` that describes how it should render in:
@@ -7,12 +7,12 @@ to a single :class:`SeverityStyle` that describes how it should render in:
 * Markdown (``md_emoji`` + ``label``),
 * Slack Block Kit (``slack_emoji`` + ``label``).
 
-Sections used to embed their own dictionaries (``_TOOLCHAIN_STYLE``,
-``_COMPLIANCE_SEVERITY_ICON``, etc.); RFC-0016b will retire those in favour of
-this module so the same finding severity renders identically everywhere.
-
-This module is purely additive — it does not yet replace any existing style
-constants. Wiring lives in 16b.
+The data is purely declarative — no Rich, MD, or Slack dependency is imported
+here, just plain strings. That is why the module lives in :mod:`domain`: both
+the presentation layer (console renderer) and the infrastructure layer
+(Markdown / JSON / Slack writers) need it, and ``domain`` is the only common
+ancestor those two layers can import from per the project's import-linter
+contracts.
 """
 
 from __future__ import annotations

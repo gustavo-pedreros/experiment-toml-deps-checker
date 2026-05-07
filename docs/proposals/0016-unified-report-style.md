@@ -1,6 +1,6 @@
 # RFC-0016: Unified report style (severity + row layout)
 
-**Status:** In progress — 16a shipped, 16b pending
+**Status:** Shipped (16a + 16b)
 **Created:** 2026-05-06
 **Related JTBDs:** JTBD-5 (readable report), cross-cutting
 **Depends on:** all shipped sections (catalog health, library
@@ -146,3 +146,36 @@ Total: ~2.5 days, ideally two PRs (16a then 16b).
 - `presentation/severity_style.py` is the only place style
   decisions live; `grep` for hardcoded style strings in writers
   returns nothing.
+
+## Notes from the implementation
+
+Two deviations from the original sketch above, both for
+maintainability:
+
+1. **`severity_style.py` lives in `domain/`, not `presentation/`.**
+   The module is pure declarative state — labels and string codes
+   for emoji / Rich style — and both presentation (the console
+   renderer) and infrastructure (Markdown / JSON / Slack writers)
+   need it. Under the project's import-linter contracts,
+   infrastructure cannot import from presentation; the only common
+   ancestor is `domain`. Putting the data there preserves Clean
+   Architecture without introducing a new layer.
+
+2. **No shared `_render_findings_table` / `print_finding_row`
+   helpers were added.** Each section has section-specific columns
+   (compliance has Library + deadline + migration, toolchain has
+   recommendation, library health has signal + replacement +
+   migration URL, security has CVE + fixed-in + link). A forced
+   common renderer would either be too generic (just severity +
+   message) or too restrictive (locking out section-specific
+   columns). The unification of *visual elements* — emoji, colors,
+   Slack codes, Rich styles — is achieved through
+   `severity_style.STYLE`, which is what the success metric
+   measures. A regression-guard test
+   (`test_no_legacy_emoji_dicts_remain_in_writers`) ensures
+   per-section style dicts cannot be silently re-introduced.
+
+A `HasCommonSeverity` Protocol (in `domain/severity.py`) captures
+the structural contract every section enum satisfies, so writers
+parameterise on the protocol instead of an ever-growing union of
+concrete enums.
