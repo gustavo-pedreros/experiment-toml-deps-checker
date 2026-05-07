@@ -1,6 +1,6 @@
 # RFC-0015: Compliance per-library attribution
 
-**Status:** Proposed
+**Status:** Shipped
 **Created:** 2026-05-06
 **Related JTBDs:** JTBD-2 (Play Store readiness), JTBD-6 (rank by
 risk)
