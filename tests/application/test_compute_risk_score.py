@@ -15,6 +15,7 @@ from gradle_deps_monitor.application.compute_risk_score import (
 from gradle_deps_monitor.domain.advisory import Advisory, AdvisorySeverity, LibraryAdvisory
 from gradle_deps_monitor.domain.catalog import Library
 from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
+from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.library_health import (
     HealthSignal,
     LibraryHealthFinding,
@@ -333,10 +334,50 @@ class TestScoreBlastRadius:
 
 
 class TestScoreCompliance:
-    def test_always_zero(self) -> None:
-        d = _score_compliance(10)
+    def _cf(
+        self,
+        alias: str,
+        severity: ComplianceSeverity,
+        message: str = "deprecated",
+    ) -> ComplianceFinding:
+        return ComplianceFinding(
+            rule_id="PLAY-DEP-001",
+            severity=severity,
+            message=message,
+            alias=alias,
+            coordinate=f"com.example:{alias}",
+        )
+
+    def test_no_finding_zero(self) -> None:
+        d = _score_compliance("lib", {}, 10)
         assert d.score == 0
-        assert "catalog-level" in d.detail
+        assert d.detail == "no findings"
+
+    def test_error_caps_dimension(self) -> None:
+        cf = self._cf("safetynet", ComplianceSeverity.ERROR, "SafetyNet deprecated")
+        d = _score_compliance("safetynet", {"safetynet": cf}, 10)
+        assert d.score == 10
+        assert d.detail == "SafetyNet deprecated"
+
+    def test_warning_is_half_cap(self) -> None:
+        cf = self._cf("x", ComplianceSeverity.WARNING)
+        d = _score_compliance("x", {"x": cf}, 10)
+        assert d.score == 5
+
+    def test_warning_with_odd_cap_floors(self) -> None:
+        cf = self._cf("x", ComplianceSeverity.WARNING)
+        d = _score_compliance("x", {"x": cf}, 11)
+        assert d.score == 5  # 11 // 2 = 5
+
+    def test_info_is_zero(self) -> None:
+        cf = self._cf("x", ComplianceSeverity.INFO)
+        d = _score_compliance("x", {"x": cf}, 10)
+        assert d.score == 0
+
+    def test_other_alias_does_not_match(self) -> None:
+        cf = self._cf("safetynet", ComplianceSeverity.ERROR)
+        d = _score_compliance("okhttp", {"safetynet": cf}, 10)
+        assert d.score == 0
 
 
 # ---------------------------------------------------------------------------
@@ -427,3 +468,57 @@ class TestScoreLibraries:
         # 30+25+15 = 70 → CRITICAL
         assert scored.total_score == 70
         assert scored.level == RiskLevel.CRITICAL
+
+    def test_compliance_finding_contributes_to_score(self) -> None:
+        """RFC-0015: an attributed ERROR finding contributes the full cap."""
+        lib = _lib("safetynet")
+        cf = ComplianceFinding(
+            rule_id="PLAY-DEP-001",
+            severity=ComplianceSeverity.ERROR,
+            message="SafetyNet deprecated",
+            alias="safetynet",
+            coordinate="com.google.android.gms:play-services-safetynet",
+        )
+        rsr = score_libraries((lib,), (), (), (), None, None, compliance_findings=(cf,))
+        assert len(rsr.scored_libraries) == 1
+        scored = rsr.scored_libraries[0]
+        assert scored.alias == "safetynet"
+        # default RiskWeights.compliance == 10
+        assert scored.total_score == 10
+
+    def test_catalog_level_finding_does_not_contribute(self) -> None:
+        """alias=None findings are reported but never feed the score."""
+        lib = _lib("kotlin")
+        cf = ComplianceFinding(
+            rule_id="PLAY-SDK-001",
+            severity=ComplianceSeverity.ERROR,
+            message="targetSdk below required",
+            # no alias / coordinate → catalog-level
+        )
+        rsr = score_libraries((lib,), (), (), (), None, None, compliance_findings=(cf,))
+        # Library has no other signals, so 0 → not included
+        assert rsr.scored_libraries == ()
+
+    def test_compliance_severity_dedup_keeps_worst(self) -> None:
+        """Two findings on the same alias collapse to the most severe one."""
+        lib = _lib("x")
+        cf_warn = ComplianceFinding(
+            rule_id="W",
+            severity=ComplianceSeverity.WARNING,
+            message="upcoming deadline",
+            alias="x",
+            coordinate="com.example:x",
+        )
+        cf_error = ComplianceFinding(
+            rule_id="E",
+            severity=ComplianceSeverity.ERROR,
+            message="deadline passed",
+            alias="x",
+            coordinate="com.example:x",
+        )
+        # WARNING listed first; ERROR should still win.
+        rsr = score_libraries(
+            (lib,), (), (), (), None, None, compliance_findings=(cf_warn, cf_error)
+        )
+        scored = rsr.scored_libraries[0]
+        assert scored.total_score == 10  # full compliance cap, not 5

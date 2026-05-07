@@ -11,7 +11,7 @@ Analyses a `libs.versions.toml` version catalog, checks every dependency against
 - **Version status** — for every library, resolves the latest stable release from Maven Central / Google Maven (Google-first for `androidx.*` / `com.google.*` / `com.android.*`, Central-first elsewhere) and classifies drift as `none` / `patch` / `minor` / `major`. Drives the outdatedness dimension of the risk score and powers the per-run "Outdated" summary in every output format. Also flags pinned versions that are `alpha`, `beta`, `rc`, `dev`, or `SNAPSHOT`
 - **Catalog health audit** — 8 pluggable rules that surface structural problems: duplicate libraries, unresolved `version.ref` keys, orphan version entries, inconsistent alias naming, missing plugins/bundles, and more
 - **CVE scan** — queries GitHub Advisory Database and OSS Index for known vulnerabilities in every pinned library (requires `GITHUB_TOKEN` / `OSSINDEX_USER` + `OSSINDEX_API_KEY`)
-- **Play Store compliance** — detects deprecated libraries (e.g. SafetyNet → Play Integrity) and checks `targetSdk` against Google's published requirements
+- **Play Store compliance** — detects deprecated libraries (e.g. SafetyNet → Play Integrity) and checks `targetSdk` against Google's published requirements; library-specific findings carry the catalog `alias`, so the risk score's compliance dimension contributes per-library (RFC-0015)
 - **Toolchain compatibility** — validates Kotlin ↔ Compose Compiler, Kotlin ↔ KSP, and AGP ↔ Gradle against bundled compatibility matrices; catches mismatches before they reach QA
 - **Library health** — detects deprecated, relocated, and abandoned libraries via a curated knowledge base (26+ Android-specific entries), Maven POM `<relocation>` tag detection, and an inactivity heuristic based on `maven-metadata.xml` (no credentials required)
 - **Maven BoM support** — detects BoM entries (artifact name ends in `-bom` / `-platform`), fetches the BoM's POM and parses `<dependencyManagement>`, then enriches the catalog so children declared without a version inherit it from the BoM. Reports show the parent–child relationship (`via firebase-bom 33.0.0`) and the risk score outdatedness for managed children mirrors the BoM's drift, so bumping a BoM is one actionable item instead of N. Catalog Health rule `catalog.unresolved-bom-child` flags orphan children if the BoM is later removed
@@ -126,7 +126,7 @@ Reports written → freeze-reports/2026-05-04
 | File | Format | Purpose |
 |------|--------|---------|
 | `freeze.md` | Markdown | Human-readable report; commit to `freeze-reports/` |
-| `freeze.json` | JSON (`schema_version: "1.2.0"`) | CI parsing, dashboards |
+| `freeze.json` | JSON (`schema_version: "1.3.0"`) | CI parsing, dashboards |
 | `freeze-slack.json` | Slack Block Kit | Post via incoming webhook |
 
 The JSON `schema_version` follows SemVer per [ADR-0008](docs/adr/0008-json-schema-semver.md): MINOR bumps are additive (new fields), MAJOR bumps are breaking. Consumers reading `1.x` MUST tolerate unknown fields and unknown enum values.

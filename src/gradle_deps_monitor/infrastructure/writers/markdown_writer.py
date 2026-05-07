@@ -241,15 +241,19 @@ def _compliance_section(findings: list[ComplianceFinding]) -> str:
         icon = _COMPLIANCE_SEVERITY_ICON.get(f.severity, "")
         deadline = f" (deadline: {f.deadline})" if f.deadline else ""
         migration = f" → `{f.migration}`" if f.migration else ""
+        # RFC-0015: per-library findings carry an alias; catalog-level
+        # findings (e.g. targetSdk deadline) leave the column empty.
+        library_cell = f"`{f.alias}`" if f.alias else "—"
         rows.append(
-            f"| {icon} {f.severity.upper()} | `{f.rule_id}` | {f.message}{deadline}{migration} |"
+            f"| {icon} {f.severity.upper()} | `{f.rule_id}` | "
+            f"{library_cell} | {f.message}{deadline}{migration} |"
         )
     noun = "finding" if len(findings) == 1 else "findings"
     return (
         f"## Play Store Compliance ({len(findings)} {noun})\n\n"
         "> Checked against the bundled Play Store compliance knowledge base.\n\n"
-        "| Severity | Rule | Details |\n"
-        "|---|---|---|\n" + "\n".join(rows)
+        "| Severity | Rule | Library | Details |\n"
+        "|---|---|---|---|\n" + "\n".join(rows)
     )
 
 

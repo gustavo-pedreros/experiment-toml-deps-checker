@@ -270,7 +270,10 @@ def _compliance_block(findings: list[ComplianceFinding]) -> dict[str, Any] | Non
     for f in shown:
         emoji = _COMPLIANCE_EMOJI.get(f.severity, ":white_circle:")
         deadline = f" (deadline: {f.deadline})" if f.deadline else ""
-        lines.append(f"{emoji} `{f.rule_id}` — {f.message}{deadline}")
+        # RFC-0015: surface the library alias when the finding is attributed,
+        # so reviewers know which catalog entry to bump.
+        alias = f" `{f.alias}` —" if f.alias else ""
+        lines.append(f"{emoji} `{f.rule_id}`{alias} {f.message}{deadline}")
     if len(findings) > _MAX_COMPLIANCE:
         lines.append(f"_…and {len(findings) - _MAX_COMPLIANCE} more_")
 

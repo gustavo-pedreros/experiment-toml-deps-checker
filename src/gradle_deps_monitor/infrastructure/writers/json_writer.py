@@ -25,7 +25,7 @@ from gradle_deps_monitor.domain.version_status import LibraryVersionStatus
 #   - MINOR (1.x.0): additive changes (new fields, new optional values)
 #   - PATCH (1.0.x): wire-format-equivalent changes
 # Consumers reading 1.x MUST tolerate unknown fields and unknown enum values.
-SCHEMA_VERSION = "1.2.0"
+SCHEMA_VERSION = "1.3.0"
 
 
 class JsonWriter:
@@ -206,6 +206,13 @@ def _compliance_finding(f: ComplianceFinding) -> dict[str, Any]:
         result["deadline"] = f.deadline
     if f.migration:
         result["migration"] = f.migration
+    # RFC-0015 (schema 1.3.0+): optional library attribution. Omitted for
+    # catalog-level findings so consumers on schema 1.2.x don't see empty
+    # keys appear out of nowhere.
+    if f.alias:
+        result["alias"] = f.alias
+    if f.coordinate:
+        result["coordinate"] = f.coordinate
     return result
 
 

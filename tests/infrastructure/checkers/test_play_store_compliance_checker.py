@@ -199,6 +199,56 @@ class TestDeprecatedLibraryDetection:
         assert core_finding is not None
         assert core_finding.severity == ComplianceSeverity.ERROR
 
+    # ------------------------------------------------------------------
+    # RFC-0015: per-library attribution
+    # ------------------------------------------------------------------
+
+    def test_safetynet_finding_carries_alias(self) -> None:
+        """Library-specific findings populate alias and coordinate."""
+        lib = Library(
+            alias="safetynet",
+            group="com.google.android.gms",
+            artifact="play-services-safetynet",
+            version=MavenVersion("1.0.0"),
+        )
+        catalog = _make_catalog(lib)
+        findings = self._checker().check(catalog)
+        safetynet = next(f for f in findings if f.rule_id == "PLAY-DEP-001")
+        assert safetynet.alias == "safetynet"
+        assert safetynet.coordinate == "com.google.android.gms:play-services-safetynet"
+
+    def test_alias_uses_catalog_alias_not_artifact(self) -> None:
+        """The alias field comes from the TOML alias, not the Maven artifactId."""
+        lib = Library(
+            alias="play-svc-safety",  # custom catalog alias
+            group="com.google.android.gms",
+            artifact="play-services-safetynet",
+            version=MavenVersion("1.0.0"),
+        )
+        catalog = _make_catalog(lib)
+        findings = self._checker().check(catalog)
+        safetynet = next(f for f in findings if f.rule_id == "PLAY-DEP-001")
+        assert safetynet.alias == "play-svc-safety"
+
+    def test_first_alias_wins_when_coordinate_duplicated(self) -> None:
+        """A coordinate listed under multiple aliases attributes to the first one."""
+        first = Library(
+            alias="safetynet-a",
+            group="com.google.android.gms",
+            artifact="play-services-safetynet",
+            version=MavenVersion("1.0.0"),
+        )
+        second = Library(
+            alias="safetynet-b",
+            group="com.google.android.gms",
+            artifact="play-services-safetynet",
+            version=MavenVersion("1.0.0"),
+        )
+        catalog = _make_catalog(first, second)
+        findings = self._checker().check(catalog)
+        safetynet = next(f for f in findings if f.rule_id == "PLAY-DEP-001")
+        assert safetynet.alias == "safetynet-a"
+
 
 # ---------------------------------------------------------------------------
 # PlayStoreComplianceChecker — SDK requirement checks
@@ -252,6 +302,16 @@ class TestSdkRequirementChecks:
         sdk_findings = [f for f in findings if f.rule_id.startswith("PLAY-SDK")]
         assert "33" in sdk_findings[0].message
         assert "35" in sdk_findings[0].message
+
+    def test_sdk_finding_has_no_alias(self, tmp_path: Path) -> None:
+        """RFC-0015: catalog-level findings keep alias/coordinate as None."""
+        toml = tmp_path / "libs.versions.toml"
+        toml.write_text('[versions]\ntargetSdk = "33"\n')
+        catalog = _make_catalog(source_path=toml)
+        findings = self._checker().check(catalog)
+        sdk_findings = [f for f in findings if f.rule_id.startswith("PLAY-SDK")]
+        assert sdk_findings[0].alias is None
+        assert sdk_findings[0].coordinate is None
 
 
 # ---------------------------------------------------------------------------

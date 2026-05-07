@@ -14,6 +14,7 @@ from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisor
 from gradle_deps_monitor.domain.bom import VersionSource
 from gradle_deps_monitor.domain.catalog import Library
 from gradle_deps_monitor.domain.changelog import ChangelogEntry
+from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
 from gradle_deps_monitor.domain.license import LicenseAudit, LicenseTier
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
@@ -39,6 +40,7 @@ def score_libraries(
     module_usage_map: ModuleUsageMap | None,
     license_audit: LicenseAudit | None,
     version_statuses: tuple[LibraryVersionStatus, ...] = (),
+    compliance_findings: tuple[ComplianceFinding, ...] = (),
     weights: RiskWeights | None = None,
     thresholds: RiskThresholds | None = None,
 ) -> RiskScoreReport:
@@ -57,6 +59,11 @@ def score_libraries(
                                   outdatedness dimension; otherwise the
                                   scorer falls back to *changelog_entries*
                                   (major-only) for backwards compatibility.
+    :param compliance_findings:   Play Store compliance findings (RFC-0015).
+                                  Findings carrying ``alias`` contribute to
+                                  the matching library's compliance dimension;
+                                  catalog-level findings (``alias=None``) are
+                                  shown in reports but do not affect the score.
     :param weights:               Custom dimension caps. ``None`` uses defaults.
     :param thresholds:            Custom score band cutoffs. ``None`` uses defaults.
     :returns:                     A :class:`RiskScoreReport` sorted by total score
@@ -78,6 +85,16 @@ def score_libraries(
     version_status_by_alias: dict[str, LibraryVersionStatus] = {
         s.alias: s for s in version_statuses
     }
+    # RFC-0015: only library-attributed findings contribute to the score.
+    # When two findings target the same alias, keep the most severe so the
+    # dimension reflects the worst issue.
+    compliance_by_alias: dict[str, ComplianceFinding] = {}
+    for cf in compliance_findings:
+        if cf.alias is None:
+            continue
+        existing = compliance_by_alias.get(cf.alias)
+        if existing is None or _COMPLIANCE_RANK[cf.severity] > _COMPLIANCE_RANK[existing.severity]:
+            compliance_by_alias[cf.alias] = cf
 
     # Score each library -------------------------------------------------------
     scored: list[LibraryRiskScore] = []
@@ -95,7 +112,7 @@ def score_libraries(
             _score_cve(lib.alias, advisories_by_alias, w.cve),
             _score_abandonment(lib.alias, health_by_alias, w.abandonment),
             _score_blast_radius(lib.alias, module_usage_map, w.blast_radius),
-            _score_compliance(w.compliance),
+            _score_compliance(lib.alias, compliance_by_alias, w.compliance),
             _score_license(lib.alias, license_finding_by_alias, license_audit, w.license),
         )
         total = sum(d.score for d in breakdown)
@@ -300,14 +317,37 @@ def _score_blast_radius(
     return DimensionScore("Blast radius", min(score, cap), cap, f"{count} {module_word}")
 
 
-def _score_compliance(cap: int) -> DimensionScore:
-    """Compliance dimension — always 0 for now.
+_COMPLIANCE_RANK: dict[ComplianceSeverity, int] = {
+    ComplianceSeverity.INFO: 0,
+    ComplianceSeverity.WARNING: 1,
+    ComplianceSeverity.ERROR: 2,
+}
 
-    ComplianceFinding has no ``alias`` field so findings cannot be
-    attributed to individual libraries.  The dimension is reserved for
-    a future RFC that adds per-library compliance rules.
+
+def _score_compliance(
+    alias: str,
+    compliance_by_alias: dict[str, ComplianceFinding],
+    cap: int,
+) -> DimensionScore:
+    """Score based on Play Store compliance findings attributed to *alias*.
+
+    Per RFC-0015 mapping (intentionally simple, calibration deferred):
+
+    .. code-block:: text
+
+        no finding for alias  →  0
+        ERROR                 →  cap
+        WARNING               →  cap // 2
+        INFO                  →  0
     """
-    return DimensionScore("Compliance", 0, cap, "catalog-level (not library-specific)")
+    finding = compliance_by_alias.get(alias)
+    if finding is None:
+        return DimensionScore("Compliance", 0, cap, "no findings")
+    if finding.severity == ComplianceSeverity.ERROR:
+        return DimensionScore("Compliance", cap, cap, finding.message)
+    if finding.severity == ComplianceSeverity.WARNING:
+        return DimensionScore("Compliance", cap // 2, cap, finding.message)
+    return DimensionScore("Compliance", 0, cap, finding.message)
 
 
 def _score_license(
