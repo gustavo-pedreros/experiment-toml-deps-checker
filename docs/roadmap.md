@@ -79,7 +79,7 @@ sections.
 | ✅ | Version status as first-class data | [RFC-0013](proposals/0013-version-status-first-class.md) |
 | ✅ | Maven BoM (Bill of Materials) support | [RFC-0014](proposals/0014-maven-bom-support.md) |
 | ✅ | Compliance per-library attribution | [RFC-0015](proposals/0015-compliance-per-library-attribution.md) |
-| 📋 | Unified report style (severity + row layout) | [RFC-0016](proposals/0016-unified-report-style.md) |
+| 🚧 | Unified report style (severity + row layout) — 16a shipped, 16b pending | [RFC-0016](proposals/0016-unified-report-style.md) |
 
 ## Backlog
 
