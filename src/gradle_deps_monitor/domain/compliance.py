@@ -19,13 +19,18 @@ class ComplianceFinding:
     """A single Play Store compliance observation.
 
     Attributes:
-        rule_id:   Stable identifier (e.g. ``"PLAY-DEP-001"``).
-        severity:  One of :class:`ComplianceSeverity`.
-        message:   Short one-line description shown in reports.
-        detail:    Optional longer explanation / recommendation.
-        deadline:  ISO 8601 date string (``"YYYY-MM-DD"``) of the compliance
-                   deadline, or ``None`` if not applicable.
-        migration: Suggested replacement Maven coordinate, or ``None``.
+        rule_id:    Stable identifier (e.g. ``"PLAY-DEP-001"``).
+        severity:   One of :class:`ComplianceSeverity`.
+        message:    Short one-line description shown in reports.
+        detail:     Optional longer explanation / recommendation.
+        deadline:   ISO 8601 date string (``"YYYY-MM-DD"``) of the compliance
+                    deadline, or ``None`` if not applicable.
+        migration:  Suggested replacement Maven coordinate, or ``None``.
+        alias:      Catalog alias when the finding concerns a specific library
+                    (e.g. ``"safetynet"``). ``None`` for catalog-level findings
+                    such as ``targetSdk`` requirements. Added by RFC-0015.
+        coordinate: ``group:artifact`` mirror of *alias*. ``None`` for
+                    catalog-level findings. Added by RFC-0015.
     """
 
     rule_id: str
@@ -34,3 +39,5 @@ class ComplianceFinding:
     detail: str = ""
     deadline: str | None = None
     migration: str | None = None
+    alias: str | None = None
+    coordinate: str | None = None

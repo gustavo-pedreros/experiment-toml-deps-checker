@@ -148,6 +148,7 @@ class GenerateFreezeReport:
                 module_usage_map=module_usage_map,
                 license_audit=license_audit,
                 version_statuses=library_version_statuses,
+                compliance_findings=compliance_findings,
                 weights=self._risk_weights,
                 thresholds=self._risk_thresholds,
             )

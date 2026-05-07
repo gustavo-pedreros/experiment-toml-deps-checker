@@ -113,12 +113,19 @@ class PlayStoreComplianceChecker:
     # ------------------------------------------------------------------
 
     def _check_deprecated_libraries(self, catalog: Catalog) -> list[ComplianceFinding]:
-        catalog_coords = {f"{lib.group}:{lib.artifact}" for lib in catalog.libraries}
+        # Build coordinate → alias index so library-specific findings (RFC-0015)
+        # carry the catalog alias they concern. A coordinate may legally appear
+        # under multiple aliases; the first one wins for attribution purposes
+        # since the finding itself fires once per coordinate.
+        alias_by_coord: dict[str, str] = {}
+        for lib in catalog.libraries:
+            alias_by_coord.setdefault(f"{lib.group}:{lib.artifact}", lib.alias)
+
         findings: list[ComplianceFinding] = []
 
         for entry in self._kb.get("deprecated_libraries", []):
             coordinate: str = entry[_FIELD_COORDINATE]
-            if coordinate not in catalog_coords:
+            if coordinate not in alias_by_coord:
                 continue
 
             deadline_str: str | None = entry.get(_FIELD_DEADLINE)
@@ -133,6 +140,8 @@ class PlayStoreComplianceChecker:
                     detail=detail,
                     deadline=deadline_str,
                     migration=entry.get(_FIELD_MIGRATION),
+                    alias=alias_by_coord[coordinate],
+                    coordinate=coordinate,
                 )
             )
 

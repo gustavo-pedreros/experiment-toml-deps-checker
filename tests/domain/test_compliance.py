@@ -35,6 +35,21 @@ class TestComplianceFinding:
         assert f.detail == ""
         assert f.deadline is None
         assert f.migration is None
+        # RFC-0015 defaults: catalog-level findings have no attribution.
+        assert f.alias is None
+        assert f.coordinate is None
+
+    def test_attribution_fields(self) -> None:
+        """RFC-0015: alias and coordinate may be set for library-specific findings."""
+        f = ComplianceFinding(
+            rule_id="PLAY-DEP-001",
+            severity=ComplianceSeverity.ERROR,
+            message="SafetyNet deprecated",
+            alias="safetynet",
+            coordinate="com.google.android.gms:play-services-safetynet",
+        )
+        assert f.alias == "safetynet"
+        assert f.coordinate == "com.google.android.gms:play-services-safetynet"
 
     def test_immutable(self) -> None:
         f = ComplianceFinding(
