@@ -87,6 +87,17 @@ def print_summary(
     grid.add_row("Bundles", str(len(cat.bundles)))
     con.print(Panel(grid, title="[bold]Gradle Dependency Freeze Report[/bold]", expand=False))
 
+    # --- BoMs ---
+    if report.bom_resolutions:
+        con.print()
+        con.print(f"[bold]BoMs ({len(report.bom_resolutions)})[/bold]")
+        for res in report.bom_resolutions:
+            children = sum(1 for lib in cat.libraries if lib.bom_alias == res.bom_alias)
+            con.print(
+                f"  • [cyan]{res.bom_alias}[/cyan]  {res.bom_version}  "
+                f"[dim]manages {len(res.managed)}, catalog uses {children}[/dim]"
+            )
+
     # --- Outdated summary ---
     if report.library_version_statuses:
         outdated = report.outdated_libraries

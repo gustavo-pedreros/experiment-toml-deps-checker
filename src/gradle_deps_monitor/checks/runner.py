@@ -10,6 +10,7 @@ from gradle_deps_monitor.checks.catalog_health import (
     missing_bundles,
     missing_plugins,
     orphan_version_ref,
+    unresolved_bom_child,
     unresolved_version_ref,
 )
 from gradle_deps_monitor.domain.catalog import Catalog
@@ -19,6 +20,7 @@ from gradle_deps_monitor.domain.finding import Finding
 _RULES = [
     duplicate_library,
     unresolved_version_ref,
+    unresolved_bom_child,
     inconsistent_naming,
     missing_plugins,
     orphan_version_ref,

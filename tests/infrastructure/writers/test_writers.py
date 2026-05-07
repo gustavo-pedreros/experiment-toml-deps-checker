@@ -172,7 +172,7 @@ def test_json_schema_version(full_report: FreezeReport, tmp_path: Path) -> None:
     dest = tmp_path / "freeze.json"
     JsonWriter().write(full_report, dest)
     data = json.loads(dest.read_text(encoding="utf-8"))
-    assert data["schema_version"] == "1.1.0"
+    assert data["schema_version"] == "1.2.0"
 
 
 def test_json_generated_at(full_report: FreezeReport, tmp_path: Path) -> None:

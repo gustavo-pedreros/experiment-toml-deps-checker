@@ -1,6 +1,6 @@
 # RFC-0014: Maven BoM (Bill of Materials) support
 
-**Status:** Proposed
+**Status:** Shipped
 **Created:** 2026-05-06
 **Related JTBDs:** JTBD-1 (know what is outdated), JTBD-3 (catalog
 hygiene), JTBD-6 (rank by risk)

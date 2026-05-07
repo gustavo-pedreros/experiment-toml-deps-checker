@@ -342,3 +342,52 @@ def test_duplicate_library_silent_when_all_unique() -> None:
 
 def test_duplicate_library_silent_on_empty_catalog() -> None:
     assert duplicate_library.check(_catalog()) == []
+
+
+# ---------------------------------------------------------------------------
+# catalog.unresolved-bom-child (RFC-0014)
+# ---------------------------------------------------------------------------
+
+
+def test_unresolved_bom_child_fires_for_orphan_library() -> None:
+    from gradle_deps_monitor.checks.catalog_health import unresolved_bom_child
+
+    cat = _catalog(
+        libraries=(
+            _lib("ghost", version=""),  # no version, no bom_alias
+        )
+    )
+    findings = unresolved_bom_child.check(cat)
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.ERROR
+    assert "ghost" in findings[0].details
+    assert findings[0].rule_id == "catalog.unresolved-bom-child"
+
+
+def test_unresolved_bom_child_silent_when_all_resolved() -> None:
+    from gradle_deps_monitor.checks.catalog_health import unresolved_bom_child
+
+    cat = _catalog(
+        libraries=(
+            _lib("kotlin", version="2.0.0"),
+            Library(
+                alias="firebase-analytics",
+                group="com.google.firebase",
+                artifact="firebase-analytics",
+                version=MavenVersion("21.5.0"),
+                bom_alias="firebase-bom",
+            ),
+        )
+    )
+    assert unresolved_bom_child.check(cat) == []
+
+
+def test_unresolved_bom_child_silent_when_version_ref() -> None:
+    """A library backed by [versions] is fine even if it has no inline literal."""
+    from gradle_deps_monitor.checks.catalog_health import unresolved_bom_child
+
+    cat = _catalog(
+        libraries=(_lib("kotlin", version="2.0.0", version_ref="kotlin"),),
+        versions={"kotlin": "2.0.0"},
+    )
+    assert unresolved_bom_child.check(cat) == []

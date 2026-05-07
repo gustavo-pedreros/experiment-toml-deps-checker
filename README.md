@@ -14,6 +14,7 @@ Analyses a `libs.versions.toml` version catalog, checks every dependency against
 - **Play Store compliance** — detects deprecated libraries (e.g. SafetyNet → Play Integrity) and checks `targetSdk` against Google's published requirements
 - **Toolchain compatibility** — validates Kotlin ↔ Compose Compiler, Kotlin ↔ KSP, and AGP ↔ Gradle against bundled compatibility matrices; catches mismatches before they reach QA
 - **Library health** — detects deprecated, relocated, and abandoned libraries via a curated knowledge base (26+ Android-specific entries), Maven POM `<relocation>` tag detection, and an inactivity heuristic based on `maven-metadata.xml` (no credentials required)
+- **Maven BoM support** — detects BoM entries (artifact name ends in `-bom` / `-platform`), fetches the BoM's POM and parses `<dependencyManagement>`, then enriches the catalog so children declared without a version inherit it from the BoM. Reports show the parent–child relationship (`via firebase-bom 33.0.0`) and the risk score outdatedness for managed children mirrors the BoM's drift, so bumping a BoM is one actionable item instead of N. Catalog Health rule `catalog.unresolved-bom-child` flags orphan children if the BoM is later removed
 - **Changelog scraper** — for every library with a major upgrade available, discovers the release notes via the GitHub Releases API or a `CHANGELOG.md` fallback; applies a breaking-change heuristic (🔴 likely breaking / 🟢 clean / ⚪ unknown); `GITHUB_TOKEN` optional but increases API rate limit
 - **Module usage map** _(opt-in: `--module-usage`)_ — static analysis of `build.gradle(.kts)` files; shows how many modules use each library via `implementation`, `api`, or test configurations; identifies the heaviest dependency modules
 - **License audit** — fetches Maven POM `<licenses>` metadata for every pinned library and classifies licenses into tiers (Permissive / Weak copyleft / Strong copyleft / Unknown); flags GPL/AGPL dependencies automatically, with Google Maven fallback for `androidx`/`com.google.*` groups
@@ -125,7 +126,7 @@ Reports written → freeze-reports/2026-05-04
 | File | Format | Purpose |
 |------|--------|---------|
 | `freeze.md` | Markdown | Human-readable report; commit to `freeze-reports/` |
-| `freeze.json` | JSON (`schema_version: "1.1.0"`) | CI parsing, dashboards |
+| `freeze.json` | JSON (`schema_version: "1.2.0"`) | CI parsing, dashboards |
 | `freeze-slack.json` | Slack Block Kit | Post via incoming webhook |
 
 The JSON `schema_version` follows SemVer per [ADR-0008](docs/adr/0008-json-schema-semver.md): MINOR bumps are additive (new fields), MAJOR bumps are breaking. Consumers reading `1.x` MUST tolerate unknown fields and unknown enum values.
@@ -144,6 +145,7 @@ The JSON `schema_version` follows SemVer per [ADR-0008](docs/adr/0008-json-schem
 | `HDX-006` | info | Inline version literals (prefer `version.ref` for deduplication) |
 | `HDX-007` | info | No `[bundles]` block (multi-library catalog) |
 | `HDX-008` | suggestion | Duplicate version values (different keys share the same version string) |
+| `catalog.unresolved-bom-child` | error | Library declared without a version and no BoM resolved it (RFC-0014) |
 
 ---
 

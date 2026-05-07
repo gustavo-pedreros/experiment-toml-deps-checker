@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from gradle_deps_monitor.domain.advisory import LibraryAdvisory
+from gradle_deps_monitor.domain.bom import BomResolution
 from gradle_deps_monitor.domain.catalog import Catalog
 from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
@@ -45,6 +46,7 @@ class FreezeReport:
     license_audit: LicenseAudit | None = field(default=None)
     risk_score_report: RiskScoreReport | None = field(default=None)
     library_version_statuses: tuple[LibraryVersionStatus, ...] = field(default_factory=tuple)
+    bom_resolutions: tuple[BomResolution, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         if self.generated_at.tzinfo is None:
