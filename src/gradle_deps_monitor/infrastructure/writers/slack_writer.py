@@ -69,6 +69,11 @@ def _build_payload(report: FreezeReport) -> dict[str, Any]:
         blocks.append(outdated_block)
         blocks.append({"type": "divider"})
 
+    bom_block = _bom_block(report)
+    if bom_block:
+        blocks.append(bom_block)
+        blocks.append({"type": "divider"})
+
     blocks.append(_health_block(list(report.health_findings)))
 
     security_block = _security_block(list(report.vulnerable_libraries), report)
@@ -166,6 +171,22 @@ def _outdated_block(report: FreezeReport) -> dict[str, Any] | None:
         f"{report.minor_outdated_count} minor, "
         f"{report.patch_outdated_count} patch"
     )
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+
+def _bom_block(report: FreezeReport) -> dict[str, Any] | None:
+    if not report.bom_resolutions:
+        return None
+    children_count_by_bom: dict[str, int] = {}
+    for lib in report.catalog.libraries:
+        if lib.bom_alias:
+            children_count_by_bom[lib.bom_alias] = children_count_by_bom.get(lib.bom_alias, 0) + 1
+    lines = [
+        f"• `{r.bom_alias}` `{r.bom_version}` "
+        f"— manages {len(r.managed)} (catalog uses {children_count_by_bom.get(r.bom_alias, 0)})"
+        for r in report.bom_resolutions
+    ]
+    text = f"*:bookmark_tabs: BoMs ({len(report.bom_resolutions)}):*\n" + "\n".join(lines)
     return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
 

@@ -8,6 +8,7 @@ from typing import Any
 
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import Advisory, LibraryAdvisory
+from gradle_deps_monitor.domain.bom import BomResolution
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
 from gradle_deps_monitor.domain.changelog import ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding
@@ -24,7 +25,7 @@ from gradle_deps_monitor.domain.version_status import LibraryVersionStatus
 #   - MINOR (1.x.0): additive changes (new fields, new optional values)
 #   - PATCH (1.0.x): wire-format-equivalent changes
 # Consumers reading 1.x MUST tolerate unknown fields and unknown enum values.
-SCHEMA_VERSION = "1.1.0"
+SCHEMA_VERSION = "1.2.0"
 
 
 class JsonWriter:
@@ -64,6 +65,7 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
             "bundles": [_bundle(b) for b in bundles],
         },
         "version_status": _version_status_summary(report),
+        "boms": [_bom(b) for b in report.bom_resolutions],
         "health": {
             "finding_count": len(report.health_findings),
             "findings": [_finding(f) for f in report.health_findings],
@@ -106,13 +108,33 @@ def _lib(lib: Library, status: LibraryVersionStatus | None = None) -> dict[str, 
         "artifact": lib.artifact,
         "version": str(lib.version),
         "stability": lib.version.stability.value,
+        "version_source": lib.version_source.value,
     }
+    if lib.bom_alias is not None:
+        payload["bom_alias"] = lib.bom_alias
     if status is not None:
         payload["version_status"] = {
             "latest": status.latest.raw if status.latest is not None else None,
             "drift": status.drift.value,
         }
     return payload
+
+
+def _bom(resolution: BomResolution) -> dict[str, Any]:
+    return {
+        "alias": resolution.bom_alias,
+        "coordinate": resolution.bom_coordinate,
+        "version": resolution.bom_version.raw,
+        "managed_count": len(resolution.managed),
+        "managed": [
+            {
+                "group": m.group,
+                "artifact": m.artifact,
+                "version": m.version.raw,
+            }
+            for m in resolution.managed
+        ],
+    }
 
 
 def _version_status_summary(report: FreezeReport) -> dict[str, Any] | None:

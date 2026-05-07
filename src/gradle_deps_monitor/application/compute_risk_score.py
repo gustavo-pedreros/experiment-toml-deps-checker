@@ -11,6 +11,7 @@ No I/O. No external dependencies. Safe to call synchronously inside
 from __future__ import annotations
 
 from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisory
+from gradle_deps_monitor.domain.bom import VersionSource
 from gradle_deps_monitor.domain.catalog import Library
 from gradle_deps_monitor.domain.changelog import ChangelogEntry
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
@@ -81,9 +82,15 @@ def score_libraries(
     # Score each library -------------------------------------------------------
     scored: list[LibraryRiskScore] = []
     for lib in libraries:
+        # RFC-0014: a library managed by a BoM inherits the BoM's
+        # outdatedness signal — bumping the BoM is what drives the upgrade.
+        outdatedness_alias = lib.alias
+        if lib.version_source == VersionSource.FROM_BOM and lib.bom_alias:
+            outdatedness_alias = lib.bom_alias
+
         breakdown = (
             _score_outdatedness(
-                lib.alias, version_status_by_alias, changelog_by_alias, w.outdatedness
+                outdatedness_alias, version_status_by_alias, changelog_by_alias, w.outdatedness
             ),
             _score_cve(lib.alias, advisories_by_alias, w.cve),
             _score_abandonment(lib.alias, health_by_alias, w.abandonment),

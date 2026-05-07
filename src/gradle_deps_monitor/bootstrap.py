@@ -28,6 +28,7 @@ from gradle_deps_monitor.infrastructure.checkers.toolchain_compatibility_checker
 from gradle_deps_monitor.infrastructure.fetchers.changelog_fetcher import ChangelogFetcher
 from gradle_deps_monitor.infrastructure.loaders.json_snapshot_loader import JsonSnapshotLoader
 from gradle_deps_monitor.infrastructure.parsing.toml_catalog_parser import TomlCatalogParser
+from gradle_deps_monitor.infrastructure.resolvers.maven_bom_resolver import MavenBomResolver
 from gradle_deps_monitor.infrastructure.resolvers.maven_version_status_resolver import (
     MavenVersionStatusResolver,
 )
@@ -112,6 +113,7 @@ def create_check_command(
     scanner = _build_scanner()
     gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     version_status_resolver = MavenVersionStatusResolver(cache_dir=_CACHE_ROOT / "maven")
+    bom_resolver = MavenBomResolver()
     use_case = GenerateFreezeReport(
         catalog_parser=parser,
         health_checker=_run_health_checks,
@@ -123,6 +125,7 @@ def create_check_command(
         module_usage_scanner=GradleModuleScanner() if module_usage else None,
         license_checker=PomLicenseChecker(),
         version_status_resolver=version_status_resolver,
+        bom_resolver=bom_resolver,
         enable_risk_score=risk_score,
         risk_weights=cfg.risk_weights,
         risk_thresholds=cfg.risk_thresholds,

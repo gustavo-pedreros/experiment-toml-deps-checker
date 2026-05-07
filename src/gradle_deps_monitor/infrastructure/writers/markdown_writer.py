@@ -6,6 +6,7 @@ from pathlib import Path
 
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisory
+from gradle_deps_monitor.domain.bom import BomResolution, VersionSource
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
 from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
@@ -49,7 +50,8 @@ def _render(report: FreezeReport) -> str:
     sections: list[str] = [
         _header(report),
         _outdated_summary_section(report),
-        _libraries_section(libs, status_by_alias),
+        _bom_section(report),
+        _libraries_section(libs, status_by_alias, report.bom_resolutions),
         _plugins_section(plugins),
         _bundles_section(bundles),
         _health_section(list(report.health_findings)),
@@ -81,10 +83,12 @@ def _header(report: FreezeReport) -> str:
 def _libraries_section(
     libs: list[Library],
     status_by_alias: dict[str, LibraryVersionStatus] | None = None,
+    bom_resolutions: tuple[BomResolution, ...] = (),
 ) -> str:
     if not libs:
         return ""
     status_by_alias = status_by_alias or {}
+    bom_versions: dict[str, str] = {b.bom_alias: b.bom_version.raw for b in bom_resolutions}
 
     def _drift_cell(alias: str) -> str:
         status = status_by_alias.get(alias)
@@ -93,17 +97,50 @@ def _libraries_section(
         latest = status.latest.raw if status.latest else "?"
         return f"{_DRIFT_LABEL[status.drift]} → `{latest}`"
 
+    def _source_cell(lib: Library) -> str:
+        if lib.version_source == VersionSource.FROM_BOM and lib.bom_alias:
+            bom_v = bom_versions.get(lib.bom_alias, "?")
+            return f"via `{lib.bom_alias}` `{bom_v}`"
+        if lib.version_source == VersionSource.VERSION_REF:
+            return f"ref `{lib.version_ref}`"
+        if lib.version_source == VersionSource.UNRESOLVED:
+            return "**unresolved**"
+        return "—"
+
     rows = "\n".join(
         f"| `{lib.alias}` | `{lib.group}` | `{lib.artifact}` "
-        f"| `{lib.version}` | {lib.version.stability} | {_drift_cell(lib.alias)} |"
+        f"| `{lib.version}` | {lib.version.stability} "
+        f"| {_drift_cell(lib.alias)} | {_source_cell(lib)} |"
         for lib in libs
     )
     return (
         f"## Libraries ({len(libs)})\n\n"
-        "| Alias | Group | Artifact | Version | Stability | Drift |\n"
-        "|---|---|---|---|---|---|\n"
+        "| Alias | Group | Artifact | Version | Stability | Drift | Source |\n"
+        "|---|---|---|---|---|---|---|\n"
         f"{rows}"
     )
+
+
+def _bom_section(report: FreezeReport) -> str:
+    if not report.bom_resolutions:
+        return ""
+    lines = []
+    for res in report.bom_resolutions:
+        managed_count = len(res.managed)
+        children = sorted(
+            lib.alias for lib in report.catalog.libraries if lib.bom_alias == res.bom_alias
+        )
+        children_text = (
+            ", ".join(f"`{a}`" for a in children)
+            if children
+            else "_no managed children in this catalog_"
+        )
+        lines.append(
+            f"### `{res.bom_alias}` — `{res.bom_coordinate}` `{res.bom_version}`\n"
+            f"- Manages **{managed_count}** coordinate(s).\n"
+            f"- Children in catalog: {children_text}"
+        )
+    return f"## BoMs ({len(report.bom_resolutions)})\n\n" + "\n\n".join(lines)
 
 
 _DRIFT_LABEL: dict[VersionDrift, str] = {

@@ -9,7 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from gradle_deps_monitor.domain.bom import VersionSource
 from gradle_deps_monitor.domain.version import MavenVersion
+
+# Suffixes that mark a library entry as a BoM by convention.
+_BOM_ARTIFACT_SUFFIXES: tuple[str, ...] = ("-bom", "-platform")
 
 
 @dataclass(frozen=True)
@@ -21,8 +25,13 @@ class Library:
     artifact: str
     version: MavenVersion
     #: Name of the ``[versions]`` key used via ``version.ref``, or ``None``
-    #: when the version is declared inline or absent (BOM-managed).
+    #: when the version is declared inline or absent (BoM-managed).
     version_ref: str | None = None
+    #: Catalog alias of the BoM that supplies this library's version, or
+    #: ``None`` when the version did not come from a BoM. Set by the
+    #: BoM-resolution step in
+    #: :class:`~gradle_deps_monitor.application.generate_freeze_report.GenerateFreezeReport`.
+    bom_alias: str | None = None
 
     @property
     def coordinate(self) -> str:
@@ -31,6 +40,22 @@ class Library:
     @property
     def notation(self) -> str:
         return f"{self.group}:{self.artifact}:{self.version}"
+
+    @property
+    def is_bom_candidate(self) -> bool:
+        """``True`` when the artifact name marks this entry as a Maven BoM."""
+        return any(self.artifact.endswith(s) for s in _BOM_ARTIFACT_SUFFIXES)
+
+    @property
+    def version_source(self) -> VersionSource:
+        """Where this library's effective version came from. Derived (RFC-0014)."""
+        if self.bom_alias is not None:
+            return VersionSource.FROM_BOM
+        if self.version_ref is not None:
+            return VersionSource.VERSION_REF
+        if self.version.raw:
+            return VersionSource.LITERAL
+        return VersionSource.UNRESOLVED
 
 
 @dataclass(frozen=True)

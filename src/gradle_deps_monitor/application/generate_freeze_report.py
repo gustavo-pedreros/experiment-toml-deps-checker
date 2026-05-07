@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from gradle_deps_monitor.application.bom_enrichment import enrich_catalog_with_boms
 from gradle_deps_monitor.application.compute_risk_score import score_libraries
+from gradle_deps_monitor.application.ports.bom_resolver import BomResolver
 from gradle_deps_monitor.application.ports.catalog_parser import CatalogParser
 from gradle_deps_monitor.application.ports.changelog_fetcher import ChangelogFetcher
 from gradle_deps_monitor.application.ports.compliance_checker import ComplianceChecker
@@ -18,6 +20,7 @@ from gradle_deps_monitor.application.ports.version_status_resolver import Versio
 from gradle_deps_monitor.application.ports.vulnerability_scanner import VulnerabilityScanner
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import LibraryAdvisory
+from gradle_deps_monitor.domain.bom import BomResolution
 from gradle_deps_monitor.domain.changelog import ChangelogEntry
 from gradle_deps_monitor.domain.compliance import ComplianceFinding
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
@@ -54,6 +57,7 @@ class GenerateFreezeReport:
         module_usage_scanner: ModuleUsageScanner | None = None,
         license_checker: LicenseChecker | None = None,
         version_status_resolver: VersionStatusResolver | None = None,
+        bom_resolver: BomResolver | None = None,
         enable_risk_score: bool = False,
         risk_weights: RiskWeights | None = None,
         risk_thresholds: RiskThresholds | None = None,
@@ -68,6 +72,7 @@ class GenerateFreezeReport:
         self._module_usage_scanner = module_usage_scanner
         self._license_checker = license_checker
         self._version_status_resolver = version_status_resolver
+        self._bom_resolver = bom_resolver
         self._enable_risk_score = enable_risk_score
         self._risk_weights = risk_weights
         self._risk_thresholds = risk_thresholds
@@ -83,6 +88,17 @@ class GenerateFreezeReport:
             unrecoverable network or API error.
         """
         catalog = self._parser.parse(catalog_path)
+
+        # Resolve BoMs and enrich the catalog before any other step runs,
+        # so every downstream consumer (health checks, registries, scanners,
+        # writers) sees the same fully-resolved library set.
+        bom_resolutions: tuple[BomResolution, ...] = ()
+        if self._bom_resolver is not None:
+            bom_libraries = tuple(lib for lib in catalog.libraries if lib.is_bom_candidate)
+            if bom_libraries:
+                bom_resolutions = asyncio.run(self._bom_resolver.resolve(bom_libraries))
+                catalog = enrich_catalog_with_boms(catalog, bom_resolutions)
+
         findings = self._health_checker(catalog) if self._health_checker else ()
 
         security_advisories: tuple[LibraryAdvisory, ...] = ()
@@ -148,4 +164,5 @@ class GenerateFreezeReport:
             license_audit=license_audit,
             risk_score_report=risk_score_report,
             library_version_statuses=library_version_statuses,
+            bom_resolutions=bom_resolutions,
         )
