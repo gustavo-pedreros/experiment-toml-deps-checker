@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from gradle_deps_monitor.domain.severity import CommonSeverity
+
 
 class AdvisorySeverity(StrEnum):
     """Severity levels for security advisories, ordered from most to least severe."""
@@ -14,6 +16,26 @@ class AdvisorySeverity(StrEnum):
     MEDIUM = "medium"
     LOW = "low"
     UNKNOWN = "unknown"
+
+    def to_common(self) -> CommonSeverity:
+        """Map this advisory severity to the cross-section vocabulary.
+
+        ``CRITICAL`` and ``HIGH`` both render as :class:`CommonSeverity.ERROR`
+        because either is enough to block a release. ``MEDIUM`` is a
+        :class:`CommonSeverity.WARNING`. ``LOW`` and ``UNKNOWN`` collapse to
+        :class:`CommonSeverity.INFO` — they show up in reports but should not
+        out-shout louder findings.
+        """
+        return _ADVISORY_TO_COMMON[self]
+
+
+_ADVISORY_TO_COMMON: dict[AdvisorySeverity, CommonSeverity] = {
+    AdvisorySeverity.CRITICAL: CommonSeverity.ERROR,
+    AdvisorySeverity.HIGH: CommonSeverity.ERROR,
+    AdvisorySeverity.MEDIUM: CommonSeverity.WARNING,
+    AdvisorySeverity.LOW: CommonSeverity.INFO,
+    AdvisorySeverity.UNKNOWN: CommonSeverity.INFO,
+}
 
 
 # Ordered for comparison (index 0 = most severe).

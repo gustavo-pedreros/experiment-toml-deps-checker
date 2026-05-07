@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from gradle_deps_monitor.domain.severity import CommonSeverity
+
 
 class ComplianceSeverity(StrEnum):
     """Severity levels for Play Store compliance findings."""
@@ -12,6 +14,18 @@ class ComplianceSeverity(StrEnum):
     ERROR = "error"  # Active violation: deadline already passed
     WARNING = "warning"  # Upcoming deadline within the foreseeable future
     INFO = "info"  # Compliant / informational
+
+    def to_common(self) -> CommonSeverity:
+        """Map this compliance severity to the cross-section vocabulary."""
+        return _COMPLIANCE_TO_COMMON[self]
+
+
+# 1:1 — compliance vocabulary already aligns with CommonSeverity.
+_COMPLIANCE_TO_COMMON: dict[ComplianceSeverity, CommonSeverity] = {
+    ComplianceSeverity.ERROR: CommonSeverity.ERROR,
+    ComplianceSeverity.WARNING: CommonSeverity.WARNING,
+    ComplianceSeverity.INFO: CommonSeverity.INFO,
+}
 
 
 @dataclass(frozen=True)
