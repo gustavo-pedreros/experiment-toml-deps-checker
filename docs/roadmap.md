@@ -38,7 +38,7 @@ overall shape of this phase is constrained by [ADR-0006](adr/0006-pragmatic-clea
 | ✅ | Markdown + JSON outputs, committable to `freeze-reports/` | [ADR-0002](adr/0002-markdown-as-canonical-output-format.md) |
 | ✅ | Slack Block Kit output | — |
 | ✅ | Console executive summary | — |
-| ✅ | JSON output schema versioned (`schema_version: 1`) | — |
+| ✅ | JSON output schema versioned (`schema_version: "x.y.z"` SemVer string) | [ADR-0008](adr/0008-json-schema-semver.md) |
 | ✅ | Catalog Health audit (pluggable rules) | [RFC-0011](proposals/0011-catalog-health-audit.md) |
 
 ## Phase 2 — High-impact features for freeze workflow
@@ -63,13 +63,13 @@ Android teams at scale.
 | ✅ | Library health & deprecation prediction (hybrid KB + POM relocation) | [RFC-0006](proposals/0006-library-health-and-deprecation.md) |
 | ✅ | Module usage map (opt-in, expensive but high-signal) | [RFC-0007](proposals/0007-module-usage-map.md) |
 
-## Phase 4 — Polish and consolidation
+## Phase 4 — Polish and consolidation ✅ Closed (2026-05-07)
 
-Phase 4 closes the gaps discovered while integrating Phases 1–3
+Phase 4 closed the gaps discovered while integrating Phases 1–3
 end-to-end: dead infrastructure adapters, hard-coded config, BoM
 families treated as independent libraries, the empty compliance
 dimension in the risk score, and the visual inconsistency across
-sections.
+sections. All seven items shipped.
 
 | Status | Item | Reference |
 |--------|------|-----------|
@@ -83,7 +83,7 @@ sections.
 
 ## Backlog
 
-Items accepted into the roadmap but deferred until Phase 4 closes.
+Items accepted into the roadmap, scheduled after Phase 4.
 Ordering inside the backlog is not yet fixed; items here may be
 re-promoted into a later phase or split into sub-RFCs.
 
