@@ -25,7 +25,7 @@ from gradle_deps_monitor.domain.version_status import LibraryVersionStatus
 #   - MINOR (1.x.0): additive changes (new fields, new optional values)
 #   - PATCH (1.0.x): wire-format-equivalent changes
 # Consumers reading 1.x MUST tolerate unknown fields and unknown enum values.
-SCHEMA_VERSION = "1.3.0"
+SCHEMA_VERSION = "1.4.0"
 
 
 class JsonWriter:
@@ -183,6 +183,10 @@ def _advisory(a: Advisory) -> dict[str, Any]:
     result: dict[str, Any] = {
         "ghsa_id": a.ghsa_id,
         "severity": a.severity.value,
+        # RFC-0016b (schema 1.4.0+): cross-section severity for dashboards
+        # that want to chart "errors across all sections" without knowing
+        # each section's local vocabulary.
+        "common_severity": a.severity.to_common().value,
         "summary": a.summary,
         "url": a.url,
         "source": a.source,
@@ -198,6 +202,7 @@ def _compliance_finding(f: ComplianceFinding) -> dict[str, Any]:
     result: dict[str, Any] = {
         "rule_id": f.rule_id,
         "severity": f.severity.value,
+        "common_severity": f.severity.to_common().value,
         "message": f.message,
     }
     if f.detail:
@@ -220,6 +225,7 @@ def _toolchain_finding(f: ToolchainFinding) -> dict[str, Any]:
     result: dict[str, Any] = {
         "rule_id": f.rule_id,
         "severity": f.severity.value,
+        "common_severity": f.severity.to_common().value,
         "message": f.message,
     }
     if f.detail:
@@ -236,6 +242,7 @@ def _library_health_finding(f: LibraryHealthFinding) -> dict[str, Any]:
         "version": f.version,
         "signal": f.signal.value,
         "severity": f.severity.value,
+        "common_severity": f.severity.to_common().value,
         "message": f.message,
     }
     if f.replacement:
@@ -292,6 +299,7 @@ def _finding(f: Finding) -> dict[str, Any]:
     result: dict[str, Any] = {
         "rule_id": f.rule_id,
         "severity": f.severity.value,
+        "common_severity": f.severity.to_common().value,
         "message": f.message,
     }
     if f.details:

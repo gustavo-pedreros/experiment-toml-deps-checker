@@ -126,7 +126,7 @@ Reports written → freeze-reports/2026-05-04
 | File | Format | Purpose |
 |------|--------|---------|
 | `freeze.md` | Markdown | Human-readable report; commit to `freeze-reports/` |
-| `freeze.json` | JSON (`schema_version: "1.3.0"`) | CI parsing, dashboards |
+| `freeze.json` | JSON (`schema_version: "1.4.0"`) | CI parsing, dashboards |
 | `freeze-slack.json` | Slack Block Kit | Post via incoming webhook |
 
 The JSON `schema_version` follows SemVer per [ADR-0008](docs/adr/0008-json-schema-semver.md): MINOR bumps are additive (new fields), MAJOR bumps are breaking. Consumers reading `1.x` MUST tolerate unknown fields and unknown enum values.
@@ -231,7 +231,7 @@ ruff check . && ruff format --check . && mypy src/ && lint-imports && pytest
 ## Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md).  
-Phases 1–3 are fully shipped. Phase 4 (polish and consolidation) closes the gaps surfaced by integrating the previous phases end-to-end: layered configuration (RFC-0012), version-status as first-class data (RFC-0013), Maven BoM support (RFC-0014), compliance per-library attribution (RFC-0015), and a unified report style (RFC-0016). HTML export (RFC-0010) and freeze-history trend rendering are deferred to the backlog until Phase 4 closes.
+Phases 1–4 are fully shipped. The backlog now drives next steps: HTML export (RFC-0010) and freeze-history trend rendering, plus exploratory items.
 
 ---
 

@@ -5,17 +5,18 @@ from __future__ import annotations
 from pathlib import Path
 
 from gradle_deps_monitor.domain import FreezeReport
-from gradle_deps_monitor.domain.advisory import AdvisorySeverity, LibraryAdvisory
+from gradle_deps_monitor.domain.advisory import LibraryAdvisory
 from gradle_deps_monitor.domain.bom import BomResolution, VersionSource
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
 from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
-from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
-from gradle_deps_monitor.domain.finding import Finding, Severity
-from gradle_deps_monitor.domain.library_health import LibraryHealthFinding, LibraryHealthSeverity
+from gradle_deps_monitor.domain.compliance import ComplianceFinding
+from gradle_deps_monitor.domain.finding import Finding
+from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
 from gradle_deps_monitor.domain.license import LicenseAudit, LicenseTier
 from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.risk_score import RiskLevel, RiskScoreReport
-from gradle_deps_monitor.domain.toolchain import ToolchainFinding, ToolchainSeverity
+from gradle_deps_monitor.domain.severity_style import style_for
+from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 from gradle_deps_monitor.domain.version_status import LibraryVersionStatus, VersionDrift
 
 
@@ -32,12 +33,9 @@ class MarkdownWriter:
 # Rendering helpers
 # ---------------------------------------------------------------------------
 
-_SEVERITY_ICON = {
-    Severity.ERROR: "🔴",
-    Severity.WARNING: "⚠️",
-    Severity.INFO: "\U00002139️",
-    Severity.SUGGESTION: "💡",
-}
+# RFC-0016b: severity icons across every section now come from
+# severity_style.STYLE so the same severity renders with the same emoji
+# in Markdown, Slack, and console.
 
 
 def _render(report: FreezeReport) -> str:
@@ -193,22 +191,13 @@ def _bundles_section(bundles: list[Bundle]) -> str:
     return f"## Bundles ({len(bundles)})\n\n| Alias | Members |\n|---|---|\n{rows}"
 
 
-_ADVISORY_SEVERITY_ICON: dict[AdvisorySeverity, str] = {
-    AdvisorySeverity.CRITICAL: "🔴",
-    AdvisorySeverity.HIGH: "🟠",
-    AdvisorySeverity.MEDIUM: "🟡",
-    AdvisorySeverity.LOW: "🔵",
-    AdvisorySeverity.UNKNOWN: "⚪",
-}
-
-
 def _security_section(vulnerable: list[LibraryAdvisory]) -> str:
     if not vulnerable:
         return ""
     rows: list[str] = []
     for la in sorted(vulnerable, key=lambda x: x.alias):
         for adv in sorted(la.advisories, key=lambda a: a.severity):
-            icon = _ADVISORY_SEVERITY_ICON.get(adv.severity, "⚪")
+            icon = style_for(adv.severity.to_common()).md_emoji
             cve = f" / {adv.cve_id}" if adv.cve_id else ""
             fixed = f" · fixed in `{adv.fixed_version}`" if adv.fixed_version else ""
             rows.append(
@@ -226,19 +215,12 @@ def _security_section(vulnerable: list[LibraryAdvisory]) -> str:
     )
 
 
-_COMPLIANCE_SEVERITY_ICON: dict[ComplianceSeverity, str] = {
-    ComplianceSeverity.ERROR: "🔴",
-    ComplianceSeverity.WARNING: "⚠️",
-    ComplianceSeverity.INFO: "✅",
-}
-
-
 def _compliance_section(findings: list[ComplianceFinding]) -> str:
     if not findings:
         return ""
     rows: list[str] = []
     for f in findings:
-        icon = _COMPLIANCE_SEVERITY_ICON.get(f.severity, "")
+        icon = style_for(f.severity.to_common()).md_emoji
         deadline = f" (deadline: {f.deadline})" if f.deadline else ""
         migration = f" → `{f.migration}`" if f.migration else ""
         # RFC-0015: per-library findings carry an alias; catalog-level
@@ -257,19 +239,12 @@ def _compliance_section(findings: list[ComplianceFinding]) -> str:
     )
 
 
-_TOOLCHAIN_SEVERITY_ICON: dict[ToolchainSeverity, str] = {
-    ToolchainSeverity.ERROR: "🔴",
-    ToolchainSeverity.WARNING: "⚠️",
-    ToolchainSeverity.INFO: "✅",
-}
-
-
 def _toolchain_section(findings: list[ToolchainFinding]) -> str:
     if not findings:
         return ""
     rows: list[str] = []
     for f in findings:
-        icon = _TOOLCHAIN_SEVERITY_ICON.get(f.severity, "")
+        icon = style_for(f.severity.to_common()).md_emoji
         rec = f" {f.recommendation}" if f.recommendation else ""
         rows.append(f"| {icon} {f.severity.upper()} | `{f.rule_id}` | {f.message}{rec} |")
     noun = "finding" if len(findings) == 1 else "findings"
@@ -285,7 +260,7 @@ def _health_section(findings: list[Finding]) -> str:
     if not findings:
         return ""
     rows = "\n".join(
-        f"| {_SEVERITY_ICON.get(f.severity, f.severity.value)} {f.severity.value} "
+        f"| {style_for(f.severity.to_common()).md_emoji} {f.severity.value} "
         f"| `{f.rule_id}` | {f.message} |"
         for f in findings
     )
@@ -326,19 +301,12 @@ def _changelog_section(entries: list[ChangelogEntry]) -> str:
     )
 
 
-_LIBRARY_HEALTH_SEVERITY_ICON: dict[LibraryHealthSeverity, str] = {
-    LibraryHealthSeverity.HIGH: "🔴",
-    LibraryHealthSeverity.MEDIUM: "🟡",
-    LibraryHealthSeverity.LOW: "🔵",
-}
-
-
 def _library_health_section(findings: list[LibraryHealthFinding]) -> str:
     if not findings:
         return ""
     rows: list[str] = []
     for f in sorted(findings, key=lambda x: (x.severity, x.alias)):
-        icon = _LIBRARY_HEALTH_SEVERITY_ICON.get(f.severity, "⚪")
+        icon = style_for(f.severity.to_common()).md_emoji
         replacement = f" → `{f.replacement}`" if f.replacement else ""
         migration = f" ([migration]({f.migration_url}))" if f.migration_url else ""
         rows.append(

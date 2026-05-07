@@ -1,11 +1,11 @@
-"""Unit tests for the central SeverityStyle map (RFC-0016a)."""
+"""Unit tests for the central SeverityStyle map (RFC-0016)."""
 
 from __future__ import annotations
 
 import pytest
 
 from gradle_deps_monitor.domain.severity import CommonSeverity
-from gradle_deps_monitor.presentation.severity_style import (
+from gradle_deps_monitor.domain.severity_style import (
     STYLE,
     SeverityStyle,
     style_for,

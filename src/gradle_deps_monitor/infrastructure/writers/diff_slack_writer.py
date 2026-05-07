@@ -7,15 +7,23 @@ from pathlib import Path
 from typing import Any
 
 from gradle_deps_monitor.domain.diff import FreezeDiff, VersionBump
+from gradle_deps_monitor.domain.finding import Severity
+from gradle_deps_monitor.domain.severity_style import style_for
 
 _MAX_ENTRIES = 8  # Max library rows shown per section in Slack
 
-_SEVERITY_EMOJI = {
-    "error": ":red_circle:",
-    "warning": ":warning:",
-    "info": ":information_source:",
-    "suggestion": ":bulb:",
-}
+
+def _severity_emoji(severity_value: str) -> str:
+    """Resolve a serialised severity string to its unified Slack emoji.
+
+    The diff loader stores severity as a plain string for forward-compat;
+    mapping it back through :class:`Severity` keeps the diff writer aligned
+    with the freeze writer (RFC-0016b).
+    """
+    try:
+        return style_for(Severity(severity_value).to_common()).slack_emoji
+    except ValueError:
+        return ""
 
 
 class DiffSlackWriter:
@@ -221,7 +229,7 @@ def _findings_block(diff: FreezeDiff) -> dict[str, Any]:
 
     lines: list[str] = ["*:stethoscope: Catalog Health*"]
     for f in diff.findings_introduced:
-        emoji = _SEVERITY_EMOJI.get(f.severity, "")
+        emoji = _severity_emoji(f.severity)
         lines.append(f":new: {emoji} `{f.rule_id}` — {f.message}")
     for f in diff.findings_resolved:
         lines.append(f":white_check_mark: `{f.rule_id}` — {f.message} _(resolved)_")
