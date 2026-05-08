@@ -81,9 +81,23 @@ sections. All seven items shipped.
 | ✅ | Compliance per-library attribution | [RFC-0015](proposals/0015-compliance-per-library-attribution.md) |
 | ✅ | Unified report style (severity + row layout) | [RFC-0016](proposals/0016-unified-report-style.md) |
 
+## Phase 5 — Scale & CI Integration 🚧 In progress
+
+Focuses on making the tool production-ready for large Android teams,
+improving audit visibility through CSV exports, and establishing
+policy enforcement for CI/CD.
+
+| Status | Item | Reference |
+|--------|------|-----------|
+| 🚧 | Comprehensive CSV Export (Inventory & Findings) | [RFC-0017](proposals/0017-csv-export.md) |
+| 📋 | Official User Guide (English) | [RFC-0021](proposals/0021-user-guide.md) |
+| 📋 | High-Performance & Accurate Module Scanner | [RFC-0019](proposals/0019-module-scanner.md) |
+| 📋 | Robust Version Detection (Rich Versions) | [RFC-0020](proposals/0020-rich-versions.md) |
+| 📋 | CI Gatekeeper (Policy Enforcement) | [RFC-0018](proposals/0018-ci-gatekeeper.md) |
+
 ## Backlog
 
-Items accepted into the roadmap, scheduled after Phase 4.
+Items accepted into the roadmap, scheduled after Phase 5.
 Ordering inside the backlog is not yet fixed; items here may be
 re-promoted into a later phase or split into sub-RFCs.
 

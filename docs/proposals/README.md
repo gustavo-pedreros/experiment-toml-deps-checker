@@ -79,6 +79,11 @@ How will we know this proposal achieved its goal once shipped?
 | [0014](0014-maven-bom-support.md) | Maven BoM (Bill of Materials) support | Proposed | 1, 3, 6 |
 | [0015](0015-compliance-per-library-attribution.md) | Compliance per-library attribution | Proposed | 2, 6 |
 | [0016](0016-unified-report-style.md) | Unified report style (severity + row layout) | Proposed | 5 |
+| [0017](0017-csv-export.md) | Comprehensive CSV Export (Inventory & Findings) | Proposed | 5 |
+| [0018](0018-ci-gatekeeper.md) | CI Gatekeeper (Policy Enforcement) | Proposed | 1, 2 |
+| [0019](0019-module-scanner.md) | High-Performance & Accurate Module Scanner | Proposed | 3, 5 |
+| [0020](0020-rich-versions.md) | Robust Version Detection (Rich Versions Support) | Proposed | 5 |
+| [0021](0021-user-guide.md) | Official User Guide | Proposed | 5 |
 
 > Lifecycle status (Accepted, In progress, Shipped) is tracked in
 > [`docs/roadmap.md`](../roadmap.md). The "Status" column above
