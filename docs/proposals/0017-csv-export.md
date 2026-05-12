@@ -2,7 +2,7 @@
 
 **Status:** Draft
 **Created:** 2026-05-07
-**Related JTBDs:** JTBD-5 (readable report), cross-cutting
+**Related JTBDs:** JTBD-5 (Technical Audit Trail), cross-cutting
 **Depends on:** none
 
 ## Problem
@@ -48,22 +48,43 @@ A flat log of every warning, error, and informational finding detected across th
 - `message`: Human-readable description of the problem.
 - `recommendation`: Suggested fix or next steps.
 
+## Tracer Bullet Path (ADR-0009)
+
+To validate the end-to-end integration before implementing all 15+ columns, the first PR will consist of:
+1. **Infrastructure**: Create a skeletal `InventoryCsvWriter` in `infrastructure/writers/`.
+2. **Domain**: Ensure `FreezeReport` has access to the library list (already exists).
+3. **Composition Root**: Register the new writer in `bootstrap.py` so an `inventory.csv` file is generated on every run.
+4. **Minimal Output**: The initial CSV will only contain two columns: `alias` and `coordinate`.
+
+This confirms that file system operations, permissions, and the wiring in the Composition Root are working correctly.
+
 ## Implementation Plan
 
-### Phase 1: Infrastructure Adapters
-- Create `src/gradle_deps_monitor/infrastructure/writers/csv_writer.py`.
-- Implement `InventoryCsvWriter` and `FindingsCsvWriter` using the standard `csv` module.
-- Ensure proper escaping and UTF-8 encoding.
+### Phase 1: Tracer Bullet
+- Implement the skeletal writer and wire it in the Composition Root (`bootstrap.py`).
+- Verify the file is created in the output directory with minimal columns.
 
-### Phase 2: Wiring
-- Update `src/gradle_deps_monitor/bootstrap.py` to include these writers in the `check` command pipeline.
-- Filenames: `inventory.csv` and `findings.csv`.
+### Phase 2: Exploration (Optional Spike)
+- Research handling of special characters and line breaks in CSV cells to ensure Excel compatibility (Python's `csv` module dialects).
 
-### Phase 3: Verification
-- Add unit tests for both writers using mock `FreezeReport` data.
-- Verify that opt-out data (like `--risk-score` disabled) results in empty or "N/A" columns instead of crashes.
+### Phase 3: Enrichment
+- Add the remaining columns (Risk Score, CVEs, etc.) once the "plumbing" is validated.
 
 ## Alternatives considered
 
 - **Single Master CSV:** Rejected. Mixing library dimensions with individual findings results in a confusing schema with too many empty cells.
 - **Excel (.xlsx) Export:** Rejected. CSV is simpler to implement, version-control friendly, and more portable for CI environments.
+
+## Success metrics
+
+- `inventory.csv` and `findings.csv` are generated alongside the Markdown report.
+- The CSV files are correctly parsed by Microsoft Excel and Google Sheets without encoding issues.
+
+## Definition of Done (DoD)
+
+- [ ] **Integration**: `inventory.csv` is automatically generated when running `check`.
+- [ ] **Architecture**: The writer is registered in the **Composition Root** (`bootstrap.py`).
+- [ ] **Testing**: Integration tests verify file creation and basic content.
+- [ ] **Robustness**: Verified that the exporter does not crash when optional features (Risk Score, Module Usage) are disabled.
+- [ ] **Validation**: CSV format is compatible with common spreadsheet software (UTF-8).
+ormat is compatible with common spreadsheet software (UTF-8).

@@ -45,6 +45,11 @@ user see? What does the report look like?
 
 Where helpful, include a concrete output example.
 
+## Tracer Bullet Path (ADR-0009)
+
+Describe the thinnest end-to-end path to see a real data point in the final report.
+Identify what needs to be wired in the **Composition Root** (e.g., `bootstrap.py`) for the first PR.
+
 ## Alternatives considered
 
 What other approaches were considered? Why were they not chosen?
@@ -57,6 +62,31 @@ APIs, or operational concerns.
 ## Success metrics
 
 How will we know this proposal achieved its goal once shipped?
+
+## Schema impact
+
+Declare any change to `freeze.json` / `freeze-diff.json` schema per
+ADR-0008: `none | patch | minor | major`. If the change adds an output
+file (CSV, HTML, etc.) describe its versioning contract here too.
+
+## Rollback strategy
+
+How can this change be reverted without breaking downstream consumers?
+Required for any RFC that adds an output file, changes a schema, or
+introduces a new CLI flag that other tooling may come to depend on.
+List the revert order if multiple PRs are involved.
+
+## PR budget
+
+Estimated number of PRs from tracer to DoD. If `> 5`, consider
+splitting into sub-RFCs.
+
+## Definition of Done (DoD)
+
+- [ ] **Integration**: Wired in the **Composition Root** and visible in at least one report output.
+- [ ] **Architecture**: Follows ADR-0006 (Clean Architecture) and ADR-0009 (Tracer Bullets).
+- [ ] **Testing**: Integration tests cover the Tracer Bullet path.
+- [ ] **Documentation**: README or User Guide updated if applicable.
 ```
 
 ## Index
