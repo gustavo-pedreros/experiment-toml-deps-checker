@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from gradle_deps_monitor.domain.catalog import Catalog
 from gradle_deps_monitor.domain.toolchain import ToolchainSeverity
 from gradle_deps_monitor.infrastructure.checkers.toolchain_compatibility_checker import (
     ToolchainCompatibilityChecker,
@@ -15,17 +16,38 @@ from gradle_deps_monitor.infrastructure.checkers.toolchain_compatibility_checker
     _normalize_key,
     _version_tuple,
 )
+from gradle_deps_monitor.infrastructure.parsing.toml_catalog_parser import TomlCatalogParser
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_catalog(tmp_path: Path, toml_content: str) -> _MockCatalog:
-    """Write a TOML file and return a minimal catalog-like object."""
+def _make_catalog(tmp_path: Path, toml_content: str) -> Catalog:
+    """Write a TOML file and parse it with the real ``TomlCatalogParser``.
+
+    Returns a real :class:`Catalog`. RFC-0020 PR #2 made the toolchain
+    checker a pure consumer of the domain model (no TOML re-parse), so
+    the tests now exercise the same path as production.
+    """
     toml_file = tmp_path / "libs.versions.toml"
     toml_file.write_text(textwrap.dedent(toml_content), encoding="utf-8")
-    return _MockCatalog(toml_file)
+    return TomlCatalogParser().parse(toml_file)
+
+
+def _catalog_with_versions(tmp_path: Path, versions: dict[str, str]) -> Catalog:
+    """Build a Catalog with an arbitrary versions map, no TOML on disk.
+
+    Useful for unit tests of helpers that only need ``Catalog.versions``
+    and a stable ``source_path``.
+    """
+    return Catalog(
+        source_path=tmp_path / "libs.versions.toml",
+        libraries=(),
+        plugins=(),
+        bundles=(),
+        versions=dict(versions),
+    )
 
 
 def _make_wrapper(tmp_path: Path, gradle_version: str) -> None:
@@ -38,14 +60,6 @@ def _make_wrapper(tmp_path: Path, gradle_version: str) -> None:
         f"gradle-{gradle_version}-bin.zip\n",
         encoding="utf-8",
     )
-
-
-class _MockCatalog:
-    """Minimal stand-in for Catalog used in tests."""
-
-    def __init__(self, source_path: Path) -> None:
-        self.source_path = source_path
-        self.libraries: list = []
 
 
 # ---------------------------------------------------------------------------
@@ -155,22 +169,40 @@ class TestFindToolchainVersions:
         v = _find_toolchain_versions(cat)
         assert v["compose_compiler"] == "1.5.8"
 
-    def test_missing_file_returns_empty(self, tmp_path: Path) -> None:
-        cat = _MockCatalog(tmp_path / "nonexistent.toml")
+    def test_empty_versions_returns_empty(self, tmp_path: Path) -> None:
+        """An empty catalog versions map yields no toolchain entries.
+
+        RFC-0020 PR #2 replaced the previous "ignore non-string values"
+        path: the parser now rejects unsupported types in ``[versions]``
+        at parse time (matching Gradle's own constraint). The checker
+        sees only valid string entries.
+        """
+        cat = _catalog_with_versions(tmp_path, {})
         assert _find_toolchain_versions(cat) == {}
 
-    def test_ignores_non_string_values(self, tmp_path: Path) -> None:
+    def test_detects_kotlin_pinned_with_strictly(self, tmp_path: Path) -> None:
+        """RFC-0020 §2: ``[versions]`` rich blocks are flattened to the effective string."""
         cat = _make_catalog(
             tmp_path,
             """\
             [versions]
-            targetSdk = 35
-            kotlin = "2.1.0"
+            kotlin = { strictly = "2.0.21" }
             """,
         )
         v = _find_toolchain_versions(cat)
-        assert "kotlin" in v
-        assert "targetSdk" not in v
+        assert v["kotlin"] == "2.0.21"
+
+    def test_skips_reject_only_entries(self, tmp_path: Path) -> None:
+        """Reject-only rich blocks have no positive pin → checker skips them."""
+        cat = _make_catalog(
+            tmp_path,
+            """\
+            [versions]
+            kotlin = { reject = ["2.0.0"] }
+            """,
+        )
+        v = _find_toolchain_versions(cat)
+        assert "kotlin" not in v
 
     def test_first_match_wins(self, tmp_path: Path) -> None:
         """When two keys normalize to the same token the first one wins."""
@@ -194,16 +226,16 @@ class TestFindToolchainVersions:
 class TestFindGradleVersion:
     def test_reads_bin_zip(self, tmp_path: Path) -> None:
         _make_wrapper(tmp_path, "8.11")
-        cat = _MockCatalog(tmp_path / "libs.versions.toml")
+        cat = _catalog_with_versions(tmp_path, {})
         assert _find_gradle_version(cat) == "8.11"
 
     def test_reads_three_part_version(self, tmp_path: Path) -> None:
         _make_wrapper(tmp_path, "8.11.1")
-        cat = _MockCatalog(tmp_path / "libs.versions.toml")
+        cat = _catalog_with_versions(tmp_path, {})
         assert _find_gradle_version(cat) == "8.11.1"
 
     def test_returns_none_when_missing(self, tmp_path: Path) -> None:
-        cat = _MockCatalog(tmp_path / "libs.versions.toml")
+        cat = _catalog_with_versions(tmp_path, {})
         assert _find_gradle_version(cat) is None
 
 

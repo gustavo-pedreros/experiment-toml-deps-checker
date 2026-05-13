@@ -35,7 +35,7 @@ class TomlCatalogParser:
         toml_path = self._resolve_path(path)
         data = self._load(toml_path)
 
-        versions: dict[str, str] = _expect_str_map(data.get("versions", {}), "versions")
+        versions: dict[str, str] = _parse_versions_map(data.get("versions", {}))
         libraries = self._parse_libraries(data.get("libraries", {}), versions)
         plugins = self._parse_plugins(data.get("plugins", {}), versions)
         bundles = self._parse_bundles(data.get("bundles", {}))
@@ -219,7 +219,8 @@ def _resolve_version_table(
         )
 
     if rich_keys_present:
-        return _build_rich_version(alias, table, section)
+        constraints = _build_rich_version_from_table(alias, table, section)
+        return constraints.effective, None, constraints
 
     if isinstance(ref, str):
         resolved = versions.get(ref)
@@ -236,28 +237,29 @@ def _resolve_version_table(
     )
 
 
-def _build_rich_version(
+def _build_rich_version_from_table(
     alias: str,
     table: dict[str, Any],
     section: str,
-) -> tuple[MavenVersion, str | None, RichVersion | None]:
+) -> RichVersion:
     """Build a :class:`RichVersion` from a TOML rich-version table.
 
     Validates the type of each recognised key and rejects anything
-    unparseable with a useful, section-aware error message.
+    unparseable with a useful, section-aware error message. Shared by
+    the ``[libraries]``/``[plugins]`` version-field parser and the
+    top-level ``[versions]`` map parser.
     """
     strictly = _expect_optional_str(table, "strictly", alias, section)
     require = _expect_optional_str(table, "require", alias, section)
     prefer = _expect_optional_str(table, "prefer", alias, section)
     reject = _expect_optional_str_list(table, "reject", alias, section)
 
-    constraints = RichVersion(
+    return RichVersion(
         strictly=strictly,
         require=require,
         prefer=prefer,
         reject=reject,
     )
-    return constraints.effective, None, constraints
 
 
 def _expect_optional_str(table: dict[str, Any], key: str, alias: str, section: str) -> str | None:
@@ -285,11 +287,46 @@ def _expect_optional_str_list(
     return tuple(value)
 
 
-def _expect_str_map(value: Any, section: str) -> dict[str, str]:
+def _parse_versions_map(value: Any) -> dict[str, str]:
+    """Parse the top-level ``[versions]`` map.
+
+    Accepts two value shapes per key (RFC-0020):
+
+    - **string** — the canonical form (``kotlin = "2.0.0"``).
+    - **rich-version table** — one or more of ``strictly`` / ``require`` /
+      ``prefer`` / ``reject`` (``kotlin = { strictly = "2.0.0" }``).
+
+    Rich tables are flattened to their *effective* version per
+    :class:`RichVersion` precedence (``strictly`` > ``require`` >
+    ``prefer``). A reject-only entry resolves to the empty-string
+    sentinel, which mirrors the BoM-managed convention and excludes the
+    key from drift analysis.
+
+    This preserves ``Catalog.versions``'s ``dict[str, str]`` contract:
+    every downstream consumer (catalog health rules, ``version.ref``
+    resolution, toolchain checker) keeps seeing plain strings, while
+    catalogs that pin toolchains via rich tables no longer crash.
+    """
     if not isinstance(value, dict):
-        raise CatalogParseError(f"[{section}] must be a table")
-    bad = {k: v for k, v in value.items() if not isinstance(v, str)}
-    if bad:
-        keys = ", ".join(bad)
-        raise CatalogParseError(f"[{section}] non-string values for keys: {keys}")
-    return value
+        raise CatalogParseError("[versions] must be a table")
+
+    resolved: dict[str, str] = {}
+    for key, raw in value.items():
+        if isinstance(raw, str):
+            resolved[key] = raw
+            continue
+        if isinstance(raw, dict):
+            rich_keys_present = _RICH_KEYS.intersection(raw.keys())
+            if not rich_keys_present:
+                raise CatalogParseError(
+                    f"[versions] '{key}': version table has no rich-version keys "
+                    f"({', '.join(sorted(_RICH_KEYS))})"
+                )
+            constraints = _build_rich_version_from_table(key, raw, "[versions]")
+            resolved[key] = constraints.effective.raw
+            continue
+        raise CatalogParseError(
+            f"[versions] '{key}': expected a string or rich-version table, "
+            f"got '{type(raw).__name__}'"
+        )
+    return resolved

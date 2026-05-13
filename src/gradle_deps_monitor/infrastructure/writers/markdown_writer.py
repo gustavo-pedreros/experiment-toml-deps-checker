@@ -55,6 +55,7 @@ def _render(report: FreezeReport) -> str:
         _health_section(list(report.health_findings)),
         _security_section(list(report.vulnerable_libraries)),
         _compliance_section(list(report.compliance_findings)),
+        _active_rejections_section(list(report.catalog.libraries)),
         _toolchain_section(list(report.toolchain_findings)),
         _library_health_section(list(report.library_health_findings)),
         _changelog_section(list(report.changelog_entries)),
@@ -235,6 +236,38 @@ def _compliance_section(findings: list[ComplianceFinding]) -> str:
         f"## Play Store Compliance ({len(findings)} {noun})\n\n"
         "> Checked against the bundled Play Store compliance knowledge base.\n\n"
         "| Severity | Rule | Library | Details |\n"
+        "|---|---|---|---|\n" + "\n".join(rows)
+    )
+
+
+def _active_rejections_section(libraries: list[Library]) -> str:
+    """Render libraries whose catalog entry declares a ``reject`` list.
+
+    RFC-0020 §3 surfaces ``reject`` as a positive correctness signal:
+    the team has explicitly forbidden specific versions of a library
+    (typically known-vulnerable releases or CVE-tainted lines). This
+    section gives reviewers a single place to see those intentional
+    negative pins.
+
+    Emits nothing when no library uses ``reject``.
+    """
+    rows: list[str] = []
+    for lib in sorted(libraries, key=lambda x: x.alias):
+        vc = lib.version_constraints
+        if vc is None or not vc.reject:
+            continue
+        rejected = ", ".join(f"`{v}`" for v in vc.reject)
+        effective = lib.version.raw if lib.version.raw else "—"
+        rows.append(f"| `{lib.alias}` | `{lib.coordinate}` | `{effective}` | {rejected} |")
+    if not rows:
+        return ""
+    noun = "rejection" if len(rows) == 1 else "rejections"
+    return (
+        f"## Active Rejections ({len(rows)} {noun})\n\n"
+        "> Libraries with an explicit `reject` list in the catalog. "
+        "These are intentional negative pins — versions the team has "
+        "forbidden (often known-vulnerable releases).\n\n"
+        "| Library | Coordinate | Effective version | Rejected versions |\n"
         "|---|---|---|---|\n" + "\n".join(rows)
     )
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import tomllib
 from importlib import resources
 from typing import Any
 
@@ -66,22 +65,21 @@ def _version_tuple(version: str) -> tuple[int, ...]:
 
 
 def _find_toolchain_versions(catalog: Catalog) -> dict[str, str]:
-    """Extract toolchain-relevant version strings from the catalog TOML.
+    """Extract toolchain-relevant version strings from the parsed catalog.
+
+    Consumes :attr:`Catalog.versions` directly — the parser has already
+    flattened rich-version blocks (e.g. ``kotlin = { strictly = "2.0.0" }``)
+    to their effective string, per RFC-0020. The checker no longer re-parses
+    the TOML; it is a pure consumer of the domain model.
 
     Returns a dict with any of the keys ``"kotlin"``, ``"agp"``, ``"ksp"``,
     ``"compose_compiler"`` that could be found. Missing keys are omitted.
+    Entries whose effective version is empty (reject-only rich blocks,
+    BoM-managed) are skipped because there is nothing to compare against.
     """
-    try:
-        with open(catalog.source_path, "rb") as fh:
-            data = tomllib.load(fh)
-    except OSError:
-        return {}
-
-    versions: dict[str, Any] = data.get("versions", {})
     result: dict[str, str] = {}
-
-    for key, value in versions.items():
-        if not isinstance(value, str):
+    for key, value in catalog.versions.items():
+        if not value:  # reject-only or otherwise unresolved → skip silently
             continue
         norm = _normalize_key(key)
         if norm in _KOTLIN_TOKENS and "kotlin" not in result:
