@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from gradle_deps_monitor.domain.bom import VersionSource
+from gradle_deps_monitor.domain.rich_version import RichVersion
 from gradle_deps_monitor.domain.version import MavenVersion
 
 # Suffixes that mark a library entry as a BoM by convention.
@@ -32,6 +33,22 @@ class Library:
     #: BoM-resolution step in
     #: :class:`~gradle_deps_monitor.application.generate_freeze_report.GenerateFreezeReport`.
     bom_alias: str | None = None
+    #: Rich-version declaration (``strictly`` / ``require`` / ``prefer`` /
+    #: ``reject``) when the catalog used one. ``None`` for plain-string
+    #: versions, ``version.ref`` lookups, and BoM-managed entries. See
+    #: RFC-0020. When set, ``version_constraints.effective`` MUST equal
+    #: ``version`` — enforced in :meth:`__post_init__`.
+    version_constraints: RichVersion | None = None
+
+    def __post_init__(self) -> None:
+        if self.version_constraints is None:
+            return
+        effective = self.version_constraints.effective
+        if effective != self.version:
+            raise ValueError(
+                f"Library '{self.alias}': version_constraints.effective "
+                f"('{effective.raw}') must equal version ('{self.version.raw}')"
+            )
 
     @property
     def coordinate(self) -> str:

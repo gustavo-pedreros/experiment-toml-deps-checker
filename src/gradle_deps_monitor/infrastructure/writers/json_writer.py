@@ -25,7 +25,7 @@ from gradle_deps_monitor.domain.version_status import LibraryVersionStatus
 #   - MINOR (1.x.0): additive changes (new fields, new optional values)
 #   - PATCH (1.0.x): wire-format-equivalent changes
 # Consumers reading 1.x MUST tolerate unknown fields and unknown enum values.
-SCHEMA_VERSION = "1.4.0"
+SCHEMA_VERSION = "1.5.0"
 
 
 class JsonWriter:
@@ -112,6 +112,20 @@ def _lib(lib: Library, status: LibraryVersionStatus | None = None) -> dict[str, 
     }
     if lib.bom_alias is not None:
         payload["bom_alias"] = lib.bom_alias
+    if lib.version_constraints is not None:
+        rv = lib.version_constraints
+        # Only emit keys actually declared in the catalog, to keep the
+        # output minimal and unambiguous. Empty ``reject`` is omitted.
+        constraints: dict[str, Any] = {}
+        if rv.strictly is not None:
+            constraints["strictly"] = rv.strictly
+        if rv.require is not None:
+            constraints["require"] = rv.require
+        if rv.prefer is not None:
+            constraints["prefer"] = rv.prefer
+        if rv.reject:
+            constraints["reject"] = list(rv.reject)
+        payload["version_constraints"] = constraints
     if status is not None:
         payload["version_status"] = {
             "latest": status.latest.raw if status.latest is not None else None,

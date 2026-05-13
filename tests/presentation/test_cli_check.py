@@ -96,7 +96,7 @@ def test_check_json_report_is_valid(tmp_path: Path) -> None:
     out = tmp_path / "reports"
     runner.invoke(app, ["check", str(gradle_dir), "--out", str(out)])
     data = json.loads((out / "freeze.json").read_text(encoding="utf-8"))
-    assert data["schema_version"] == "1.4.0"
+    assert data["schema_version"] == "1.5.0"
     assert data["catalog"]["library_count"] == 1
 
 

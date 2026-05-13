@@ -17,6 +17,7 @@ from gradle_deps_monitor.domain import (
     Plugin,
     Severity,
 )
+from gradle_deps_monitor.domain.rich_version import RichVersion
 from gradle_deps_monitor.domain.version import MavenVersion
 from gradle_deps_monitor.infrastructure.writers.json_writer import JsonWriter
 from gradle_deps_monitor.infrastructure.writers.markdown_writer import MarkdownWriter
@@ -172,7 +173,7 @@ def test_json_schema_version(full_report: FreezeReport, tmp_path: Path) -> None:
     dest = tmp_path / "freeze.json"
     JsonWriter().write(full_report, dest)
     data = json.loads(dest.read_text(encoding="utf-8"))
-    assert data["schema_version"] == "1.4.0"
+    assert data["schema_version"] == "1.5.0"
 
 
 def test_json_generated_at(full_report: FreezeReport, tmp_path: Path) -> None:
@@ -232,6 +233,79 @@ def test_json_ends_with_newline(full_report: FreezeReport, tmp_path: Path) -> No
     dest = tmp_path / "freeze.json"
     JsonWriter().write(full_report, dest)
     assert dest.read_text(encoding="utf-8").endswith("\n")
+
+
+# ---------------------------------------------------------------------------
+# JsonWriter — rich-version metadata (RFC-0020)
+# ---------------------------------------------------------------------------
+
+
+def test_json_omits_version_constraints_when_absent(
+    full_report: FreezeReport, tmp_path: Path
+) -> None:
+    """Libraries built with plain-string versions emit no ``version_constraints``."""
+    dest = tmp_path / "freeze.json"
+    JsonWriter().write(full_report, dest)
+    data = json.loads(dest.read_text(encoding="utf-8"))
+    for lib in data["catalog"]["libraries"]:
+        assert "version_constraints" not in lib
+
+
+def test_json_emits_version_constraints_when_present(tmp_path: Path) -> None:
+    """A rich-versioned library serialises its declared keys verbatim."""
+    catalog = Catalog(
+        source_path=tmp_path / "libs.versions.toml",
+        libraries=(
+            Library(
+                alias="kotlin-stdlib",
+                group="org.jetbrains.kotlin",
+                artifact="kotlin-stdlib",
+                version=MavenVersion("2.0.0"),
+                version_constraints=RichVersion(strictly="2.0.0", reject=("1.9.0",)),
+            ),
+        ),
+        plugins=(),
+        bundles=(),
+    )
+    report = FreezeReport(catalog=catalog, generated_at=_TS)
+
+    dest = tmp_path / "freeze.json"
+    JsonWriter().write(report, dest)
+    data = json.loads(dest.read_text(encoding="utf-8"))
+
+    lib = data["catalog"]["libraries"][0]
+    assert lib["version"] == "2.0.0"
+    assert lib["version_constraints"] == {
+        "strictly": "2.0.0",
+        "reject": ["1.9.0"],
+    }
+
+
+def test_json_reject_only_library_emits_empty_version_string(tmp_path: Path) -> None:
+    """Reject-only entries serialise with an empty ``version`` and a non-empty ``reject``."""
+    catalog = Catalog(
+        source_path=tmp_path / "libs.versions.toml",
+        libraries=(
+            Library(
+                alias="coil",
+                group="io.coil-kt",
+                artifact="coil-compose",
+                version=MavenVersion(""),
+                version_constraints=RichVersion(reject=("2.5.0", "2.5.0-rc1")),
+            ),
+        ),
+        plugins=(),
+        bundles=(),
+    )
+    report = FreezeReport(catalog=catalog, generated_at=_TS)
+
+    dest = tmp_path / "freeze.json"
+    JsonWriter().write(report, dest)
+    data = json.loads(dest.read_text(encoding="utf-8"))
+
+    lib = data["catalog"]["libraries"][0]
+    assert lib["version"] == ""
+    assert lib["version_constraints"] == {"reject": ["2.5.0", "2.5.0-rc1"]}
 
 
 def test_json_empty_catalog(empty_report: FreezeReport, tmp_path: Path) -> None:

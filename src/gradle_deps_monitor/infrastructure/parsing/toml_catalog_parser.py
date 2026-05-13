@@ -8,7 +8,11 @@ from typing import Any
 
 from gradle_deps_monitor.application.ports.catalog_parser import CatalogParseError
 from gradle_deps_monitor.domain import Bundle, Catalog, Library, Plugin
+from gradle_deps_monitor.domain.rich_version import RichVersion
 from gradle_deps_monitor.domain.version import MavenVersion
+
+# Rich-version keys recognised in a TOML version table (RFC-0020).
+_RICH_KEYS: frozenset[str] = frozenset({"strictly", "require", "prefer", "reject"})
 
 # Gradle Version Catalog conventional filename.
 _CATALOG_FILENAME = "libs.versions.toml"
@@ -79,7 +83,7 @@ class TomlCatalogParser:
                     f"[libraries] '{alias}': expected a table, got {type(entry).__name__}"
                 )
             group, artifact = _parse_coordinate(alias, entry)
-            version, version_ref = _resolve_version(
+            version, version_ref, constraints = _resolve_version(
                 alias, entry.get("version"), versions, "[libraries]"
             )
             libraries.append(
@@ -89,6 +93,7 @@ class TomlCatalogParser:
                     artifact=artifact,
                     version=version,
                     version_ref=version_ref,
+                    version_constraints=constraints,
                 )
             )
         return libraries
@@ -107,7 +112,11 @@ class TomlCatalogParser:
             plugin_id = entry.get("id")
             if not isinstance(plugin_id, str):
                 raise CatalogParseError(f"[plugins] '{alias}': missing or invalid 'id' field")
-            version, version_ref = _resolve_version(
+            # Plugins share the same parser path as libraries to fix the
+            # rich-version crash, but for the tracer they discard the
+            # rich-version metadata. Surfacing Plugin.version_constraints
+            # is a Phase 3 follow-up of RFC-0020.
+            version, version_ref, _ = _resolve_version(
                 alias, entry.get("version"), versions, "[plugins]"
             )
             plugins.append(
@@ -156,32 +165,124 @@ def _resolve_version(
     version_field: Any,
     versions: dict[str, str],
     section: str,
-) -> tuple[MavenVersion, str | None]:
-    """Resolve a TOML version field to a ``(MavenVersion, version_ref)`` pair.
+) -> tuple[MavenVersion, str | None, RichVersion | None]:
+    """Resolve a TOML version field to ``(MavenVersion, version_ref, constraints)``.
 
-    The field can be absent (BOM-managed), a literal string, or a table
-    with a ``ref`` key pointing to ``[versions]``.
+    The field can be:
 
-    Returns the resolved :class:`MavenVersion` and the name of the version
-    key used (``version_ref``), or ``None`` when the version is inline or absent.
+    - absent (BoM-managed)
+    - a literal string
+    - a table with a ``ref`` key pointing to ``[versions]``
+    - a table with one or more rich-version keys (``strictly`` /
+      ``require`` / ``prefer`` / ``reject``), per RFC-0020
+
+    Returns a triple:
+
+    - ``MavenVersion``: the effective version for comparisons / drift.
+    - ``version_ref``: the ``[versions]`` key used, or ``None`` for
+      inline / absent / rich.
+    - ``constraints``: a :class:`RichVersion` when the table used any
+      rich key, else ``None``. The invariant
+      ``constraints.effective == returned_version`` always holds.
     """
     if version_field is None:
-        return MavenVersion(""), None
+        return MavenVersion(""), None, None
     if isinstance(version_field, str):
-        return MavenVersion(version_field), None
+        return MavenVersion(version_field), None, None
     if isinstance(version_field, dict):
-        ref: str | None = version_field.get("ref")
-        if not isinstance(ref, str):
-            raise CatalogParseError(f"{section} '{alias}': version table has no 'ref' key")
+        return _resolve_version_table(alias, version_field, versions, section)
+    raise CatalogParseError(
+        f"{section} '{alias}': unexpected version type '{type(version_field).__name__}'"
+    )
+
+
+def _resolve_version_table(
+    alias: str,
+    table: dict[str, Any],
+    versions: dict[str, str],
+    section: str,
+) -> tuple[MavenVersion, str | None, RichVersion | None]:
+    """Resolve a version *table*: either ``{ref}`` or rich-version keys.
+
+    The two forms are mutually exclusive in this tracer. Mixing
+    ``ref`` with rich-version keys raises :class:`CatalogParseError`;
+    Phase 2 of RFC-0020 may revisit that policy after sampling real
+    catalogs.
+    """
+    ref = table.get("ref")
+    rich_keys_present = _RICH_KEYS.intersection(table.keys())
+
+    if ref is not None and rich_keys_present:
+        raise CatalogParseError(
+            f"{section} '{alias}': combining 'ref' with rich-version keys "
+            f"({', '.join(sorted(rich_keys_present))}) is not supported"
+        )
+
+    if rich_keys_present:
+        return _build_rich_version(alias, table, section)
+
+    if isinstance(ref, str):
         resolved = versions.get(ref)
         if resolved is None:
             raise CatalogParseError(
                 f"{section} '{alias}': version.ref '{ref}' not found in [versions]"
             )
-        return MavenVersion(resolved), ref
+        return MavenVersion(resolved), ref, None
+
+    # Empty table or table with only unknown keys.
     raise CatalogParseError(
-        f"{section} '{alias}': unexpected version type '{type(version_field).__name__}'"
+        f"{section} '{alias}': version table has no 'ref' key and no rich-version keys "
+        f"({', '.join(sorted(_RICH_KEYS))})"
     )
+
+
+def _build_rich_version(
+    alias: str,
+    table: dict[str, Any],
+    section: str,
+) -> tuple[MavenVersion, str | None, RichVersion | None]:
+    """Build a :class:`RichVersion` from a TOML rich-version table.
+
+    Validates the type of each recognised key and rejects anything
+    unparseable with a useful, section-aware error message.
+    """
+    strictly = _expect_optional_str(table, "strictly", alias, section)
+    require = _expect_optional_str(table, "require", alias, section)
+    prefer = _expect_optional_str(table, "prefer", alias, section)
+    reject = _expect_optional_str_list(table, "reject", alias, section)
+
+    constraints = RichVersion(
+        strictly=strictly,
+        require=require,
+        prefer=prefer,
+        reject=reject,
+    )
+    return constraints.effective, None, constraints
+
+
+def _expect_optional_str(table: dict[str, Any], key: str, alias: str, section: str) -> str | None:
+    value = table.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise CatalogParseError(
+            f"{section} '{alias}': rich-version key '{key}' must be a string, "
+            f"got '{type(value).__name__}'"
+        )
+    return value
+
+
+def _expect_optional_str_list(
+    table: dict[str, Any], key: str, alias: str, section: str
+) -> tuple[str, ...]:
+    value = table.get(key)
+    if value is None:
+        return ()
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise CatalogParseError(
+            f"{section} '{alias}': rich-version key '{key}' must be a list of strings"
+        )
+    return tuple(value)
 
 
 def _expect_str_map(value: Any, section: str) -> dict[str, str]:

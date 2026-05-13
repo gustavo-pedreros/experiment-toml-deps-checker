@@ -10,6 +10,28 @@ be assigned once a stable public API is established.
 
 ## [Unreleased]
 
+### Fixed
+- Parser no longer crashes on Gradle Version Catalogs that use rich-version
+  blocks (`strictly` / `require` / `prefer` / `reject`). Previously,
+  `TomlCatalogParser` raised `CatalogParseError` on the first such entry,
+  making the tool unusable for teams pinning toolchains via `strictly`
+  (a common pattern with Kotlin / KSP / AGP). See
+  [RFC-0020](docs/proposals/0020-rich-versions.md) — Tracer Bullet.
+
+### Added
+- New `RichVersion` domain value object capturing the four Gradle rich-version
+  keys plus a derived `effective` version (precedence: `strictly` > `require`
+  > `prefer`, falling back to an empty version for reject-only entries).
+- `Library.version_constraints` optional field, set only when the catalog
+  actually uses a rich block. Construction is guarded by a runtime invariant:
+  `version_constraints.effective` must equal `version`.
+- `freeze.json` schema bumped to `1.5.0` (MINOR per ADR-0008). Adds optional
+  `version_constraints` per library entry. Existing consumers reading `1.x`
+  continue to work.
+- Production-style fixture under `tests/fixtures/rich_versions/` covering
+  Kotlin/KSP `strictly`, AGP `require`, Hilt `prefer`, Coil `reject`-only,
+  plus plain-string and `version.ref` libraries in the same catalog.
+
 ---
 
 ## [0.1.0] — 2026-05-04
