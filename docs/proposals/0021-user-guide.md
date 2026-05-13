@@ -2,46 +2,58 @@
 
 **Status:** Draft
 **Created:** 2026-05-07
-**Related JTBDs:** JTBD-5 (readability), onboarding
+**Related JTBDs:** JTBD-5 (Readability), Onboarding
 **Depends on:** none
 
 ## Problem
 
-The project lacks official user-facing documentation. While a draft `USER_GUIDE.md` exists in some environments, it is not part of the repository's core docs, is written in Spanish (violating ADR-0005), and contains outdated information about "limitations" (like BoM support) that were resolved in Phase 4.
+The project lacks official, up-to-date, and unified documentation for end users. The existing information is scattered across READMEs and RFCs, and the untracked `USER_GUIDE.md` is in Spanish (violating ADR-0005) and contains technical inaccuracies regarding recently shipped features (like BoM support).
 
 ## Proposed solution
 
-Create a comprehensive, official `docs/USER_GUIDE.md` in English that reflects the current state of the tool and provides clear onboarding for Android teams.
+Deliver a comprehensive `docs/USER_GUIDE.md` in English that serves as the "Technical Manual" for Android teams.
 
-### Content Outline
+### 1. Scope
+- **Getting Started**: Installation, project structure, and first run.
+- **Feature Deep-Dives**: Detailed explanation of Risk Score, Module Usage, and BoM support.
+- **CI Integration**: Copy-pasteable examples for GitHub Actions and Bitrise.
+- **Configuration**: Complete reference for `gradle-deps-monitor.toml` and environment variables.
 
-1.  **Introduction:** Purpose of the tool and technical due-diligence.
-2.  **Core Commands:**
-    *   `check`: Deep audit and reporting.
-    *   `diff`: Baseline establishment and comparative analysis.
-3.  **Advanced Features:**
-    *   Risk Score (weights and thresholds).
-    *   Module Usage Map (opt-in).
-    *   Maven BoM support.
-4.  **CI Integration:**
-    *   GitHub Actions example.
-    *   Bitrise example.
-    *   Slack notification setup.
-5.  **Configuration:**
-    *   `gradle-deps-monitor.toml` reference.
-    *   Environment variables (tokens).
+## Tracer Bullet Path (ADR-0009)
+
+While this is a documentation task, it must be "integrated" into the project structure:
+1. **Documentation**: Create a skeletal `docs/USER_GUIDE.md` with just the Introduction and Table of Contents.
+2. **Project Index**: Link to the guide from `README.md`.
+3. **Cleanup**: Remove any legacy or untracked `USER_GUIDE.md` files from the root to avoid confusion.
+
+*This confirms the documentation "plumbing" is correct and discoverable by users.*
 
 ## Implementation Plan
 
-### Phase 1: Drafting
-- Write the full guide in English.
-- Verify all CLI examples against the actual help output.
+### Phase 1: Tracer Bullet & Cleanup
+- Create the skeletal guide.
+- Link from README and remove the legacy Spanish file.
 
-### Phase 2: Integration
-- Move the guide to `docs/USER_GUIDE.md`.
-- Update `README.md` with a "Documentation" section pointing to the guide.
-- Remove the unofficial/untracked `USER_GUIDE.md` from the root (if present).
+### Phase 2: Content Drafting
+- Write the core sections (Check, Diff, Config).
+- Verify all CLI flags against the actual implementation.
+
+### Phase 3: CI Examples
+- Add tested examples for major CI platforms.
 
 ## Alternatives considered
 
-- **In-README documentation:** Rejected. The README should be a high-level overview. A separate guide is better for deep-dives and CI examples.
+- **External Documentation Site**: Rejected for now. Keeping it in-repo (`.md`) is better for versioning and offline access.
+
+## Success metrics
+
+- A user can set up the tool in a new project in under 5 minutes using the guide.
+- The guide covers 100% of the features described in the README.
+- Zero Spanish text remains in the documentation.
+
+## Definition of Done (DoD)
+
+- [ ] **Content**: Full English guide covering all major features.
+- [ ] **Discoverability**: Clearly linked from the main README.
+- [ ] **Accuracy**: All code snippets and CLI flags are verified to be correct.
+- [ ] **Cleanup**: No duplicate or legacy documentation files remain in the root.
