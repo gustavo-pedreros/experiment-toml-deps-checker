@@ -1,0 +1,38 @@
+# Production-style fixture for RFC-0020 (rich versions).
+#
+# Mirrors a realistic Android toolchain catalog where pin/preference
+# semantics matter: Kotlin and KSP are *strictly* pinned together (a
+# single mismatch breaks the build), AGP declares a baseline that
+# tooling may bump, Hilt expresses a soft preference, and an old known-
+# bad release of Coil is explicitly rejected.
+#
+# Before RFC-0020, parsing this file crashed the tool with
+# ``CatalogParseError: version table has no 'ref' key``. The whole
+# point of the tracer is that ``check`` runs to completion against
+# this fixture and emits a freeze.json with the rich-version metadata.
+
+[versions]
+compose = "1.6.4"
+
+[libraries]
+# Strictly pinned: KSP must match the Kotlin compiler exactly.
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version = { strictly = "2.0.0" } }
+ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version = { strictly = "2.0.0-1.0.21" } }
+
+# Baseline declaration: tooling may upgrade if other constraints allow.
+agp-gradle = { module = "com.android.tools.build:gradle", version = { require = "8.3.0" } }
+
+# Soft preference: take 2.51.1 unless something stronger is asked.
+hilt-android = { module = "com.google.dagger:hilt-android", version = { prefer = "2.51.1" } }
+
+# Reject-only: explicit "do not use these versions" with no positive pin.
+# Real example: coil-compose 2.5.0 had a memory regression that some
+# teams blocklist while allowing whatever positive pin transitive
+# resolution lands on.
+coil-compose = { module = "io.coil-kt:coil-compose", version = { reject = ["2.5.0", "2.5.0-rc1"] } }
+
+# Plain-string version, mixed with rich-version libraries above.
+compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "compose" }
+
+[plugins]
+android-application = { id = "com.android.application", version = { require = "8.3.0" } }

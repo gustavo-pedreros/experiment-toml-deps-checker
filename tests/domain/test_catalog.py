@@ -8,6 +8,7 @@ import pytest
 
 from gradle_deps_monitor.domain.catalog import Bundle, Catalog, Library, Plugin
 from gradle_deps_monitor.domain.report import FreezeReport
+from gradle_deps_monitor.domain.rich_version import RichVersion
 from gradle_deps_monitor.domain.version import MavenVersion
 
 # ---------------------------------------------------------------------------
@@ -57,6 +58,37 @@ def test_library_is_immutable() -> None:
     lib = _lib("my-lib")
     with pytest.raises(FrozenInstanceError):
         lib.alias = "other"  # type: ignore[misc]
+
+
+def test_library_accepts_consistent_version_constraints() -> None:
+    """RFC-0020: ``version_constraints.effective`` matches ``version``."""
+    lib = Library(
+        alias="kotlin-stdlib",
+        group="org.jetbrains.kotlin",
+        artifact="kotlin-stdlib",
+        version=MavenVersion("2.0.0"),
+        version_constraints=RichVersion(strictly="2.0.0"),
+    )
+    assert lib.version_constraints is not None
+    assert lib.version_constraints.strictly == "2.0.0"
+
+
+def test_library_rejects_inconsistent_version_constraints() -> None:
+    """RFC-0020 invariant: divergence between ``version`` and ``effective`` is forbidden."""
+    with pytest.raises(ValueError, match="must equal version"):
+        Library(
+            alias="kotlin-stdlib",
+            group="org.jetbrains.kotlin",
+            artifact="kotlin-stdlib",
+            version=MavenVersion("2.0.0"),
+            version_constraints=RichVersion(strictly="9.9.9"),
+        )
+
+
+def test_library_without_version_constraints_is_unchanged() -> None:
+    """Libraries with plain-string versions keep ``version_constraints`` as ``None``."""
+    lib = _lib("ordinary-lib", version="1.2.3")
+    assert lib.version_constraints is None
 
 
 # ---------------------------------------------------------------------------

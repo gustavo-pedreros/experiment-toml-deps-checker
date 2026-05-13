@@ -83,3 +83,5 @@ acceptable because the tool has no public consumers yet.
   — additional MINOR bump (`1.x.0` → `1.x+1.0`).
 - [RFC-0016](../proposals/0016-unified-report-style.md) — adds
   `common_severity` to existing finding objects (MINOR).
+- [RFC-0020](../proposals/0020-rich-versions.md) — adds optional
+  `version_constraints` to library entries (MINOR, `1.4.0` → `1.5.0`).

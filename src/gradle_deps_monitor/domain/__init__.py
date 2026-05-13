@@ -8,6 +8,7 @@ from gradle_deps_monitor.domain.advisory import Advisory, AdvisorySeverity, Libr
 from gradle_deps_monitor.domain.catalog import Bundle, Catalog, Library, Plugin
 from gradle_deps_monitor.domain.finding import Finding, Severity
 from gradle_deps_monitor.domain.report import FreezeReport
+from gradle_deps_monitor.domain.rich_version import RichVersion
 from gradle_deps_monitor.domain.version import MavenVersion, Stability
 
 __all__ = [
@@ -21,6 +22,7 @@ __all__ = [
     "LibraryAdvisory",
     "MavenVersion",
     "Plugin",
+    "RichVersion",
     "Severity",
     "Stability",
 ]
