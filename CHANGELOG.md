@@ -17,6 +17,25 @@ be assigned once a stable public API is established.
   making the tool unusable for teams pinning toolchains via `strictly`
   (a common pattern with Kotlin / KSP / AGP). See
   [RFC-0020](docs/proposals/0020-rich-versions.md) — Tracer Bullet.
+- Parser now also accepts rich-version blocks in the top-level `[versions]`
+  table (e.g. `kotlin = { strictly = "2.0.0" }`), not only inline on
+  `[libraries]` / `[plugins]` entries. Previously the tracer fix only
+  covered library-level rich blocks; catalogs pinning Kotlin/KSP/AGP via
+  `[versions]` + `version.ref` still crashed at parse time. Rich blocks
+  in `[versions]` are flattened to their effective string in
+  `Catalog.versions`, preserving the `dict[str, str]` contract for
+  downstream consumers. RFC-0020 — PR #2.
+- `ToolchainCompatibilityChecker` now sees Kotlin/AGP/KSP versions that
+  are declared with rich blocks in `[versions]`. Before, the checker
+  silently skipped non-string entries because it re-parsed the raw TOML
+  itself, so pinning Kotlin with `strictly` made the entire toolchain
+  audit invisible.
+
+### Changed
+- `ToolchainCompatibilityChecker` no longer re-parses the catalog TOML
+  file. It consumes `Catalog.versions` directly, per the RFC-0020 checker
+  contract ("checkers stop doing any TOML-aware introspection"). Behaviour
+  is unchanged for catalogs that use plain-string versions.
 
 ### Added
 - New `RichVersion` domain value object capturing the four Gradle rich-version
@@ -31,6 +50,11 @@ be assigned once a stable public API is established.
 - Production-style fixture under `tests/fixtures/rich_versions/` covering
   Kotlin/KSP `strictly`, AGP `require`, Hilt `prefer`, Coil `reject`-only,
   plus plain-string and `version.ref` libraries in the same catalog.
+- New **Active Rejections** section in the Markdown report. Lists every
+  library whose catalog entry declares a `reject` list — intentional
+  negative pins (often known-vulnerable releases) — so reviewers see them
+  in one place. Emits nothing when no library uses `reject`. The JSON
+  report already exposes the same data per library since schema 1.5.0.
 
 ---
 

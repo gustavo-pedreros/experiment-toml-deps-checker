@@ -309,3 +309,161 @@ def test_production_style_fixture_parses() -> None:
     assert compose_ui is not None
     assert compose_ui.version_constraints is None
     assert str(compose_ui.version) == "1.6.4"
+
+
+# ---------------------------------------------------------------------------
+# RFC-0020 PR #2: rich-version tables inside the top-level [versions] map
+# ---------------------------------------------------------------------------
+
+
+class TestVersionsMapRichTables:
+    """Pre-PR #2, ``[versions]`` rejected any non-string value (including
+    rich-version tables). Real catalogs pin Kotlin/KSP/AGP via rich tables
+    at the [versions] level and reference them through ``version.ref``,
+    so this crash blocked toolchain auditing for those teams.
+
+    PR #2 extends the parser to accept rich tables in ``[versions]`` and
+    flatten them to the effective string. The ``dict[str, str]`` contract
+    of ``Catalog.versions`` is preserved so downstream consumers don't
+    change.
+    """
+
+    def test_strictly_in_versions_is_flattened(self, tmp_path: Path) -> None:
+        cat = PARSER.parse(
+            _write(
+                tmp_path,
+                """\
+[versions]
+kotlin = { strictly = "2.0.21" }
+""",
+            )
+        )
+        assert cat.versions["kotlin"] == "2.0.21"
+
+    def test_require_in_versions_is_flattened(self, tmp_path: Path) -> None:
+        cat = PARSER.parse(
+            _write(
+                tmp_path,
+                """\
+[versions]
+agp = { require = "8.3.0" }
+""",
+            )
+        )
+        assert cat.versions["agp"] == "8.3.0"
+
+    def test_prefer_in_versions_is_flattened(self, tmp_path: Path) -> None:
+        cat = PARSER.parse(
+            _write(
+                tmp_path,
+                """\
+[versions]
+hilt = { prefer = "2.51.1" }
+""",
+            )
+        )
+        assert cat.versions["hilt"] == "2.51.1"
+
+    def test_reject_only_resolves_to_empty_sentinel(self, tmp_path: Path) -> None:
+        """Reject-only entries have no positive pin → flatten to ``""``.
+
+        This matches the BoM-managed sentinel used elsewhere in the
+        domain (empty :class:`MavenVersion`). Downstream consumers that
+        skip empty entries (e.g. toolchain checker) handle this
+        transparently.
+        """
+        cat = PARSER.parse(
+            _write(
+                tmp_path,
+                """\
+[versions]
+coil = { reject = ["2.5.0"] }
+""",
+            )
+        )
+        assert cat.versions["coil"] == ""
+
+    def test_strictly_wins_over_prefer_in_versions(self, tmp_path: Path) -> None:
+        cat = PARSER.parse(
+            _write(
+                tmp_path,
+                """\
+[versions]
+kotlin = { strictly = "2.0.21", prefer = "1.9.20" }
+""",
+            )
+        )
+        assert cat.versions["kotlin"] == "2.0.21"
+
+    def test_versions_rich_block_resolvable_via_ref(self, tmp_path: Path) -> None:
+        """A rich-pinned version remains addressable by ``version.ref``.
+
+        End-to-end: rich block in ``[versions]`` → ``Catalog.versions``
+        flattened → library's ``version.ref`` resolves to the effective
+        string. This is the common production pattern (Kotlin pinned with
+        ``strictly`` once, referenced by stdlib/coroutines libraries).
+        """
+        cat = PARSER.parse(
+            _write(
+                tmp_path,
+                """\
+[versions]
+kotlin = { strictly = "2.0.21" }
+
+[libraries]
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
+""",
+            )
+        )
+        stdlib = cat.library("kotlin-stdlib")
+        assert stdlib is not None
+        assert str(stdlib.version) == "2.0.21"
+        assert stdlib.version_ref == "kotlin"
+        # The library inherits the effective string; the rich metadata
+        # itself stays on Catalog.versions (PR #2 keeps the per-library
+        # version_constraints unset for ref-resolved entries — a possible
+        # PR #3 enhancement).
+        assert stdlib.version_constraints is None
+
+    def test_plain_string_still_accepted(self, tmp_path: Path) -> None:
+        cat = PARSER.parse(
+            _write(
+                tmp_path,
+                """\
+[versions]
+kotlin = "2.0.21"
+""",
+            )
+        )
+        assert cat.versions["kotlin"] == "2.0.21"
+
+    def test_integer_in_versions_still_rejected(self, tmp_path: Path) -> None:
+        """Gradle requires strings/tables in ``[versions]``; integers fail.
+
+        Pre-PR #2 the error message said "non-string values for keys";
+        post-PR #2 it's a per-key message. Either way, the parser MUST
+        reject non-string, non-table values.
+        """
+        with pytest.raises(CatalogParseError, match="versions"):
+            PARSER.parse(
+                _write(
+                    tmp_path,
+                    """\
+[versions]
+targetSdk = 35
+""",
+                )
+            )
+
+    def test_empty_table_in_versions_is_rejected(self, tmp_path: Path) -> None:
+        """An empty table has no rich keys — clearly an authoring mistake."""
+        with pytest.raises(CatalogParseError, match="rich-version keys"):
+            PARSER.parse(
+                _write(
+                    tmp_path,
+                    """\
+[versions]
+kotlin = {}
+""",
+                )
+            )

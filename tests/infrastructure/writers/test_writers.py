@@ -404,3 +404,106 @@ def test_json_health_finding_count_matches_list(
     JsonWriter().write(report_with_findings, dest)
     data = json.loads(dest.read_text(encoding="utf-8"))
     assert data["health"]["finding_count"] == len(data["health"]["findings"])
+
+
+# ---------------------------------------------------------------------------
+# Markdown — Active Rejections section (RFC-0020 PR #2)
+# ---------------------------------------------------------------------------
+
+
+def _report_with_rejecting_library(tmp_path: Path) -> FreezeReport:
+    catalog = Catalog(
+        source_path=tmp_path / "libs.versions.toml",
+        libraries=(
+            Library(
+                alias="coil-compose",
+                group="io.coil-kt",
+                artifact="coil-compose",
+                version=MavenVersion(""),
+                version_constraints=RichVersion(reject=("2.5.0", "2.5.0-rc1")),
+            ),
+            Library(
+                alias="kotlin-stdlib",
+                group="org.jetbrains.kotlin",
+                artifact="kotlin-stdlib",
+                version=MavenVersion("2.0.0"),
+                version_constraints=RichVersion(strictly="2.0.0", reject=("1.9.0",)),
+            ),
+            Library(
+                alias="plain",
+                group="org.example",
+                artifact="plain",
+                version=MavenVersion("1.0.0"),
+            ),
+        ),
+        plugins=(),
+        bundles=(),
+    )
+    return FreezeReport(catalog=catalog, generated_at=_TS)
+
+
+def test_markdown_active_rejections_section_present(tmp_path: Path) -> None:
+    """Libraries with ``reject`` produce a dedicated section."""
+    report = _report_with_rejecting_library(tmp_path)
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(report, dest)
+    text = dest.read_text(encoding="utf-8")
+    assert "## Active Rejections" in text
+
+
+def test_markdown_active_rejections_lists_rejected_versions(tmp_path: Path) -> None:
+    """Every rejected version appears verbatim in the table."""
+    report = _report_with_rejecting_library(tmp_path)
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(report, dest)
+    text = dest.read_text(encoding="utf-8")
+    assert "2.5.0" in text
+    assert "2.5.0-rc1" in text
+    assert "1.9.0" in text
+
+
+def test_markdown_active_rejections_lists_aliases(tmp_path: Path) -> None:
+    """Each rejecting library appears as its own row."""
+    report = _report_with_rejecting_library(tmp_path)
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(report, dest)
+    text = dest.read_text(encoding="utf-8")
+    # Both rejecting libraries are listed; the plain library is not.
+    rejections_section = text.split("## Active Rejections", 1)[1]
+    next_section = rejections_section.split("\n## ", 1)[0]
+    assert "coil-compose" in next_section
+    assert "kotlin-stdlib" in next_section
+    assert "plain" not in next_section
+
+
+def test_markdown_omits_active_rejections_when_no_library_uses_reject(
+    full_report: FreezeReport, tmp_path: Path
+) -> None:
+    """No reject lists → no section emitted (keeps reports lean)."""
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(full_report, dest)
+    text = dest.read_text(encoding="utf-8")
+    assert "Active Rejections" not in text
+
+
+def test_markdown_active_rejections_singular_noun(tmp_path: Path) -> None:
+    """Header agrees in number when exactly one library declares a reject list."""
+    catalog = Catalog(
+        source_path=tmp_path / "libs.versions.toml",
+        libraries=(
+            Library(
+                alias="coil",
+                group="io.coil-kt",
+                artifact="coil",
+                version=MavenVersion(""),
+                version_constraints=RichVersion(reject=("2.5.0",)),
+            ),
+        ),
+        plugins=(),
+        bundles=(),
+    )
+    report = FreezeReport(catalog=catalog, generated_at=_TS)
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(report, dest)
+    text = dest.read_text(encoding="utf-8")
+    assert "Active Rejections (1 rejection)" in text
