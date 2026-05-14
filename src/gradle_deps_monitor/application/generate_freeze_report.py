@@ -127,6 +127,13 @@ class GenerateFreezeReport:
         module_usage_map: ModuleUsageMap | None = None
         if self._module_usage_scanner is not None:
             module_usage_map = self._module_usage_scanner.scan(catalog_path, catalog)
+            # RFC-0019 PR #1: scanner-emitted findings (e.g. ``MOD-001``
+            # for unreadable build files) are appended to the existing
+            # health findings channel, per the RFC's "via the existing
+            # findings channel" contract. They reuse the same Finding
+            # shape so writers don't need a dedicated section.
+            if module_usage_map is not None and module_usage_map.findings:
+                findings = findings + module_usage_map.findings
 
         license_audit: LicenseAudit | None = None
         if self._license_checker is not None:
