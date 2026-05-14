@@ -330,3 +330,186 @@ class TestGradleModuleScannerEdgeCases:
         assert result is not None
         usages = {u.alias: u for u in result.library_usages}
         assert ":app" in usages["androidx-core-ktx"].implementation_modules
+
+
+# ---------------------------------------------------------------------------
+# RFC-0019 PR #1 — camelCase accessor recognition
+# ---------------------------------------------------------------------------
+
+
+from gradle_deps_monitor.infrastructure.scanners.gradle_module_scanner import (  # noqa: E402
+    _alias_to_camel,
+    _build_accessor_map,
+)
+
+
+class TestAliasToCamel:
+    """Gradle generates camelCase from kebab aliases by lowercasing the
+    first segment and title-casing every subsequent segment.
+    """
+
+    def test_single_word(self) -> None:
+        assert _alias_to_camel("retrofit") == "retrofit"
+
+    def test_two_segments(self) -> None:
+        assert _alias_to_camel("core-ktx") == "coreKtx"
+
+    def test_three_segments(self) -> None:
+        assert _alias_to_camel("androidx-core-ktx") == "androidxCoreKtx"
+
+    def test_already_camel_remains_camel(self) -> None:
+        # No hyphens → input is returned as-is.
+        assert _alias_to_camel("okHttp") == "okhttp"
+
+    def test_empty_segments_dropped(self) -> None:
+        # Leading / trailing / consecutive hyphens are silently coalesced.
+        assert _alias_to_camel("--foo--bar--") == "fooBar"
+
+    def test_empty_alias_returns_input(self) -> None:
+        assert _alias_to_camel("") == ""
+
+
+class TestBuildAccessorMap:
+    """The reverse-lookup map must cover BOTH accessor forms so that
+    KTS-style ``libs.fooBar`` and Groovy-style ``libs.foo.bar`` both
+    resolve to the same catalog alias.
+    """
+
+    def test_contains_dotted_form(self) -> None:
+        m = _build_accessor_map(_catalog("androidx-core-ktx"))
+        assert m["androidx.core.ktx"] == "androidx-core-ktx"
+
+    def test_contains_camel_form(self) -> None:
+        m = _build_accessor_map(_catalog("androidx-core-ktx"))
+        assert m["androidxCoreKtx"] == "androidx-core-ktx"
+
+    def test_single_word_alias_same_under_both_forms(self) -> None:
+        m = _build_accessor_map(_catalog("retrofit"))
+        # Both forms collapse to "retrofit"; one key, one value.
+        assert m == {"retrofit": "retrofit"}
+
+    def test_multiple_libraries(self) -> None:
+        m = _build_accessor_map(_catalog("retrofit", "androidx-core-ktx", "core-ktx"))
+        # Five distinct accessor strings (retrofit + two pairs).
+        assert m["retrofit"] == "retrofit"
+        assert m["androidx.core.ktx"] == "androidx-core-ktx"
+        assert m["androidxCoreKtx"] == "androidx-core-ktx"
+        assert m["core.ktx"] == "core-ktx"
+        assert m["coreKtx"] == "core-ktx"
+
+
+class TestGradleModuleScannerCamelCase:
+    """End-to-end: a KTS build file using ``libs.fooBar`` produces a
+    non-zero usage count. This is the regression target — pre-PR #1 the
+    scanner returned 0 here.
+    """
+
+    def test_camel_case_accessor_detected(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.androidxCoreKtx) }",
+        )
+        result = GradleModuleScanner().scan(tmp_path, _catalog("androidx-core-ktx"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["androidx-core-ktx"].implementation_modules
+
+    def test_mixed_camel_and_dotted_in_same_project(self, tmp_path: Path) -> None:
+        _write(
+            tmp_path / "settings.gradle.kts",
+            'include(":app")\ninclude(":feature")',
+        )
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.androidxCoreKtx) }",
+        )
+        _write(
+            tmp_path / "feature" / "build.gradle.kts",
+            "dependencies { implementation(libs.androidx.core.ktx) }",
+        )
+        result = GradleModuleScanner().scan(tmp_path, _catalog("androidx-core-ktx"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["androidx-core-ktx"].implementation_modules
+        assert ":feature" in usages["androidx-core-ktx"].implementation_modules
+
+    def test_camel_case_in_kts_with_string_quotes(self, tmp_path: Path) -> None:
+        """``api libs.fooBar`` (Groovy without parens) — same regex path."""
+        _write(tmp_path / "settings.gradle", "include ':app'")
+        _write(
+            tmp_path / "app" / "build.gradle",
+            "dependencies {\n    api libs.androidxCoreKtx\n}",
+        )
+        result = GradleModuleScanner().scan(tmp_path, _catalog("androidx-core-ktx"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["androidx-core-ktx"].api_modules
+
+
+# ---------------------------------------------------------------------------
+# RFC-0019 PR #1 — malformed-file resilience (MOD-001)
+# ---------------------------------------------------------------------------
+
+
+class TestGradleModuleScannerMalformedFile:
+    """A binary or otherwise unreadable build file must not crash the
+    scan. Each affected module emits one ``MOD-001`` finding; the rest
+    of the project continues to scan.
+    """
+
+    def test_binary_build_file_emits_mod_001(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")\ninclude(":corrupt")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.retrofit) }",
+        )
+        # :corrupt has a build file containing bytes that aren't valid UTF-8.
+        corrupt_path = tmp_path / "corrupt" / "build.gradle.kts"
+        corrupt_path.parent.mkdir(parents=True, exist_ok=True)
+        corrupt_path.write_bytes(b"\xff\xfe\x00\x80 not valid utf-8 \xc3\x28")
+
+        result = GradleModuleScanner().scan(tmp_path, _catalog("retrofit"))
+        assert result is not None
+        rule_ids = [f.rule_id for f in result.findings]
+        assert "MOD-001" in rule_ids
+
+    def test_scan_continues_after_corrupt_module(self, tmp_path: Path) -> None:
+        """Healthy modules are still scanned after a corrupt sibling."""
+        _write(tmp_path / "settings.gradle.kts", 'include(":corrupt")\ninclude(":app")')
+        corrupt_path = tmp_path / "corrupt" / "build.gradle.kts"
+        corrupt_path.parent.mkdir(parents=True, exist_ok=True)
+        corrupt_path.write_bytes(b"\xff\xfe\x00")
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.retrofit) }",
+        )
+
+        result = GradleModuleScanner().scan(tmp_path, _catalog("retrofit"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        # :app was still scanned despite the corrupt :corrupt module.
+        assert ":app" in usages["retrofit"].implementation_modules
+
+    def test_mod_001_message_includes_module_path(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle.kts", 'include(":bad")')
+        bad = tmp_path / "bad" / "build.gradle.kts"
+        bad.parent.mkdir(parents=True, exist_ok=True)
+        bad.write_bytes(b"\xff\xfe\x00")
+        result = GradleModuleScanner().scan(tmp_path, _catalog("retrofit"))
+        assert result is not None
+        assert len(result.findings) == 1
+        finding = result.findings[0]
+        assert finding.rule_id == "MOD-001"
+        assert ":bad" in finding.message
+
+    def test_healthy_scan_emits_no_findings(self, tmp_path: Path) -> None:
+        """Default invariant: no corrupt files → empty findings tuple."""
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.retrofit) }",
+        )
+        result = GradleModuleScanner().scan(tmp_path, _catalog("retrofit"))
+        assert result is not None
+        assert result.findings == ()

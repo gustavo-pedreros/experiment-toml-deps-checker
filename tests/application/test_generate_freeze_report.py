@@ -204,3 +204,70 @@ def test_execute_uses_default_weights_when_none_provided(
     assert report.risk_score_report is not None
     assert report.risk_score_report.weights == RiskWeights()
     assert report.risk_score_report.thresholds == RiskThresholds()
+
+
+# ---------------------------------------------------------------------------
+# RFC-0019 PR #1 — scanner findings are merged into health_findings
+# ---------------------------------------------------------------------------
+
+
+class _ScannerEmittingMod001:
+    """Stub ModuleUsageScanner that returns a map carrying a MOD-001 finding.
+
+    Models the production scenario where one module's build file is
+    unreadable: the scanner returns a map for the modules that DID
+    read, plus a ``MOD-001`` Finding for the one that didn't. The
+    application layer must promote that finding into
+    ``FreezeReport.health_findings`` per the RFC-0019 contract.
+    """
+
+    def __init__(self) -> None:
+        self.scanned = False
+
+    def scan(self, catalog_path, catalog):  # type: ignore[no-untyped-def]
+        from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
+
+        self.scanned = True
+        return ModuleUsageMap(
+            library_usages=(),
+            module_summaries=(),
+            modules_scanned=0,
+            findings=(
+                Finding(
+                    rule_id="MOD-001",
+                    severity=Severity.WARNING,
+                    message="Could not read build file for module `:corrupt`: UnicodeDecodeError",
+                ),
+            ),
+        )
+
+
+def test_scanner_findings_merged_into_health_findings(catalog_with_libs: Catalog) -> None:
+    """RFC-0019 PR #1: scanner-emitted findings reach the report."""
+    scanner = _ScannerEmittingMod001()
+    use_case = GenerateFreezeReport(_OkParser(catalog_with_libs), module_usage_scanner=scanner)
+    report = use_case.execute(Path("/some/path"))
+
+    assert scanner.scanned
+    rule_ids = [f.rule_id for f in report.health_findings]
+    assert "MOD-001" in rule_ids
+
+
+def test_scanner_findings_appended_after_existing_health_findings(
+    catalog_with_libs: Catalog,
+) -> None:
+    """Health checker findings come first; scanner findings are appended."""
+
+    def health_check(_catalog):  # type: ignore[no-untyped-def]
+        return (Finding(rule_id="HDX-005", severity=Severity.WARNING, message="orphan"),)
+
+    scanner = _ScannerEmittingMod001()
+    use_case = GenerateFreezeReport(
+        _OkParser(catalog_with_libs),
+        health_checker=health_check,
+        module_usage_scanner=scanner,
+    )
+    report = use_case.execute(Path("/some/path"))
+
+    rule_ids = [f.rule_id for f in report.health_findings]
+    assert rule_ids == ["HDX-005", "MOD-001"]

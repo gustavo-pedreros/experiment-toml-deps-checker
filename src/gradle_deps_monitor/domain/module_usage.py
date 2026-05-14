@@ -6,7 +6,9 @@ cross-referencing them against the version catalog.  Pure data; no I/O.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from gradle_deps_monitor.domain.finding import Finding
 
 
 @dataclass(frozen=True)
@@ -76,11 +78,17 @@ class ModuleUsageMap:
     :param module_summaries: One :class:`ModuleSummary` per scanned module.
     :param modules_scanned: Total number of modules whose build files were
         successfully read (modules with no build file are excluded).
+    :param findings: Scanner-emitted observations that don't fit the usage
+        model — typically ``MOD-001`` ("could not read build file"). The
+        application layer merges these into :attr:`FreezeReport.health_findings`
+        so they surface in the report alongside catalog health rules.
+        Empty when every module was readable. Added in RFC-0019 PR #1.
     """
 
     library_usages: tuple[LibraryUsage, ...]
     module_summaries: tuple[ModuleSummary, ...]
     modules_scanned: int
+    findings: tuple[Finding, ...] = field(default_factory=tuple)
 
     def libraries_in_use(self) -> tuple[LibraryUsage, ...]:
         """Return only libraries referenced by at least one module."""

@@ -1,4 +1,4 @@
-"""GradleModuleScanner — static parser for Gradle build files (RFC-0007).
+"""GradleModuleScanner — static parser for Gradle build files (RFC-0007 / RFC-0019).
 
 Pipeline
 --------
@@ -6,19 +6,26 @@ Pipeline
 2. Parse ``include(...)`` calls to enumerate module paths.
 3. For each module, locate ``build.gradle(.kts)`` and extract dependency
    declarations that reference ``libs.<accessor>``.
-4. Map the dotted accessor back to the catalog alias via a pre-built
-   reverse lookup table.
+4. Map the accessor back to the catalog alias via a pre-built reverse
+   lookup table that covers **both** the dotted and camelCase forms
+   (RFC-0019 PR #1).
 5. Aggregate into a :class:`~...domain.module_usage.ModuleUsageMap`.
 
 Accessor mapping
 ----------------
-Gradle generates a dotted accessor from the catalog alias by replacing
-every ``-`` with ``.`` and lowercasing:
-``androidx-core-ktx`` → ``libs.androidx.core.ktx``.
+Gradle generates two equivalent accessors from a kebab-case catalog
+alias:
 
-This scanner only recognises the **dotted** form.  The camelCase form
-(``libs.androidxCoreKtx``) used by some KTS type-safe blocks is not
-matched by this first-cut implementation.
+- **Dotted** form (``-`` → ``.``, lowercased):
+  ``androidx-core-ktx`` → ``libs.androidx.core.ktx``.
+- **camelCase** form (first segment lowercased; subsequent segments
+  title-cased and concatenated):
+  ``androidx-core-ktx`` → ``libs.androidxCoreKtx``.
+
+The camelCase form is the canonical accessor in Kotlin DSL type-safe
+blocks, so KTS-heavy projects rely on it heavily. PR #1 of RFC-0019
+added recognition for both forms; before this change, KTS projects had
+their usage counts systematically under-reported.
 
 Configuration classification
 -----------------------------
@@ -28,6 +35,14 @@ Configuration classification
 * **impl** — everything else: ``implementation``, ``runtimeOnly``,
   ``debugImplementation``, ``releaseImplementation``,
   ``ksp``, ``kapt``, ``annotationProcessor``
+
+Resilience
+----------
+A single unreadable ``build.gradle(.kts)`` file (binary garbage, broken
+encoding, permission error) no longer poisons the entire scan. Each
+affected module produces a ``MOD-001`` :class:`Finding`; the scan
+continues over the rest of the project. Findings are merged into
+:attr:`FreezeReport.health_findings` by the application layer.
 """
 
 from __future__ import annotations
@@ -36,6 +51,7 @@ import re
 from pathlib import Path
 
 from gradle_deps_monitor.domain.catalog import Catalog
+from gradle_deps_monitor.domain.finding import Finding, Severity
 from gradle_deps_monitor.domain.module_usage import LibraryUsage, ModuleSummary, ModuleUsageMap
 
 # ---------------------------------------------------------------------------
@@ -78,13 +94,56 @@ _TEST_CONFIGS: frozenset[str] = frozenset(
 
 
 def _alias_to_accessor(alias: str) -> str:
-    """Return the dotted accessor form for *alias* (``-`` → ``.``, lowercased)."""
+    """Return the dotted accessor form for *alias* (``-`` → ``.``, lowercased).
+
+    Kept under the historical name so PR #2/#3 follow-ups (and existing
+    unit tests) keep working; ``_alias_to_camel`` is the camelCase
+    sibling introduced by RFC-0019 PR #1.
+    """
     return alias.replace("-", ".").lower()
 
 
+def _alias_to_camel(alias: str) -> str:
+    """Return the camelCase accessor form for *alias*.
+
+    The first segment is lowercased; every subsequent segment is
+    title-cased and concatenated::
+
+        "androidx-core-ktx" → "androidxCoreKtx"
+        "retrofit"          → "retrofit"
+        "okhttp"            → "okhttp"
+
+    Empty segments (from leading / trailing / consecutive ``-``) are
+    dropped, matching Gradle's behaviour for malformed aliases.
+    """
+    parts = [p for p in alias.split("-") if p]
+    if not parts:
+        return alias
+    head = parts[0].lower()
+    tail = "".join(p[:1].upper() + p[1:].lower() for p in parts[1:])
+    return head + tail
+
+
 def _build_accessor_map(catalog: Catalog) -> dict[str, str]:
-    """Return ``{normalized_accessor: alias}`` for every catalog library."""
-    return {_alias_to_accessor(lib.alias): lib.alias for lib in catalog.libraries}
+    """Return ``{accessor: alias}`` covering both dotted and camelCase forms.
+
+    Each catalog library contributes two entries — its dotted accessor
+    (``androidx.core.ktx``) and its camelCase accessor
+    (``androidxCoreKtx``). Both map back to the same alias, so the
+    scanner can recognise either form in a build file. Keys are stored
+    verbatim (no lowercasing) so the camelCase lookup remains
+    case-sensitive — Gradle's generated accessors are deterministic in
+    case, so this matches reality.
+
+    If a single alias somehow produces the same string in both forms
+    (e.g. a single-word alias like ``retrofit``), the duplicate write is
+    a harmless no-op.
+    """
+    mapping: dict[str, str] = {}
+    for lib in catalog.libraries:
+        mapping[_alias_to_accessor(lib.alias)] = lib.alias
+        mapping[_alias_to_camel(lib.alias)] = lib.alias
+    return mapping
 
 
 def _find_project_root(catalog_path: Path) -> Path | None:
@@ -205,6 +264,7 @@ class GradleModuleScanner:
             lib.alias: {"impl": [], "api": [], "test": []} for lib in catalog.libraries
         }
         module_direct_counts: dict[str, int] = {}
+        scan_findings: list[Finding] = []
 
         for module_path in module_paths:
             module_dir = _module_dir(project_root, module_path)
@@ -212,16 +272,38 @@ class GradleModuleScanner:
             if build_file is None:
                 continue
 
+            # RFC-0019 PR #1: ``errors="strict"`` lets us catch corrupt
+            # build files explicitly. Pre-PR #1 the read used
+            # ``errors="replace"`` and substituted U+FFFD silently, which
+            # masked legitimate corruption and produced false-zero usage
+            # numbers for the affected module.
             try:
-                text = build_file.read_text(encoding="utf-8", errors="replace")
-            except OSError:
+                text = build_file.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError) as exc:
+                scan_findings.append(
+                    Finding(
+                        rule_id="MOD-001",
+                        severity=Severity.WARNING,
+                        message=(
+                            f"Could not read build file for module `{module_path}`: "
+                            f"{type(exc).__name__}"
+                        ),
+                        details=f"Path: {build_file}",
+                    )
+                )
                 continue
 
             direct_count = 0
 
             for m in _DEP_RE.finditer(text):
                 config = m.group(1)
-                accessor = m.group(2).lower()
+                # PR #1 of RFC-0019: look up the accessor verbatim. The
+                # previous ``.lower()`` discarded the case information
+                # that distinguishes ``libs.androidxCoreKtx`` (camelCase)
+                # from ``libs.androidx.core.ktx`` (dotted). The dotted
+                # form is still all-lowercase by construction, so this
+                # is backward-compatible.
+                accessor = m.group(2)
                 alias = accessor_map.get(accessor)
                 if alias is None:
                     continue
@@ -255,4 +337,5 @@ class GradleModuleScanner:
             library_usages=library_usages,
             module_summaries=module_summaries,
             modules_scanned=len(module_direct_counts),
+            findings=tuple(scan_findings),
         )

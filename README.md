@@ -232,6 +232,7 @@ Reports written → freeze-reports/2026-05-18
 | `HDX-007` | info | No `[bundles]` block (multi-library catalog) |
 | `HDX-008` | suggestion | Duplicate version values (different keys share the same version string) |
 | `catalog.unresolved-bom-child` | error | Library declared without a version and no BoM resolved it (RFC-0014) |
+| `MOD-001` | warning | Module scanner could not read a `build.gradle(.kts)` file (binary garbage, broken encoding, permission error). The scan continues over the rest of the project. RFC-0019 PR #1 |
 
 ---
 

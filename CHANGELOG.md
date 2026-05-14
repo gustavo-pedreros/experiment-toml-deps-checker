@@ -30,6 +30,18 @@ be assigned once a stable public API is established.
   silently skipped non-string entries because it re-parsed the raw TOML
   itself, so pinning Kotlin with `strictly` made the entire toolchain
   audit invisible.
+- `GradleModuleScanner` now recognises **camelCase accessors**
+  (`libs.androidxCoreKtx`) in addition to the dotted form
+  (`libs.androidx.core.ktx`). The camelCase form is the canonical
+  accessor in Kotlin DSL type-safe blocks, so KTS-heavy projects had
+  their usage counts systematically under-reported pre-fix. RFC-0019
+  PR #1.
+- `GradleModuleScanner` now survives a single corrupt or unreadable
+  `build.gradle(.kts)` file. Previously, `errors="replace"` silently
+  substituted U+FFFD characters, hiding the corruption; the scanner
+  now reads with `errors="strict"` and emits a `MOD-001` finding for
+  the affected module while continuing the scan on the rest of the
+  project. RFC-0019 PR #1.
 
 ### Changed
 - `ToolchainCompatibilityChecker` no longer re-parses the catalog TOML
