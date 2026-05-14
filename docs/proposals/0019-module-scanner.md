@@ -1,6 +1,6 @@
 # RFC-0019: High-Performance & Accurate Module Scanner
 
-**Status:** Draft
+**Status:** In progress (PR #1 and PR #2 merged; PR #3 pending)
 **Created:** 2026-05-07
 **Related JTBDs:** JTBD-3 (blast radius), JTBD-5 (report accuracy)
 **Depends on:** none
@@ -113,19 +113,36 @@ matching logic without breaking the existing dotted-form contract.*
 
 ## Implementation Plan
 
-### PR #1 — Tracer: camelCase + malformed-file handling
+### PR #1 — Tracer: camelCase + malformed-file handling — **MERGED**
 - Dual-accessor reverse map.
 - Regex update to admit camelCase tokens.
 - `OSError` / `UnicodeDecodeError` per-module recovery + `MOD-001`
   finding.
-- 10-module fixture under `tests/fixtures/` exercising both forms.
-- Unit + integration tests.
+- Unit + integration tests covering both forms and malformed files.
+  (The dedicated 200+ module fixture is deferred to PR #3, where the
+  benchmark needs it.)
 
-### PR #2 — Bundle Attribution
+### PR #2 — Bundle Attribution — **MERGED**
 - Catalog-aware bundle resolution still on the sync scanner.
-- Fixture extended with `libs.bundles.<name>` usage.
-- Tests verify that each library inside a bundle gets credited exactly
-  once per module that uses the bundle.
+- `_build_bundle_accessor_map(catalog)` produces a second reverse
+  lookup table keyed by ``bundles.<dotted>`` and ``bundles.<camelCase>``,
+  each mapping to the bundle's full member tuple.
+- Scan loop consults the bundle table only after the library table
+  misses, so direct ``libs.<lib>`` references keep their fast path.
+- Bundle members credited under the configuration the bundle was
+  declared with (``implementation`` → ``impl`` bucket, ``api`` → ``api``
+  bucket, etc.). A library referenced both directly and via a bundle in
+  the same module is credited exactly once per bucket — dedup falls
+  out of the existing "already in bucket" check.
+- A bundle that references an alias missing from `[libraries]` no
+  longer crashes; the orphan reference is silently skipped (catalog
+  health rule ``HDX-002`` flags the catalog problem separately).
+- 13 new unit + integration tests in
+  `tests/infrastructure/scanners/test_gradle_module_scanner.py`
+  covering: dotted form, camelCase form, mixed-KTS-Groovy projects,
+  per-configuration attribution, dedup with direct declarations,
+  ``direct_dep_count`` expansion, orphan member tolerance, unused
+  bundles.
 
 ### PR #3 — Async refactor
 - Replace the synchronous loop with `asyncio.to_thread` for file reads;
@@ -189,15 +206,16 @@ swapping `asyncio.to_thread` for `aiofiles`.
 ## Definition of Done (DoD)
 
 - [ ] **Integration:** Async scanner wired in the **Composition Root**
-  (`bootstrap.py`).
-- [ ] **Architecture:** Follows ADR-0006 and the Tracer Bullet path
-  from ADR-0009.
-- [ ] **Accuracy:** Unit tests verify detection of dotted, camelCase,
-  and bundle accessors.
-- [ ] **Resilience:** Malformed `build.gradle(.kts)` files produce
-  `MOD-001` findings rather than crashes.
+  (`bootstrap.py`). _(PR #3.)_
+- [x] **Architecture:** Follows ADR-0006 and the Tracer Bullet path
+  from ADR-0009. _(PRs #1 + #2.)_
+- [x] **Accuracy:** Unit tests verify detection of dotted, camelCase,
+  and bundle accessors. _(PR #1 dotted/camelCase; PR #2 bundles.)_
+- [x] **Resilience:** Malformed `build.gradle(.kts)` files produce
+  `MOD-001` findings rather than crashes. _(PR #1.)_
 - [ ] **Performance:** >3× faster on the 200+ module generated fixture
-  compared to the sync baseline.
-- [ ] **Testing:** Integration tests cover a multi-module project
+  compared to the sync baseline. _(PR #3.)_
+- [x] **Testing:** Integration tests cover a multi-module project
   structure with mixed `.gradle` and `.kts` files, bundle declarations,
-  and at least one intentionally malformed file.
+  and at least one intentionally malformed file. _(PR #1 mixed +
+  malformed; PR #2 bundles + mixed-form bundles.)_
