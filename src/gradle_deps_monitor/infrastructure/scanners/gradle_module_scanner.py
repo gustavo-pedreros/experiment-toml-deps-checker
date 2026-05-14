@@ -5,7 +5,10 @@ Pipeline
 1. Walk up from *catalog_path* to find ``settings.gradle(.kts)``.
 2. Parse ``include(...)`` calls to enumerate module paths.
 3. For each module, locate ``build.gradle(.kts)`` and extract dependency
-   declarations that reference ``libs.<accessor>``.
+   declarations that reference ``libs.<accessor>``. Per-module work
+   (read + regex + classify) runs **in parallel** via
+   ``asyncio.to_thread`` (RFC-0019 PR #3) so a 200-module project no
+   longer pays a serialised read for every build file.
 4. Map the accessor back to the catalog alias via a pre-built reverse
    lookup table that covers **both** the dotted and camelCase forms
    (RFC-0019 PR #1). Bundle accessors (``libs.bundles.<form>``) are
@@ -66,7 +69,9 @@ continues over the rest of the project. Findings are merged into
 
 from __future__ import annotations
 
+import asyncio
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 from gradle_deps_monitor.domain.catalog import Catalog
@@ -262,6 +267,120 @@ def _classify_config(config: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Per-module scan helper (RFC-0019 PR #3)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _ModuleScanResult:
+    """Outcome of scanning a single ``build.gradle(.kts)``.
+
+    Pure data carrier so the per-module worker can run inside
+    ``asyncio.to_thread`` and the main coroutine can aggregate without
+    sharing mutable state across tasks.
+
+    Exactly one of two states applies:
+
+    - ``finding is None`` → the file was read successfully; ``credits``
+      lists every ``(alias, bucket)`` pair this module should be added
+      to (already deduplicated), and ``direct_count`` is the module's
+      non-test direct dep count.
+    - ``finding is not None`` → the file could not be read; ``credits``
+      is empty and ``direct_count`` is 0. The application layer merges
+      the finding into ``FreezeReport.health_findings``.
+    """
+
+    module_path: str
+    credits: tuple[tuple[str, str], ...]
+    direct_count: int
+    finding: Finding | None
+
+
+def _scan_module_file(
+    module_path: str,
+    build_file: Path,
+    accessor_map: dict[str, str],
+    bundle_accessor_map: dict[str, tuple[str, ...]],
+    known_aliases: frozenset[str],
+) -> _ModuleScanResult:
+    """Read a single ``build.gradle(.kts)`` and extract its catalog usages.
+
+    Pure synchronous worker designed to be dispatched through
+    ``asyncio.to_thread``. It receives the two pre-built accessor maps
+    and the set of known aliases so it never touches the
+    :class:`Catalog` (no shared object across threads).
+
+    Bucket dedup is local to this call: a library referenced both
+    directly and via a bundle in the same module is credited once per
+    bucket; that decision lives here so the aggregator just appends.
+    """
+    try:
+        text = build_file.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        # RFC-0019 PR #1: ``errors="strict"`` (Python's default for
+        # ``read_text``) makes corrupt build files surface as a
+        # ``MOD-001`` finding instead of the silent U+FFFD substitution
+        # the old ``errors="replace"`` produced.
+        return _ModuleScanResult(
+            module_path=module_path,
+            credits=(),
+            direct_count=0,
+            finding=Finding(
+                rule_id="MOD-001",
+                severity=Severity.WARNING,
+                message=(
+                    f"Could not read build file for module `{module_path}`: {type(exc).__name__}"
+                ),
+                details=f"Path: {build_file}",
+            ),
+        )
+
+    seen: dict[str, set[str]] = {}
+    credits: list[tuple[str, str]] = []
+    direct_count = 0
+
+    for m in _DEP_RE.finditer(text):
+        config = m.group(1)
+        accessor = m.group(2)
+
+        # PR #2 of RFC-0019: library lookup first (fast path), then
+        # bundle expansion. Unknown accessors are silently ignored.
+        target_aliases: tuple[str, ...]
+        direct_alias = accessor_map.get(accessor)
+        if direct_alias is not None:
+            target_aliases = (direct_alias,)
+        else:
+            bundle_members = bundle_accessor_map.get(accessor)
+            if bundle_members is None:
+                continue
+            target_aliases = bundle_members
+
+        bucket = _classify_config(config)
+        for alias in target_aliases:
+            # Bundle pointing at an alias missing from ``[libraries]``
+            # is a catalog-health concern (HDX-002), not a scanner crash.
+            if alias not in known_aliases:
+                continue
+            already = seen.get(alias)
+            if already is None:
+                seen[alias] = {bucket}
+            elif bucket in already:
+                continue
+            else:
+                already.add(bucket)
+            credits.append((alias, bucket))
+            if bucket != "test":
+                direct_count += 1
+
+    return _ModuleScanResult(
+        module_path=module_path,
+        credits=tuple(credits),
+        direct_count=direct_count,
+        finding=None,
+    )
+
+
+# ---------------------------------------------------------------------------
 # GradleModuleScanner
 # ---------------------------------------------------------------------------
 
@@ -273,9 +392,18 @@ class GradleModuleScanner:
     It reads ``build.gradle(.kts)`` files directly using regex-based
     parsing.  Accuracy is high for the common single-line declaration
     patterns; multi-line and programmatic declarations may be missed.
+
+    Concurrency
+    -----------
+    RFC-0019 PR #3 made :meth:`scan` async. Each module's I/O + regex
+    work runs in a worker thread via ``asyncio.to_thread`` and the
+    coroutine ``gather``s the results, so a 200-module project no
+    longer pays a serialised read for every build file. The public
+    contract is the same: callers ``await`` the coroutine (or wrap it
+    with ``asyncio.run`` at the CLI entry point).
     """
 
-    def scan(self, catalog_path: Path, catalog: Catalog) -> ModuleUsageMap | None:
+    async def scan(self, catalog_path: Path, catalog: Catalog) -> ModuleUsageMap | None:
         """Run the scan and return a :class:`ModuleUsageMap`, or ``None`` on failure.
 
         :param catalog_path: Directory (or file) where ``libs.versions.toml`` lives.
@@ -295,7 +423,12 @@ class GradleModuleScanner:
             return None  # pragma: no cover — already found above
 
         try:
-            settings_text = settings_file.read_text(encoding="utf-8", errors="replace")
+            # The settings file is small and read once, but we still go
+            # through ``to_thread`` to keep the event loop non-blocking
+            # for callers that drive several adapters in parallel.
+            settings_text = await asyncio.to_thread(
+                settings_file.read_text, encoding="utf-8", errors="replace"
+            )
         except OSError:
             return None
 
@@ -309,84 +442,56 @@ class GradleModuleScanner:
         # library lookup misses, so direct ``libs.<lib>`` references keep
         # their existing fast path.
         bundle_accessor_map = _build_bundle_accessor_map(catalog)
+        known_aliases = frozenset(lib.alias for lib in catalog.libraries)
 
-        # alias → {"impl": [...], "api": [...], "test": [...]}
+        # Resolve build files up-front (cheap stat calls) so the parallel
+        # workers receive a ready-to-read path; modules without a build
+        # file are skipped here, matching the pre-PR #3 contract that
+        # they don't appear in ``modules_scanned``.
+        modules_with_files: list[tuple[str, Path]] = []
+        for module_path in module_paths:
+            build_file = _find_build_file(_module_dir(project_root, module_path))
+            if build_file is not None:
+                modules_with_files.append((module_path, build_file))
+
+        # Parallel I/O + parse. ``asyncio.to_thread`` dispatches each
+        # worker to the default thread pool; ``gather`` waits for all to
+        # complete. Results come back in the order they were submitted,
+        # so aggregation produces stable ``module_summaries`` ordering
+        # after the trailing ``sorted(...)``.
+        results: tuple[_ModuleScanResult, ...] = tuple(
+            await asyncio.gather(
+                *(
+                    asyncio.to_thread(
+                        _scan_module_file,
+                        module_path,
+                        build_file,
+                        accessor_map,
+                        bundle_accessor_map,
+                        known_aliases,
+                    )
+                    for module_path, build_file in modules_with_files
+                )
+            )
+        )
+
+        # Aggregate in the main coroutine (no contention, no shared
+        # mutable state across tasks).
         usage: dict[str, dict[str, list[str]]] = {
             lib.alias: {"impl": [], "api": [], "test": []} for lib in catalog.libraries
         }
         module_direct_counts: dict[str, int] = {}
         scan_findings: list[Finding] = []
 
-        for module_path in module_paths:
-            module_dir = _module_dir(project_root, module_path)
-            build_file = _find_build_file(module_dir)
-            if build_file is None:
+        for result in results:
+            if result.finding is not None:
+                scan_findings.append(result.finding)
                 continue
-
-            # RFC-0019 PR #1: ``errors="strict"`` lets us catch corrupt
-            # build files explicitly. Pre-PR #1 the read used
-            # ``errors="replace"`` and substituted U+FFFD silently, which
-            # masked legitimate corruption and produced false-zero usage
-            # numbers for the affected module.
-            try:
-                text = build_file.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError) as exc:
-                scan_findings.append(
-                    Finding(
-                        rule_id="MOD-001",
-                        severity=Severity.WARNING,
-                        message=(
-                            f"Could not read build file for module `{module_path}`: "
-                            f"{type(exc).__name__}"
-                        ),
-                        details=f"Path: {build_file}",
-                    )
-                )
-                continue
-
-            direct_count = 0
-
-            for m in _DEP_RE.finditer(text):
-                config = m.group(1)
-                # PR #1 of RFC-0019: look up the accessor verbatim. The
-                # previous ``.lower()`` discarded the case information
-                # that distinguishes ``libs.androidxCoreKtx`` (camelCase)
-                # from ``libs.androidx.core.ktx`` (dotted). The dotted
-                # form is still all-lowercase by construction, so this
-                # is backward-compatible.
-                accessor = m.group(2)
-
-                # PR #2 of RFC-0019: resolve the accessor to one or more
-                # library aliases. A direct ``libs.<lib>`` hit produces a
-                # single-element tuple; a ``libs.bundles.<name>`` hit
-                # expands to every member of the bundle. Unknown
-                # accessors are silently ignored (could be a stray
-                # ``libs.versions.kotlin`` reference, for example).
-                target_aliases: tuple[str, ...]
-                direct_alias = accessor_map.get(accessor)
-                if direct_alias is not None:
-                    target_aliases = (direct_alias,)
-                else:
-                    bundle_members = bundle_accessor_map.get(accessor)
-                    if bundle_members is None:
-                        continue
-                    target_aliases = bundle_members
-
-                bucket = _classify_config(config)
-                for alias in target_aliases:
-                    # A bundle is free to list an alias that no longer
-                    # exists in the catalog (catalog-health rule
-                    # ``HDX-002`` flags it separately). Skip silently so
-                    # we don't ``KeyError`` mid-scan.
-                    buckets = usage.get(alias)
-                    if buckets is None:
-                        continue
-                    if module_path not in buckets[bucket]:
-                        buckets[bucket].append(module_path)
-                        if bucket != "test":
-                            direct_count += 1
-
-            module_direct_counts[module_path] = direct_count
+            for alias, bucket in result.credits:
+                # ``known_aliases`` already filtered orphans in the
+                # worker, so this lookup is safe.
+                usage[alias][bucket].append(result.module_path)
+            module_direct_counts[result.module_path] = result.direct_count
 
         library_usages = tuple(
             LibraryUsage(

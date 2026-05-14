@@ -1,8 +1,28 @@
-"""GenerateFreezeReport — core use case (Phase 1)."""
+"""GenerateFreezeReport — core use case (Phase 1).
+
+Concurrency model
+-----------------
+RFC-0019 PR #3 moved this use case from "sync ``execute`` with seven
+internal ``asyncio.run`` calls" to a single async ``execute``. The CLI
+entry point now wraps the whole pipeline in one ``asyncio.run`` at the
+outermost layer, matching the convention every other async port in the
+project already follows.
+
+Why the change is worth the refactor: every adapter call used to spin
+up its own event loop, tear it down, and discard the connection pool
+inside. With one shared loop, the same ``httpx.AsyncClient`` and the
+same default thread pool persist across adapters, and individual
+sections of the report can in the future be awaited concurrently via
+``asyncio.gather`` without further plumbing.
+
+For now the implementation keeps the sequential ordering — BoM
+enrichment must finish before downstream adapters see the enriched
+catalog, and several adapters share read-only state — but the
+plumbing no longer prevents parallel scheduling.
+"""
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
 from gradle_deps_monitor.application.bom_enrichment import enrich_catalog_with_boms
@@ -77,7 +97,7 @@ class GenerateFreezeReport:
         self._risk_weights = risk_weights
         self._risk_thresholds = risk_thresholds
 
-    def execute(self, catalog_path: Path) -> FreezeReport:
+    async def execute(self, catalog_path: Path) -> FreezeReport:
         """Parse *catalog_path* and return a :class:`~gradle_deps_monitor.domain.FreezeReport`.
 
         :param catalog_path: Path to the ``libs.versions.toml`` file, or to
@@ -86,6 +106,10 @@ class GenerateFreezeReport:
             format error.
         :raises VulnerabilityScanError: Propagated from the scanner on any
             unrecoverable network or API error.
+
+        Coroutine: the caller is responsible for the event loop. The
+        CLI does this with a single ``asyncio.run`` at its entry point;
+        tests do the same. See the module docstring for the rationale.
         """
         catalog = self._parser.parse(catalog_path)
 
@@ -96,7 +120,7 @@ class GenerateFreezeReport:
         if self._bom_resolver is not None:
             bom_libraries = tuple(lib for lib in catalog.libraries if lib.is_bom_candidate)
             if bom_libraries:
-                bom_resolutions = asyncio.run(self._bom_resolver.resolve(bom_libraries))
+                bom_resolutions = await self._bom_resolver.resolve(bom_libraries)
                 catalog = enrich_catalog_with_boms(catalog, bom_resolutions)
 
         findings = self._health_checker(catalog) if self._health_checker else ()
@@ -104,7 +128,7 @@ class GenerateFreezeReport:
         security_advisories: tuple[LibraryAdvisory, ...] = ()
         if self._scanner is not None:
             libraries = tuple(catalog.libraries)
-            security_advisories = asyncio.run(self._scanner.scan(libraries))
+            security_advisories = await self._scanner.scan(libraries)
 
         compliance_findings: tuple[ComplianceFinding, ...] = ()
         if self._compliance_checker is not None:
@@ -117,16 +141,16 @@ class GenerateFreezeReport:
         library_health_findings: tuple[LibraryHealthFinding, ...] = ()
         if self._library_health_checker is not None:
             libraries = tuple(catalog.libraries)
-            library_health_findings = asyncio.run(self._library_health_checker.check(libraries))
+            library_health_findings = await self._library_health_checker.check(libraries)
 
         changelog_entries: tuple[ChangelogEntry, ...] = ()
         if self._changelog_fetcher is not None:
             libraries = tuple(catalog.libraries)
-            changelog_entries = asyncio.run(self._changelog_fetcher.fetch(libraries))
+            changelog_entries = await self._changelog_fetcher.fetch(libraries)
 
         module_usage_map: ModuleUsageMap | None = None
         if self._module_usage_scanner is not None:
-            module_usage_map = self._module_usage_scanner.scan(catalog_path, catalog)
+            module_usage_map = await self._module_usage_scanner.scan(catalog_path, catalog)
             # RFC-0019 PR #1: scanner-emitted findings (e.g. ``MOD-001``
             # for unreadable build files) are appended to the existing
             # health findings channel, per the RFC's "via the existing
@@ -138,12 +162,12 @@ class GenerateFreezeReport:
         license_audit: LicenseAudit | None = None
         if self._license_checker is not None:
             libraries = tuple(catalog.libraries)
-            license_audit = asyncio.run(self._license_checker.check(libraries))
+            license_audit = await self._license_checker.check(libraries)
 
         library_version_statuses: tuple[LibraryVersionStatus, ...] = ()
         if self._version_status_resolver is not None:
             libraries = tuple(catalog.libraries)
-            library_version_statuses = asyncio.run(self._version_status_resolver.resolve(libraries))
+            library_version_statuses = await self._version_status_resolver.resolve(libraries)
 
         risk_score_report: RiskScoreReport | None = None
         if self._enable_risk_score:

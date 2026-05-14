@@ -25,6 +25,14 @@ class ModuleUsageScanner(Protocol):
     :returns: A :class:`ModuleUsageMap`, or ``None`` when the project root /
         settings file cannot be found (e.g. the catalog is not inside a Gradle
         project tree).
+
+    The method is async (RFC-0019 PR #3) so the adapter can issue parallel
+    filesystem reads via ``asyncio.to_thread`` without blocking the event
+    loop. The signature now matches the other application ports
+    (``VulnerabilityScanner``, ``ChangelogFetcher``, etc.), letting
+    :class:`~...application.generate_freeze_report.GenerateFreezeReport`
+    drive every adapter through a single ``asyncio.run`` at the CLI entry
+    point.
     """
 
-    def scan(self, catalog_path: Path, catalog: Catalog) -> ModuleUsageMap | None: ...
+    async def scan(self, catalog_path: Path, catalog: Catalog) -> ModuleUsageMap | None: ...
