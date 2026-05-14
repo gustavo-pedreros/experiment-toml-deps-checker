@@ -83,38 +83,38 @@ def catalog_with_libs() -> Catalog:
 # ---------------------------------------------------------------------------
 
 
-def test_execute_returns_freeze_report(empty_catalog: Catalog) -> None:
+async def test_execute_returns_freeze_report(empty_catalog: Catalog) -> None:
     use_case = GenerateFreezeReport(_OkParser(empty_catalog))
-    result = use_case.execute(Path("/some/path"))
+    result = await use_case.execute(Path("/some/path"))
     assert isinstance(result, FreezeReport)
 
 
-def test_execute_report_contains_parsed_catalog(catalog_with_libs: Catalog) -> None:
+async def test_execute_report_contains_parsed_catalog(catalog_with_libs: Catalog) -> None:
     use_case = GenerateFreezeReport(_OkParser(catalog_with_libs))
-    result = use_case.execute(Path("/some/path"))
+    result = await use_case.execute(Path("/some/path"))
     assert result.catalog is catalog_with_libs
 
 
-def test_execute_forwards_path_to_parser(empty_catalog: Catalog) -> None:
+async def test_execute_forwards_path_to_parser(empty_catalog: Catalog) -> None:
     stub = _OkParser(empty_catalog)
     use_case = GenerateFreezeReport(stub)
     expected = Path("/gradle/libs.versions.toml")
-    use_case.execute(expected)
+    await use_case.execute(expected)
     assert stub.last_path == expected
 
 
-def test_execute_report_generated_at_is_utc(empty_catalog: Catalog) -> None:
+async def test_execute_report_generated_at_is_utc(empty_catalog: Catalog) -> None:
     use_case = GenerateFreezeReport(_OkParser(empty_catalog))
     before = datetime.now(tz=UTC)
-    result = use_case.execute(Path("/some/path"))
+    result = await use_case.execute(Path("/some/path"))
     after = datetime.now(tz=UTC)
     assert before <= result.generated_at <= after
 
 
-def test_execute_propagates_parse_error() -> None:
+async def test_execute_propagates_parse_error() -> None:
     use_case = GenerateFreezeReport(_FailParser())
     with pytest.raises(CatalogParseError, match="simulated parse failure"):
-        use_case.execute(Path("/some/path"))
+        await use_case.execute(Path("/some/path"))
 
 
 # ---------------------------------------------------------------------------
@@ -134,22 +134,22 @@ class _FixedChecker:
         return self._findings
 
 
-def test_execute_populates_health_findings_when_checker_provided(
+async def test_execute_populates_health_findings_when_checker_provided(
     empty_catalog: Catalog,
 ) -> None:
     checker = _FixedChecker((_FINDING,))
     use_case = GenerateFreezeReport(_OkParser(empty_catalog), health_checker=checker)
-    result = use_case.execute(Path("/some/path"))
+    result = await use_case.execute(Path("/some/path"))
     assert result.health_findings == (_FINDING,)
 
 
-def test_execute_health_findings_empty_without_checker(empty_catalog: Catalog) -> None:
+async def test_execute_health_findings_empty_without_checker(empty_catalog: Catalog) -> None:
     use_case = GenerateFreezeReport(_OkParser(empty_catalog))
-    result = use_case.execute(Path("/some/path"))
+    result = await use_case.execute(Path("/some/path"))
     assert result.health_findings == ()
 
 
-def test_execute_passes_parsed_catalog_to_checker(empty_catalog: Catalog) -> None:
+async def test_execute_passes_parsed_catalog_to_checker(empty_catalog: Catalog) -> None:
     received: list[Catalog] = []
 
     def _recorder(catalog: Catalog) -> tuple[Finding, ...]:
@@ -157,7 +157,7 @@ def test_execute_passes_parsed_catalog_to_checker(empty_catalog: Catalog) -> Non
         return ()
 
     use_case = GenerateFreezeReport(_OkParser(empty_catalog), health_checker=_recorder)
-    use_case.execute(Path("/some/path"))
+    await use_case.execute(Path("/some/path"))
     assert received == [empty_catalog]
 
 
@@ -166,7 +166,7 @@ def test_execute_passes_parsed_catalog_to_checker(empty_catalog: Catalog) -> Non
 # ---------------------------------------------------------------------------
 
 
-def test_execute_propagates_risk_weights_to_score(catalog_with_libs: Catalog) -> None:
+async def test_execute_propagates_risk_weights_to_score(catalog_with_libs: Catalog) -> None:
     """Custom :class:`RiskWeights` must reach :class:`RiskScoreReport.weights`."""
     from gradle_deps_monitor.domain.risk_score import RiskThresholds, RiskWeights
 
@@ -186,20 +186,20 @@ def test_execute_propagates_risk_weights_to_score(catalog_with_libs: Catalog) ->
         risk_weights=custom_weights,
         risk_thresholds=custom_thresholds,
     )
-    report = use_case.execute(Path("/some/path"))
+    report = await use_case.execute(Path("/some/path"))
 
     assert report.risk_score_report is not None
     assert report.risk_score_report.weights == custom_weights
     assert report.risk_score_report.thresholds == custom_thresholds
 
 
-def test_execute_uses_default_weights_when_none_provided(
+async def test_execute_uses_default_weights_when_none_provided(
     catalog_with_libs: Catalog,
 ) -> None:
     from gradle_deps_monitor.domain.risk_score import RiskThresholds, RiskWeights
 
     use_case = GenerateFreezeReport(_OkParser(catalog_with_libs), enable_risk_score=True)
-    report = use_case.execute(Path("/some/path"))
+    report = await use_case.execute(Path("/some/path"))
 
     assert report.risk_score_report is not None
     assert report.risk_score_report.weights == RiskWeights()
@@ -224,7 +224,7 @@ class _ScannerEmittingMod001:
     def __init__(self) -> None:
         self.scanned = False
 
-    def scan(self, catalog_path, catalog):  # type: ignore[no-untyped-def]
+    async def scan(self, catalog_path, catalog):  # type: ignore[no-untyped-def]
         from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 
         self.scanned = True
@@ -242,18 +242,18 @@ class _ScannerEmittingMod001:
         )
 
 
-def test_scanner_findings_merged_into_health_findings(catalog_with_libs: Catalog) -> None:
+async def test_scanner_findings_merged_into_health_findings(catalog_with_libs: Catalog) -> None:
     """RFC-0019 PR #1: scanner-emitted findings reach the report."""
     scanner = _ScannerEmittingMod001()
     use_case = GenerateFreezeReport(_OkParser(catalog_with_libs), module_usage_scanner=scanner)
-    report = use_case.execute(Path("/some/path"))
+    report = await use_case.execute(Path("/some/path"))
 
     assert scanner.scanned
     rule_ids = [f.rule_id for f in report.health_findings]
     assert "MOD-001" in rule_ids
 
 
-def test_scanner_findings_appended_after_existing_health_findings(
+async def test_scanner_findings_appended_after_existing_health_findings(
     catalog_with_libs: Catalog,
 ) -> None:
     """Health checker findings come first; scanner findings are appended."""
@@ -267,7 +267,7 @@ def test_scanner_findings_appended_after_existing_health_findings(
         health_checker=health_check,
         module_usage_scanner=scanner,
     )
-    report = use_case.execute(Path("/some/path"))
+    report = await use_case.execute(Path("/some/path"))
 
     rule_ids = [f.rule_id for f in report.health_findings]
     assert rule_ids == ["HDX-005", "MOD-001"]

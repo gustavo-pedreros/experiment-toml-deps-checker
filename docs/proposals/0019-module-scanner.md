@@ -1,6 +1,6 @@
 # RFC-0019: High-Performance & Accurate Module Scanner
 
-**Status:** In progress (PR #1 and PR #2 merged; PR #3 pending)
+**Status:** Implemented (PRs #1 + #2 + #3 merged; perf assertion DoD item carried forward)
 **Created:** 2026-05-07
 **Related JTBDs:** JTBD-3 (blast radius), JTBD-5 (report accuracy)
 **Depends on:** none
@@ -144,12 +144,53 @@ matching logic without breaking the existing dotted-form contract.*
   ``direct_dep_count`` expansion, orphan member tolerance, unused
   bundles.
 
-### PR #3 — Async refactor
-- Replace the synchronous loop with `asyncio.to_thread` for file reads;
-  preserve all behaviour from PR #1 and PR #2.
-- Expand the fixture generator to 200+ modules.
-- Add a benchmark assertion (>3× wall-clock speed-up vs the sync
-  baseline captured on the same generator).
+### PR #3 — Async refactor — **MERGED**
+- `GradleModuleScanner.scan` is now `async def`. Per-module work
+  (read + regex + classify) is extracted into a pure helper
+  `_scan_module_file(...)` dispatched through `asyncio.to_thread`;
+  results are awaited with `asyncio.gather`. The aggregator stays in
+  the main coroutine — no shared mutable state across tasks.
+- `ModuleUsageScanner` port signature changed to `async def scan(...)`,
+  matching the other six async adapter ports in the project.
+- `GenerateFreezeReport.execute` likewise became `async def`. The
+  previous pattern of seven independent `asyncio.run(...)` calls is
+  gone; a single `asyncio.run(...)` lives at the CLI entry
+  (`CheckCommand.run`). This means every adapter now shares one event
+  loop, one default thread pool, and (once HTTP adapters consolidate)
+  one `httpx.AsyncClient` connection pool.
+- Synthetic project generator under
+  `tests/fixtures/large_project_generator.py` produces 1-N module
+  trees with the three accessor styles (dotted / camelCase / bundle)
+  and the three configuration buckets (impl / api / test). Seeds the
+  PRNG for reproducibility.
+- Benchmark tests under
+  `tests/infrastructure/scanners/test_gradle_module_scanner_bench.py`
+  run on `BENCH=1` only. They print wall-clock for 200- and
+  500-module scans plus a smoke assertion that the generator exercises
+  enough of the alias pool to be representative. No timing assertion
+  is currently enforced — see "Carry-forward" below.
+
+### Carry-forward — perf-assertion DoD item
+
+The RFC originally asked for ">3x faster than the sync baseline" as
+the performance gate. PR #3 ships the async pipeline but defers the
+formal assertion. The three options considered (in-process serial-vs-
+async ratio, committed numeric baseline, single absolute threshold)
+all carried trade-offs we chose not to pay in this PR:
+
+- The serial-vs-async helper required maintaining a parallel sync
+  code path purely for benchmarking — production complexity for test
+  signal.
+- The committed numeric baseline tied the gate to a specific machine
+  class and would have produced false positives on slower CI runners.
+- The absolute threshold would have passed trivially on SSDs and
+  failed on network drives, providing no real protection.
+
+The benchmark **does** run end-to-end on demand and prints timings,
+so anyone investigating a regression can compare two PRs locally
+without rebuilding the harness. Picking the right gating strategy is
+tracked as a follow-up to revisit once we have more datapoints from
+real customer projects.
 
 ### Optional Spike (before PR #3)
 - **Spike:** compare `asyncio.to_thread` vs `aiofiles` for many small
@@ -205,17 +246,21 @@ swapping `asyncio.to_thread` for `aiofiles`.
 
 ## Definition of Done (DoD)
 
-- [ ] **Integration:** Async scanner wired in the **Composition Root**
-  (`bootstrap.py`). _(PR #3.)_
+- [x] **Integration:** Async scanner wired in the **Composition Root**
+  (`bootstrap.py`). _(PR #3 — port became async; the use case awaits
+  it directly; `bootstrap.py` already returns the adapter unchanged.)_
 - [x] **Architecture:** Follows ADR-0006 and the Tracer Bullet path
-  from ADR-0009. _(PRs #1 + #2.)_
+  from ADR-0009. _(PRs #1 + #2 + #3.)_
 - [x] **Accuracy:** Unit tests verify detection of dotted, camelCase,
   and bundle accessors. _(PR #1 dotted/camelCase; PR #2 bundles.)_
 - [x] **Resilience:** Malformed `build.gradle(.kts)` files produce
   `MOD-001` findings rather than crashes. _(PR #1.)_
-- [ ] **Performance:** >3× faster on the 200+ module generated fixture
-  compared to the sync baseline. _(PR #3.)_
+- [ ] **Performance:** >3x faster on the 200+ module generated fixture
+  compared to the sync baseline. _(PR #3 ships the async pipeline + a
+  200/500-module benchmark that prints wall-clock; formal ratio
+  assertion is deferred — see "Carry-forward" above.)_
 - [x] **Testing:** Integration tests cover a multi-module project
   structure with mixed `.gradle` and `.kts` files, bundle declarations,
   and at least one intentionally malformed file. _(PR #1 mixed +
-  malformed; PR #2 bundles + mixed-form bundles.)_
+  malformed; PR #2 bundles + mixed-form bundles; PR #3 generator
+  exercises all three at 200+ modules.)_

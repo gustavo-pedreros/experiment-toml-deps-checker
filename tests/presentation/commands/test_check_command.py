@@ -24,7 +24,11 @@ class _FixedUseCase:
         self._report = report
         self.received_path: Path | None = None
 
-    def execute(self, catalog_path: Path) -> FreezeReport:
+    async def execute(self, catalog_path: Path) -> FreezeReport:
+        # RFC-0019 PR #3: ``GenerateFreezeReport.execute`` is now an
+        # async coroutine; the CLI wraps the call in ``asyncio.run``.
+        # The stub mirrors that contract so the CheckCommand integration
+        # test exercises the real call shape.
         self.received_path = catalog_path
         return self._report
 

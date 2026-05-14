@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -40,8 +41,13 @@ class CheckCommand:
         :returns: A ``(report, written_files)`` tuple — the generated report
             and the absolute paths of every file that was written.
         :raises CatalogParseError: Propagated from the use case / parser.
+
+        RFC-0019 PR #3 made ``GenerateFreezeReport.execute`` an async
+        coroutine. The CLI is the outermost layer, so it owns the event
+        loop: one ``asyncio.run`` here drives every async adapter
+        (scanners, fetchers, registries, module scanner) end-to-end.
         """
-        report = self._use_case.execute(catalog_path)
+        report = asyncio.run(self._use_case.execute(catalog_path))
         written: list[Path] = []
         for filename, writer in self._writers:
             dest = output_dir / filename

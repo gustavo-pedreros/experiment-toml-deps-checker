@@ -55,6 +55,25 @@ be assigned once a stable public API is established.
   dependency graph at compile time. RFC-0019 PR #2.
 
 ### Changed
+- `GradleModuleScanner.scan` is now an `async def` coroutine. Per-module
+  file reads + regex parsing run in parallel via `asyncio.to_thread`
+  + `asyncio.gather`, so a 200-module project no longer pays a
+  serialised read for every `build.gradle(.kts)`. Output and findings
+  are identical to PR #2 (same accessors, same `MOD-001` semantics,
+  same bundle attribution). RFC-0019 PR #3.
+- `ModuleUsageScanner` port signature changed to `async def scan(...)`,
+  matching the other six async adapter ports. Downstream impact:
+  callers `await` the coroutine. The `GradleModuleScanner` is the only
+  in-tree implementation; user-defined implementations need to convert
+  their `def scan` to `async def scan`. This is a breaking change for
+  third-party adapters but not for end users of the CLI.
+- `GenerateFreezeReport.execute` is now an `async def` coroutine. The
+  previous pattern of seven independent `asyncio.run(...)` calls inside
+  the use case is replaced by a single `asyncio.run(...)` at the CLI
+  entry (`CheckCommand.run`). Every adapter now shares one event loop
+  and one default thread pool. Behaviour is unchanged for end users;
+  callers that drove `execute` directly (custom integrations) need to
+  `await` the coroutine or wrap it in `asyncio.run`. RFC-0019 PR #3.
 - `ToolchainCompatibilityChecker` no longer re-parses the catalog TOML
   file. It consumes `Catalog.versions` directly, per the RFC-0020 checker
   contract ("checkers stop doing any TOML-aware introspection"). Behaviour
