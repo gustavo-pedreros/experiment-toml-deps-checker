@@ -1,6 +1,6 @@
 # RFC-0020: Robust Version Detection (Rich Versions Support)
 
-**Status:** Draft
+**Status:** Implemented — 2026-05-13
 **Created:** 2026-05-07
 **Related JTBDs:** JTBD-5 (report accuracy), JTBD-2 (no false negatives on toolchain)
 **Depends on:** none
@@ -54,14 +54,19 @@ class RichVersion:
     require: str | None = None
     prefer: str | None = None
     reject: tuple[str, ...] = ()
-    effective: MavenVersion  # resolved per precedence rules below
+    effective: MavenVersion  # resolved per precedence rules below (property)
 ```
 
-`MavenVersion` keeps its current semantics; `RichVersion` is what
-`Library.version` exposes when the catalog uses a rich block. For plain
-string versions, the parser still builds a `RichVersion` with
-`require=<value>` and `effective=MavenVersion(<value>)`, so downstream
-checkers see a single shape.
+**Implementation note — Path B (additive field):** the original proposal
+described making `Library.version: RichVersion` (Path A, type replacement),
+requiring all 31+ call-sites to use `.effective`. During implementation we
+chose **Path B** (additive optional field) instead: `Library.version` stays
+`MavenVersion`; a new `Library.version_constraints: RichVersion | None` is
+set only when the catalog actually uses a rich block. The precedence invariant
+is enforced in `Library.__post_init__`: `version_constraints.effective` must
+equal `version`. Plain-string and `version.ref` libraries have
+`version_constraints = None` and require zero call-site changes. Path A's
+correctness guarantee (no version mismatch) is preserved by the invariant.
 
 ### 2. Parser: precedence and normalization
 
@@ -136,22 +141,37 @@ doubles as a regression test for the customer-facing crash.
 
 ## Implementation Plan
 
-### Phase 1: Tracer Bullet
-- Parser handles `strictly` blocks.
-- `Library.version` becomes `RichVersion`; call sites updated to use `.effective`.
-- Fixture-based test confirms `check` runs without crashing.
+### PR #1 — Tracer Bullet ✅ (merged #41)
+- Parser handles rich-version blocks in `[libraries]` / `[plugins]`
+  (`strictly`, `require`, `prefer`, `reject`).
+- `RichVersion` domain value object introduced.
+- `Library.version_constraints: RichVersion | None` added (Path B — see
+  design note in §1).
+- `freeze.json` schema bumped `1.4.0 → 1.5.0` (MINOR per ADR-0008).
+- Production-style fixture under `tests/fixtures/rich_versions/`.
+- Test suite: 840 → 916 passing.
 
-### Phase 2: Exploration (Optional Spike)
-- **Spike:** confirm Gradle's exact behaviour when multiple rich keys
-  collide (e.g. `strictly` + `prefer`); document the rule and match it.
-- **Spike:** sample popular Android libraries to find real-world `reject`
-  patterns that deserve a dedicated "Active rejections" report section.
+### PR #2 — Checker Migration ✅ (merged #42)
+- Parser extended to accept rich-version blocks in the top-level
+  `[versions]` table as well (flattened to effective string in
+  `Catalog.versions`; `dict[str, str]` contract preserved).
+- `ToolchainCompatibilityChecker` now reads `Catalog.versions` directly
+  (no TOML re-parse). Side-effect: `strictly`-pinned toolchain versions
+  are now visible to the toolchain audit.
+- **Active Rejections** section added to the Markdown report. Every
+  library with a non-empty `reject` list is surfaced for reviewers.
+- Phase 2 Spike (contradictions, real-world patterns) was skipped;
+  Gradle's precedence rules are documented inline in `RichVersion`.
+- Test suite: 916 → 930 passing.
 
-### Phase 3: Checker Migration
-- `PlayStoreComplianceChecker` and `ToolchainCompatibilityChecker` consume
-  `RichVersion` directly; remove any ad-hoc TOML re-parsing.
-- Surface `reject` lists in the compliance report.
-- Add the contradiction warning (`strictly` + `prefer` etc.).
+### PR #3 — Contradiction Warnings (deferred / optional)
+- Warn when a single rich-version entry combines keys that are
+  semantically redundant or contradictory (e.g. `strictly` + `prefer`,
+  `require` + `prefer`).
+- Surface `Plugin.version_constraints` metadata (currently discarded by
+  the parser).
+- Derive `Library.version_constraints` for libraries that resolve via
+  `version.ref` pointing to a rich block in `[versions]`.
 
 ## Alternatives considered
 
@@ -202,13 +222,14 @@ Estimated **3 PRs** from tracer to DoD:
 
 ## Definition of Done (DoD)
 
-- [ ] **Integration:** Parser changes are active in the **Composition Root**.
-- [ ] **Architecture:** Follows ADR-0006 and ADR-0009.
-- [ ] **Accuracy:** Rich version keys are correctly prioritized
+- [x] **Integration:** Parser changes are active in the **Composition Root**.
+- [x] **Architecture:** Follows ADR-0006 and ADR-0009.
+- [x] **Accuracy:** Rich version keys are correctly prioritized
   (`strictly` > `require` > `prefer`).
-- [ ] **Robustness:** No silent failures and no crashes when encountering
+- [x] **Robustness:** No silent failures and no crashes when encountering
   `reject`-only blocks or unknown rich-version combinations.
-- [ ] **Visibility:** `reject` lists appear in the compliance report.
-- [ ] **Testing:** Unit tests cover all 4 rich-version keys, their
+- [x] **Visibility:** `reject` lists appear in the Markdown report
+  (dedicated **Active Rejections** section, PR #2).
+- [x] **Testing:** Unit tests cover all 4 rich-version keys, their
   combinations, `version.ref` interplay, and a real-fixture regression
-  test for the original crash.
+  test for the original crash. 840 → 930 passing across both PRs.
