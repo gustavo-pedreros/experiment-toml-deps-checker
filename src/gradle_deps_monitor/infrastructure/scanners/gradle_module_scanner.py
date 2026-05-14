@@ -8,7 +8,9 @@ Pipeline
    declarations that reference ``libs.<accessor>``.
 4. Map the accessor back to the catalog alias via a pre-built reverse
    lookup table that covers **both** the dotted and camelCase forms
-   (RFC-0019 PR #1).
+   (RFC-0019 PR #1). Bundle accessors (``libs.bundles.<form>``) are
+   resolved through a second lookup table that expands to the bundle's
+   member library aliases (RFC-0019 PR #2).
 5. Aggregate into a :class:`~...domain.module_usage.ModuleUsageMap`.
 
 Accessor mapping
@@ -26,6 +28,23 @@ The camelCase form is the canonical accessor in Kotlin DSL type-safe
 blocks, so KTS-heavy projects rely on it heavily. PR #1 of RFC-0019
 added recognition for both forms; before this change, KTS projects had
 their usage counts systematically under-reported.
+
+Bundle attribution (PR #2)
+--------------------------
+Bundles are accessed under the reserved ``libs.bundles.`` namespace.
+For a bundle alias ``compose-ui`` with members ``[androidx-compose-ui,
+androidx-compose-material]``, Gradle generates two equivalent
+accessors::
+
+    libs.bundles.compose.ui   // dotted form
+    libs.bundles.composeUi    // camelCase form
+
+When the scanner matches either form, **every member library** listed
+in the bundle is credited for that module under the configuration the
+bundle was declared with (``implementation``, ``api``, etc.). A library
+referenced both directly and via a bundle in the same module is
+credited only once — dedup happens naturally through the per-module
+"already in bucket" check.
 
 Configuration classification
 -----------------------------
@@ -146,6 +165,33 @@ def _build_accessor_map(catalog: Catalog) -> dict[str, str]:
     return mapping
 
 
+def _build_bundle_accessor_map(catalog: Catalog) -> dict[str, tuple[str, ...]]:
+    """Return ``{accessor: member_aliases}`` for every bundle in *catalog*.
+
+    Bundles live under Gradle's reserved ``libs.bundles.`` namespace, so
+    every key in this map starts with ``"bundles."``. Each bundle is
+    registered under both accessor forms — for alias ``compose-ui``::
+
+        "bundles.compose.ui"   → ("androidx-compose-ui", "androidx-compose-material")
+        "bundles.composeUi"    → ("androidx-compose-ui", "androidx-compose-material")
+
+    The scanner consults this map only after the library accessor
+    lookup fails, so a (hypothetical) library aliased ``bundles-foo``
+    still resolves to itself first. In practice Gradle reserves the
+    ``bundles`` prefix, so the collision cannot happen for catalogs
+    that Gradle accepts.
+
+    RFC-0019 PR #2.
+    """
+    mapping: dict[str, tuple[str, ...]] = {}
+    for bundle in catalog.bundles:
+        dotted = "bundles." + _alias_to_accessor(bundle.alias)
+        camel = "bundles." + _alias_to_camel(bundle.alias)
+        mapping[dotted] = bundle.member_aliases
+        mapping[camel] = bundle.member_aliases
+    return mapping
+
+
 def _find_project_root(catalog_path: Path) -> Path | None:
     """Walk up from *catalog_path* looking for ``settings.gradle(.kts)``.
 
@@ -258,6 +304,11 @@ class GradleModuleScanner:
             return None
 
         accessor_map = _build_accessor_map(catalog)
+        # RFC-0019 PR #2: a second table maps ``bundles.<form>`` accessors
+        # to the bundle's member library aliases. Consulted only when the
+        # library lookup misses, so direct ``libs.<lib>`` references keep
+        # their existing fast path.
+        bundle_accessor_map = _build_bundle_accessor_map(catalog)
 
         # alias → {"impl": [...], "api": [...], "test": [...]}
         usage: dict[str, dict[str, list[str]]] = {
@@ -304,16 +355,36 @@ class GradleModuleScanner:
                 # form is still all-lowercase by construction, so this
                 # is backward-compatible.
                 accessor = m.group(2)
-                alias = accessor_map.get(accessor)
-                if alias is None:
-                    continue
+
+                # PR #2 of RFC-0019: resolve the accessor to one or more
+                # library aliases. A direct ``libs.<lib>`` hit produces a
+                # single-element tuple; a ``libs.bundles.<name>`` hit
+                # expands to every member of the bundle. Unknown
+                # accessors are silently ignored (could be a stray
+                # ``libs.versions.kotlin`` reference, for example).
+                target_aliases: tuple[str, ...]
+                direct_alias = accessor_map.get(accessor)
+                if direct_alias is not None:
+                    target_aliases = (direct_alias,)
+                else:
+                    bundle_members = bundle_accessor_map.get(accessor)
+                    if bundle_members is None:
+                        continue
+                    target_aliases = bundle_members
 
                 bucket = _classify_config(config)
-                buckets = usage[alias]
-                if module_path not in buckets[bucket]:
-                    buckets[bucket].append(module_path)
-                    if bucket != "test":
-                        direct_count += 1
+                for alias in target_aliases:
+                    # A bundle is free to list an alias that no longer
+                    # exists in the catalog (catalog-health rule
+                    # ``HDX-002`` flags it separately). Skip silently so
+                    # we don't ``KeyError`` mid-scan.
+                    buckets = usage.get(alias)
+                    if buckets is None:
+                        continue
+                    if module_path not in buckets[bucket]:
+                        buckets[bucket].append(module_path)
+                        if bucket != "test":
+                            direct_count += 1
 
             module_direct_counts[module_path] = direct_count
 

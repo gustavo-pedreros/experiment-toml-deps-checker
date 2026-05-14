@@ -42,6 +42,17 @@ be assigned once a stable public API is established.
   now reads with `errors="strict"` and emits a `MOD-001` finding for
   the affected module while continuing the scan on the rest of the
   project. RFC-0019 PR #1.
+- `GradleModuleScanner` now credits **bundle members** when a module
+  declares `libs.bundles.<name>`. Previously, bundle usages were
+  silently ignored — projects that organise their dependencies through
+  the catalog's `[bundles]` section (common for Compose, networking,
+  testing stacks) had every member library reported with zero usage.
+  Both accessor forms are recognised: dotted (`libs.bundles.compose.ui`)
+  and camelCase (`libs.bundles.composeUi`). A library referenced both
+  directly and via a bundle in the same module is credited exactly
+  once per configuration bucket. The module's `direct_dep_count`
+  reflects the expanded set, matching how Gradle resolves the
+  dependency graph at compile time. RFC-0019 PR #2.
 
 ### Changed
 - `ToolchainCompatibilityChecker` no longer re-parses the catalog TOML

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gradle_deps_monitor.domain.catalog import Catalog, Library
+from gradle_deps_monitor.domain.catalog import Bundle, Catalog, Library
 from gradle_deps_monitor.domain.version import MavenVersion
 from gradle_deps_monitor.infrastructure.scanners.gradle_module_scanner import (
     GradleModuleScanner,
@@ -37,6 +37,29 @@ def _catalog(*aliases: str) -> Catalog:
         libraries=libs,
         plugins=(),
         bundles=(),
+    )
+
+
+def _catalog_with_bundles(
+    libraries: tuple[str, ...],
+    bundles: tuple[tuple[str, tuple[str, ...]], ...],
+) -> Catalog:
+    """Build a Catalog with libraries + ``(bundle_alias, members)`` pairs."""
+    libs = tuple(
+        Library(
+            alias=alias,
+            group="com.example",
+            artifact=alias,
+            version=MavenVersion("1.0.0"),
+        )
+        for alias in libraries
+    )
+    bundle_objs = tuple(Bundle(alias=alias, member_aliases=members) for alias, members in bundles)
+    return Catalog(
+        source_path=Path("/fake/gradle/libs.versions.toml"),
+        libraries=libs,
+        plugins=(),
+        bundles=bundle_objs,
     )
 
 
@@ -513,3 +536,248 @@ class TestGradleModuleScannerMalformedFile:
         result = GradleModuleScanner().scan(tmp_path, _catalog("retrofit"))
         assert result is not None
         assert result.findings == ()
+
+
+# ---------------------------------------------------------------------------
+# RFC-0019 PR #2 — bundle attribution
+# ---------------------------------------------------------------------------
+
+
+from gradle_deps_monitor.infrastructure.scanners.gradle_module_scanner import (  # noqa: E402
+    _build_bundle_accessor_map,
+)
+
+
+class TestBuildBundleAccessorMap:
+    """Bundle accessor map populates both dotted and camelCase forms,
+    each pointing at the full member-alias tuple.
+    """
+
+    def test_single_word_bundle(self) -> None:
+        catalog = _catalog_with_bundles(
+            ("retrofit", "okhttp"),
+            (("network", ("retrofit", "okhttp")),),
+        )
+        m = _build_bundle_accessor_map(catalog)
+        # Single-word alias collapses to one key under both forms.
+        assert m == {"bundles.network": ("retrofit", "okhttp")}
+
+    def test_two_segment_bundle(self) -> None:
+        catalog = _catalog_with_bundles(
+            ("a", "b"),
+            (("compose-ui", ("a", "b")),),
+        )
+        m = _build_bundle_accessor_map(catalog)
+        assert m["bundles.compose.ui"] == ("a", "b")
+        assert m["bundles.composeUi"] == ("a", "b")
+
+    def test_multiple_bundles(self) -> None:
+        catalog = _catalog_with_bundles(
+            ("a", "b", "c", "d"),
+            (
+                ("network", ("a", "b")),
+                ("compose-ui", ("c", "d")),
+            ),
+        )
+        m = _build_bundle_accessor_map(catalog)
+        assert m["bundles.network"] == ("a", "b")
+        assert m["bundles.compose.ui"] == ("c", "d")
+        assert m["bundles.composeUi"] == ("c", "d")
+
+    def test_empty_catalog_returns_empty(self) -> None:
+        m = _build_bundle_accessor_map(_catalog())
+        assert m == {}
+
+
+class TestGradleModuleScannerBundleAttribution:
+    """End-to-end: ``libs.bundles.<name>`` credits every member library."""
+
+    def test_bundle_credits_all_members(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.bundles.network) }",
+        )
+        catalog = _catalog_with_bundles(
+            ("retrofit", "okhttp", "moshi"),
+            (("network", ("retrofit", "okhttp", "moshi")),),
+        )
+        result = GradleModuleScanner().scan(tmp_path, catalog)
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        for member in ("retrofit", "okhttp", "moshi"):
+            assert ":app" in usages[member].implementation_modules, (
+                f"{member} should be credited via bundle"
+            )
+
+    def test_bundle_camel_case_accessor(self, tmp_path: Path) -> None:
+        """``libs.bundles.composeUi`` (KTS form) is recognised."""
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.bundles.composeUi) }",
+        )
+        catalog = _catalog_with_bundles(
+            ("androidx-compose-ui", "androidx-compose-material"),
+            (("compose-ui", ("androidx-compose-ui", "androidx-compose-material")),),
+        )
+        result = GradleModuleScanner().scan(tmp_path, catalog)
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["androidx-compose-ui"].implementation_modules
+        assert ":app" in usages["androidx-compose-material"].implementation_modules
+
+    def test_bundle_dotted_accessor(self, tmp_path: Path) -> None:
+        """``libs.bundles.compose.ui`` (Groovy / multi-segment) is recognised."""
+        _write(tmp_path / "settings.gradle", "include ':app'")
+        _write(
+            tmp_path / "app" / "build.gradle",
+            "dependencies { implementation libs.bundles.compose.ui }",
+        )
+        catalog = _catalog_with_bundles(
+            ("androidx-compose-ui", "androidx-compose-material"),
+            (("compose-ui", ("androidx-compose-ui", "androidx-compose-material")),),
+        )
+        result = GradleModuleScanner().scan(tmp_path, catalog)
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["androidx-compose-ui"].implementation_modules
+        assert ":app" in usages["androidx-compose-material"].implementation_modules
+
+    def test_bundle_respects_configuration(self, tmp_path: Path) -> None:
+        """Members are credited under the bucket of the bundle declaration."""
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies {\n"
+            "    api(libs.bundles.network)\n"
+            "    testImplementation(libs.bundles.testing)\n"
+            "}",
+        )
+        catalog = _catalog_with_bundles(
+            ("retrofit", "okhttp", "junit", "mockk"),
+            (
+                ("network", ("retrofit", "okhttp")),
+                ("testing", ("junit", "mockk")),
+            ),
+        )
+        result = GradleModuleScanner().scan(tmp_path, catalog)
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["retrofit"].api_modules
+        assert ":app" in usages["okhttp"].api_modules
+        assert ":app" in usages["junit"].test_modules
+        assert ":app" in usages["mockk"].test_modules
+        # And nothing leaked into the wrong bucket.
+        assert ":app" not in usages["retrofit"].implementation_modules
+        assert ":app" not in usages["junit"].api_modules
+
+    def test_bundle_does_not_double_count_when_also_declared_directly(self, tmp_path: Path) -> None:
+        """A module that declares ``libs.retrofit`` AND a bundle containing
+        retrofit must credit retrofit exactly once in the impl bucket.
+        """
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies {\n"
+            "    implementation(libs.retrofit)\n"
+            "    implementation(libs.bundles.network)\n"
+            "}",
+        )
+        catalog = _catalog_with_bundles(
+            ("retrofit", "okhttp"),
+            (("network", ("retrofit", "okhttp")),),
+        )
+        result = GradleModuleScanner().scan(tmp_path, catalog)
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        # retrofit appears in the impl list for :app exactly once.
+        assert usages["retrofit"].implementation_modules.count(":app") == 1
+        # okhttp also credited once (only via the bundle).
+        assert usages["okhttp"].implementation_modules.count(":app") == 1
+
+    def test_module_direct_count_reflects_bundle_expansion(self, tmp_path: Path) -> None:
+        """A bundle declaration counts as ``N`` direct deps for the module,
+        where ``N`` is the number of unique libraries credited (matching how
+        Gradle resolves the dependency graph at compile time).
+        """
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.bundles.network) }",
+        )
+        catalog = _catalog_with_bundles(
+            ("retrofit", "okhttp", "moshi"),
+            (("network", ("retrofit", "okhttp", "moshi")),),
+        )
+        result = GradleModuleScanner().scan(tmp_path, catalog)
+        assert result is not None
+        counts = {s.module_path: s.direct_dep_count for s in result.module_summaries}
+        # 3 distinct libs credited via the bundle, 3 direct deps.
+        assert counts[":app"] == 3
+
+    def test_unknown_bundle_member_ignored(self, tmp_path: Path) -> None:
+        """A bundle that references an alias not in the catalog must not
+        crash the scan. ``HDX-002`` flags the catalog problem separately.
+        """
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.bundles.network) }",
+        )
+        catalog = _catalog_with_bundles(
+            ("retrofit",),  # okhttp missing!
+            (("network", ("retrofit", "okhttp")),),
+        )
+        result = GradleModuleScanner().scan(tmp_path, catalog)
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        # retrofit credited; okhttp absent from the usage map entirely.
+        assert ":app" in usages["retrofit"].implementation_modules
+        assert "okhttp" not in usages
+
+    def test_unused_bundle_does_not_credit_members(self, tmp_path: Path) -> None:
+        """A catalog can declare bundles that no module references; those
+        member libraries should keep their zero-usage status.
+        """
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.retrofit) }",
+        )
+        catalog = _catalog_with_bundles(
+            ("retrofit", "okhttp"),
+            (("network", ("retrofit", "okhttp")),),  # bundle declared but unused
+        )
+        result = GradleModuleScanner().scan(tmp_path, catalog)
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        # okhttp was not used directly, and the bundle was not referenced.
+        assert usages["okhttp"].total_count == 0
+
+    def test_bundle_in_mixed_kts_groovy_project(self, tmp_path: Path) -> None:
+        """One module uses the bundle in KTS-camel form, another in Groovy
+        dotted form — both modules credit every member.
+        """
+        _write(
+            tmp_path / "settings.gradle.kts",
+            'include(":app")\ninclude(":feature:auth")',
+        )
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.bundles.composeUi) }",
+        )
+        _write(
+            tmp_path / "feature" / "auth" / "build.gradle",
+            "dependencies { implementation libs.bundles.compose.ui }",
+        )
+        catalog = _catalog_with_bundles(
+            ("compose-ui-core", "compose-ui-material"),
+            (("compose-ui", ("compose-ui-core", "compose-ui-material")),),
+        )
+        result = GradleModuleScanner().scan(tmp_path, catalog)
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        for member in ("compose-ui-core", "compose-ui-material"):
+            assert ":app" in usages[member].implementation_modules
+            assert ":feature:auth" in usages[member].implementation_modules
