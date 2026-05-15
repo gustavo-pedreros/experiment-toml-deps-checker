@@ -48,9 +48,9 @@ dev = [
 gradle-deps-monitor = "gradle_deps_monitor.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/gustavo-pedreros/toml-deps-checker"
-Repository = "https://github.com/gustavo-pedreros/toml-deps-checker"
-Issues = "https://github.com/gustavo-pedreros/toml-deps-checker/issues"
+Homepage = "https://github.com/gustavo-pedreros/experiment-toml-deps-checker"
+Repository = "https://github.com/gustavo-pedreros/experiment-toml-deps-checker"
+Issues = "https://github.com/gustavo-pedreros/experiment-toml-deps-checker/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gradle_deps_monitor"]
