@@ -41,7 +41,7 @@ model**, with three layers of precedence:
 2. **Remote copy** — fetched from the tool's GitHub repository (raw
    URL) once per configured TTL (default: 7 days), with HTTP ETag
    for efficient revalidation. Cached on disk under
-   `~/.cache/toml-deps-checker/`.
+   `~/.cache/gradle-deps-monitor/`.
 3. **Local override** — a project-level YAML file (e.g.,
    `.deprecations.local.yaml`) where teams can add internal
    deprecations or override entries.
