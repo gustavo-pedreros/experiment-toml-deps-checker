@@ -28,7 +28,7 @@ the tool in CI for a quick freeze check can leave it off; users
 investigating a specific upgrade locally can turn it on.
 
 ```
-toml-deps-checker /path/to/project --module-usage
+gradle-deps-monitor check /path/to/project --module-usage
 ```
 
 Or, in `config.toml`:

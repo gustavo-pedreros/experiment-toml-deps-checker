@@ -22,8 +22,8 @@ two JSON snapshots) and produces a comparative report in Markdown
 and JSON.
 
 ```
-toml-deps-checker diff freeze-reports/2026-04-18-def456.json \
-                       freeze-reports/2026-05-02-abc123.json
+gradle-deps-monitor diff freeze-reports/2026-04-18-def456.json \
+                          freeze-reports/2026-05-02-abc123.json
 ```
 
 The diff report highlights:
