@@ -164,5 +164,5 @@ First complete release of Phase 1 — the technical foundation.
 
 ---
 
-[Unreleased]: https://github.com/gustavo-pedreros/toml-deps-checker/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/gustavo-pedreros/toml-deps-checker/releases/tag/v0.1.0
+[Unreleased]: https://github.com/gustavo-pedreros/experiment-toml-deps-checker/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/gustavo-pedreros/experiment-toml-deps-checker/releases/tag/v0.1.0

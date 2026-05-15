@@ -43,8 +43,8 @@ pip install gradle-deps-monitor
 Or, for local development:
 
 ```bash
-git clone https://github.com/gustavo-pedreros/toml-deps-checker.git
-cd toml-deps-checker
+git clone https://github.com/gustavo-pedreros/experiment-toml-deps-checker.git
+cd experiment-toml-deps-checker
 pip install -e ".[dev]"
 ```
 
