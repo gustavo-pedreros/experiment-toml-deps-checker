@@ -14,8 +14,16 @@ dependency_status.json
 # (committable freeze reports live under `freeze-reports/`, not `reports/`)
 reports/
 
-# Local agent / tooling sandboxes
-.claude/
+# Claude Code per-project tooling.
+# Transient state (caches, file history, per-user overrides) stays local;
+# the shared parts (subagents, hooks, team-default settings) are versioned.
+.claude/*
+!.claude/agents/
+!.claude/agents/**
+!.claude/hooks/
+!.claude/hooks/**
+!.claude/settings.json
+.claude/settings.local.json
 
 # Python bytecode and compiled artifacts
 __pycache__/
