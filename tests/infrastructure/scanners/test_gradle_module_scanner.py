@@ -570,6 +570,119 @@ class TestGradleModuleScannerUnderscoreAliases:
 
 
 # ---------------------------------------------------------------------------
+# RFC-0022 — platform() / enforcedPlatform() / testFixtures() wrappers
+# ---------------------------------------------------------------------------
+
+
+class TestGradleModuleScannerPlatformWrappers:
+    """RFC-0022: BoMs are conventionally applied via ``platform(libs.x.bom)``;
+    the related ``enforcedPlatform`` and ``testFixtures`` wrappers
+    follow the same pattern. Pre-RFC-0022 the regex required ``libs.``
+    immediately after the configuration keyword, so every wrapped
+    declaration was silently invisible.
+    """
+
+    async def test_platform_groovy(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle", "include ':app'")
+        _write(
+            tmp_path / "app" / "build.gradle",
+            "dependencies {\n    implementation platform(libs.compose.bom)\n}",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("compose-bom"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["compose-bom"].implementation_modules
+
+    async def test_platform_kts(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(platform(libs.firebase.bom)) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("firebase-bom"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["firebase-bom"].implementation_modules
+
+    async def test_enforced_platform_groovy(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle", "include ':app'")
+        _write(
+            tmp_path / "app" / "build.gradle",
+            "dependencies { api enforcedPlatform(libs.compose.bom) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("compose-bom"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["compose-bom"].api_modules
+
+    async def test_enforced_platform_kts(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { api(enforcedPlatform(libs.firebase.bom)) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("firebase-bom"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["firebase-bom"].api_modules
+
+    async def test_test_fixtures_groovy(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle", "include ':app'")
+        _write(
+            tmp_path / "app" / "build.gradle",
+            "dependencies { testImplementation testFixtures(libs.fixtures.lib) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("fixtures-lib"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["fixtures-lib"].test_modules
+
+    async def test_test_fixtures_kts(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { testImplementation(testFixtures(libs.fixtures.lib)) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("fixtures-lib"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["fixtures-lib"].test_modules
+
+    async def test_unwhitelisted_wrapper_not_matched(self, tmp_path: Path) -> None:
+        """Whitelist guard: an arbitrary helper function wrapping
+        ``libs.*`` must NOT be credited. Anchors the
+        "Alternatives considered: generalised wrapper handler — rejected"
+        decision from RFC-0022 to executable behaviour.
+        """
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(someProject(libs.retrofit)) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("retrofit"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        # The non-whitelisted wrapper interposed between
+        # ``implementation`` and ``libs.`` blocks the match.
+        assert usages["retrofit"].total_count == 0
+
+    async def test_direct_libs_still_matches(self, tmp_path: Path) -> None:
+        """Sanity check: the pre-RFC-0022 happy path
+        (``implementation(libs.retrofit)`` with no wrapper) still
+        matches. The optional wrapper group must not break the baseline.
+        """
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.retrofit) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("retrofit"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["retrofit"].implementation_modules
+
+
+# ---------------------------------------------------------------------------
 # RFC-0019 PR #1 — malformed-file resilience (MOD-001)
 # ---------------------------------------------------------------------------
 

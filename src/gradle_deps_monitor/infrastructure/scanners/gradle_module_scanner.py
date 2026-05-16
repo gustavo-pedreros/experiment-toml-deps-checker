@@ -101,12 +101,21 @@ _SEPARATORS_RE = re.compile(r"[-_]")
 
 # Matches dependency declarations referencing libs.<accessor>.
 # Groups: (1) configuration name, (2) dotted accessor after "libs."
+#
+# RFC-0022: an optional ``platform | enforcedPlatform | testFixtures``
+# wrapper between the configuration and ``libs.`` is admitted, so
+# ``implementation platform(libs.x.bom)`` (the canonical Gradle pattern
+# for applying a Maven BoM) is now matched. The wrapper whitelist is
+# intentionally narrow — a permissive "any function" wildcard would
+# credit ``someProject(libs.foo)`` and other false positives.
 _DEP_RE = re.compile(
     r"(?:^|[(\s,])"
     r"(implementation|api|testImplementation|androidTestImplementation"
     r"|testRuntimeOnly|testCompileOnly|debugImplementation|releaseImplementation"
     r"|compileOnly|runtimeOnly|ksp|kapt|annotationProcessor)"
-    r"\s*\(?\s*libs\.([a-zA-Z0-9_.]+)",
+    r"\s*\(?\s*"
+    r"(?:platform|enforcedPlatform|testFixtures)?\s*\(?\s*"
+    r"libs\.([a-zA-Z0-9_.]+)",
     re.MULTILINE,
 )
 
