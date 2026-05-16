@@ -11,6 +11,26 @@ be assigned once a stable public API is established.
 ## [Unreleased]
 
 ### Fixed
+- `GradleModuleScanner` now matches catalog aliases that use only
+  underscores (e.g. `internal_sdk_android`) against the dotted
+  accessors build files actually reference (`libs.internal.sdk.android`).
+  Pre-fix, the alias normaliser only handled `-` → `.`, so projects
+  with underscore-only aliases had every reference silently dropped
+  from the module usage map. When the affected libraries also carried
+  CVEs, the risk score's blast-radius dimension reported `0/15 "not
+  used"` — actively understating security risk. RFC-0022.
+- `GradleModuleScanner` now detects Maven BoM applications wrapped in
+  `platform()`, `enforcedPlatform()`, and `testFixtures()`. Pre-fix,
+  the regex required `libs.` immediately after the configuration
+  keyword, so every `implementation platform(libs.x.bom)` declaration
+  was invisible — BoMs reported `0` direct uses even when applied in
+  many modules. The wrapper whitelist is intentionally narrow to
+  avoid crediting arbitrary helper functions wrapping `libs.*`.
+  RFC-0022.
+- Markdown module usage section banner now enumerates every
+  recognised accessor form (dotted, camelCase, bundle expansion, BoM
+  wrapper) instead of the obsolete "only dotted-accessor form"
+  wording carried over from the RFC-0019 tracer. RFC-0022.
 - Parser no longer crashes on Gradle Version Catalogs that use rich-version
   blocks (`strictly` / `require` / `prefer` / `reject`). Previously,
   `TomlCatalogParser` raised `CatalogParseError` on the first such entry,

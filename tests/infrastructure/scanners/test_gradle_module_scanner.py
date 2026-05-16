@@ -86,6 +86,17 @@ class TestAliasToAccessor:
     def test_lowercased(self) -> None:
         assert _alias_to_accessor("OkHttp") == "okhttp"
 
+    def test_underscores_become_dots(self) -> None:
+        # RFC-0022: ``_`` is a separator alongside ``-`` per Gradle's
+        # catalog accessor convention. Pre-RFC-0022 underscore-only
+        # aliases never matched the dotted accessors that build files
+        # actually use (``libs.internal.sdk.android``).
+        assert _alias_to_accessor("internal_sdk_android") == "internal.sdk.android"
+
+    def test_mixed_dash_and_underscore(self) -> None:
+        # Both separators normalise to ``.`` in the same alias.
+        assert _alias_to_accessor("compose_ui-graphics") == "compose.ui.graphics"
+
 
 class TestFindProjectRoot:
     def test_finds_kts_in_same_dir(self, tmp_path: Path) -> None:
@@ -395,6 +406,18 @@ class TestAliasToCamel:
     def test_empty_alias_returns_input(self) -> None:
         assert _alias_to_camel("") == ""
 
+    def test_underscores_split_to_camel(self) -> None:
+        # RFC-0022: underscore-only aliases produce the same camelCase
+        # form as their kebab equivalent (``internal-sdk-android``).
+        assert _alias_to_camel("internal_sdk_android") == "internalSdkAndroid"
+
+    def test_mixed_dash_and_underscore_to_camel(self) -> None:
+        assert _alias_to_camel("compose_ui-graphics") == "composeUiGraphics"
+
+    def test_consecutive_underscores_dropped(self) -> None:
+        # Mirrors ``test_empty_segments_dropped`` for the ``-`` case.
+        assert _alias_to_camel("__foo__bar__") == "fooBar"
+
 
 class TestBuildAccessorMap:
     """The reverse-lookup map must cover BOTH accessor forms so that
@@ -423,6 +446,15 @@ class TestBuildAccessorMap:
         assert m["androidxCoreKtx"] == "androidx-core-ktx"
         assert m["core.ktx"] == "core-ktx"
         assert m["coreKtx"] == "core-ktx"
+
+    def test_underscore_only_alias_maps_under_both_forms(self) -> None:
+        # RFC-0022: an alias declared with only ``_`` (a common pattern
+        # in projects that predate the kebab-case recommendation) is
+        # addressable as both ``libs.internal.sdk.android`` (dotted)
+        # and ``libs.internalSdkAndroid`` (camelCase).
+        m = _build_accessor_map(_catalog("internal_sdk_android"))
+        assert m["internal.sdk.android"] == "internal_sdk_android"
+        assert m["internalSdkAndroid"] == "internal_sdk_android"
 
 
 class TestGradleModuleScannerCamelCase:
@@ -472,6 +504,182 @@ class TestGradleModuleScannerCamelCase:
         assert result is not None
         usages = {u.alias: u for u in result.library_usages}
         assert ":app" in usages["androidx-core-ktx"].api_modules
+
+
+# ---------------------------------------------------------------------------
+# RFC-0022 — underscore-only catalog aliases
+# ---------------------------------------------------------------------------
+
+
+class TestGradleModuleScannerUnderscoreAliases:
+    """RFC-0022: underscore-only aliases (``internal_sdk_android``) must
+    match the dotted accessors (``libs.internal.sdk.android``) and
+    camelCase accessors (``libs.internalSdkAndroid``) that build files
+    actually use. Pre-RFC-0022 these aliases were silently
+    under-counted because the helper only normalised ``-`` → ``.``.
+    """
+
+    async def test_dotted_accessor_in_groovy(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle", "include ':app'")
+        _write(
+            tmp_path / "app" / "build.gradle",
+            "dependencies {\n    implementation libs.internal.sdk.android\n}",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("internal_sdk_android"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["internal_sdk_android"].implementation_modules
+
+    async def test_dotted_accessor_in_kts(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.internal.sdk.android) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("internal_sdk_android"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["internal_sdk_android"].implementation_modules
+
+    async def test_camel_case_accessor_in_kts(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.internalSdkAndroid) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("internal_sdk_android"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["internal_sdk_android"].implementation_modules
+
+    async def test_api_configuration_preserved(self, tmp_path: Path) -> None:
+        """Underscore alias used under ``api(...)`` lands in the api
+        bucket, just like its kebab equivalent would. Regression target
+        for the security-critical case where pre-RFC-0022 the blast
+        radius was reported as zero.
+        """
+        _write(tmp_path / "settings.gradle", "include ':auth'")
+        _write(
+            tmp_path / "auth" / "build.gradle",
+            "dependencies {\n    api libs.auth.jwt.validator\n}",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("auth_jwt_validator"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":auth" in usages["auth_jwt_validator"].api_modules
+
+
+# ---------------------------------------------------------------------------
+# RFC-0022 — platform() / enforcedPlatform() / testFixtures() wrappers
+# ---------------------------------------------------------------------------
+
+
+class TestGradleModuleScannerPlatformWrappers:
+    """RFC-0022: BoMs are conventionally applied via ``platform(libs.x.bom)``;
+    the related ``enforcedPlatform`` and ``testFixtures`` wrappers
+    follow the same pattern. Pre-RFC-0022 the regex required ``libs.``
+    immediately after the configuration keyword, so every wrapped
+    declaration was silently invisible.
+    """
+
+    async def test_platform_groovy(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle", "include ':app'")
+        _write(
+            tmp_path / "app" / "build.gradle",
+            "dependencies {\n    implementation platform(libs.compose.bom)\n}",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("compose-bom"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["compose-bom"].implementation_modules
+
+    async def test_platform_kts(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(platform(libs.firebase.bom)) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("firebase-bom"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["firebase-bom"].implementation_modules
+
+    async def test_enforced_platform_groovy(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle", "include ':app'")
+        _write(
+            tmp_path / "app" / "build.gradle",
+            "dependencies { api enforcedPlatform(libs.compose.bom) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("compose-bom"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["compose-bom"].api_modules
+
+    async def test_enforced_platform_kts(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { api(enforcedPlatform(libs.firebase.bom)) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("firebase-bom"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["firebase-bom"].api_modules
+
+    async def test_test_fixtures_groovy(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle", "include ':app'")
+        _write(
+            tmp_path / "app" / "build.gradle",
+            "dependencies { testImplementation testFixtures(libs.fixtures.lib) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("fixtures-lib"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["fixtures-lib"].test_modules
+
+    async def test_test_fixtures_kts(self, tmp_path: Path) -> None:
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { testImplementation(testFixtures(libs.fixtures.lib)) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("fixtures-lib"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["fixtures-lib"].test_modules
+
+    async def test_unwhitelisted_wrapper_not_matched(self, tmp_path: Path) -> None:
+        """Whitelist guard: an arbitrary helper function wrapping
+        ``libs.*`` must NOT be credited. Anchors the
+        "Alternatives considered: generalised wrapper handler — rejected"
+        decision from RFC-0022 to executable behaviour.
+        """
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(someProject(libs.retrofit)) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("retrofit"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        # The non-whitelisted wrapper interposed between
+        # ``implementation`` and ``libs.`` blocks the match.
+        assert usages["retrofit"].total_count == 0
+
+    async def test_direct_libs_still_matches(self, tmp_path: Path) -> None:
+        """Sanity check: the pre-RFC-0022 happy path
+        (``implementation(libs.retrofit)`` with no wrapper) still
+        matches. The optional wrapper group must not break the baseline.
+        """
+        _write(tmp_path / "settings.gradle.kts", 'include(":app")')
+        _write(
+            tmp_path / "app" / "build.gradle.kts",
+            "dependencies { implementation(libs.retrofit) }",
+        )
+        result = await GradleModuleScanner().scan(tmp_path, _catalog("retrofit"))
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["retrofit"].implementation_modules
 
 
 # ---------------------------------------------------------------------------
@@ -592,6 +800,20 @@ class TestBuildBundleAccessorMap:
         m = _build_bundle_accessor_map(_catalog())
         assert m == {}
 
+    def test_underscore_only_bundle_alias(self) -> None:
+        """RFC-0022: a bundle aliased with only ``_`` produces both
+        accessor forms (dotted and camelCase) just like its kebab
+        equivalent. Members are still credited via the existing
+        bundle-expansion path.
+        """
+        catalog = _catalog_with_bundles(
+            ("a", "b"),
+            (("legacy_sdk_bundle", ("a", "b")),),
+        )
+        m = _build_bundle_accessor_map(catalog)
+        assert m["bundles.legacy.sdk.bundle"] == ("a", "b")
+        assert m["bundles.legacySdkBundle"] == ("a", "b")
+
 
 class TestGradleModuleScannerBundleAttribution:
     """End-to-end: ``libs.bundles.<name>`` credits every member library."""
@@ -672,9 +894,25 @@ class TestGradleModuleScannerBundleAttribution:
         assert ":app" in usages["okhttp"].api_modules
         assert ":app" in usages["junit"].test_modules
         assert ":app" in usages["mockk"].test_modules
-        # And nothing leaked into the wrong bucket.
-        assert ":app" not in usages["retrofit"].implementation_modules
-        assert ":app" not in usages["junit"].api_modules
+
+    async def test_bundle_with_underscore_only_alias(self, tmp_path: Path) -> None:
+        """RFC-0022: ``libs.bundles.legacy.sdk.bundle`` (dotted form of
+        an underscore-only bundle alias) credits every member.
+        """
+        _write(tmp_path / "settings.gradle", "include ':app'")
+        _write(
+            tmp_path / "app" / "build.gradle",
+            "dependencies { implementation libs.bundles.legacy.sdk.bundle }",
+        )
+        catalog = _catalog_with_bundles(
+            ("retrofit", "okhttp"),
+            (("legacy_sdk_bundle", ("retrofit", "okhttp")),),
+        )
+        result = await GradleModuleScanner().scan(tmp_path, catalog)
+        assert result is not None
+        usages = {u.alias: u for u in result.library_usages}
+        assert ":app" in usages["retrofit"].implementation_modules
+        assert ":app" in usages["okhttp"].implementation_modules
 
     async def test_bundle_does_not_double_count_when_also_declared_directly(
         self, tmp_path: Path

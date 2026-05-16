@@ -91,14 +91,31 @@ _MAX_SEARCH_DEPTH = 4
 # Matches quoted strings inside include() calls.
 _INCLUDE_STRING_RE = re.compile(r"""["'](:?[a-zA-Z0-9_:.-]+)["']""")
 
+# Separator characters that Gradle's catalog accessor convention treats
+# as equivalent: ``-`` and ``_`` both produce nesting in the generated
+# type-safe accessor (so ``foo_bar`` and ``foo-bar`` both become
+# ``libs.foo.bar`` / ``libs.fooBar``). RFC-0022 added ``_`` after
+# real-world projects with underscore-only aliases were silently
+# under-counted.
+_SEPARATORS_RE = re.compile(r"[-_]")
+
 # Matches dependency declarations referencing libs.<accessor>.
 # Groups: (1) configuration name, (2) dotted accessor after "libs."
+#
+# RFC-0022: an optional ``platform | enforcedPlatform | testFixtures``
+# wrapper between the configuration and ``libs.`` is admitted, so
+# ``implementation platform(libs.x.bom)`` (the canonical Gradle pattern
+# for applying a Maven BoM) is now matched. The wrapper whitelist is
+# intentionally narrow — a permissive "any function" wildcard would
+# credit ``someProject(libs.foo)`` and other false positives.
 _DEP_RE = re.compile(
     r"(?:^|[(\s,])"
     r"(implementation|api|testImplementation|androidTestImplementation"
     r"|testRuntimeOnly|testCompileOnly|debugImplementation|releaseImplementation"
     r"|compileOnly|runtimeOnly|ksp|kapt|annotationProcessor)"
-    r"\s*\(?\s*libs\.([a-zA-Z0-9_.]+)",
+    r"\s*\(?\s*"
+    r"(?:platform|enforcedPlatform|testFixtures)?\s*\(?\s*"
+    r"libs\.([a-zA-Z0-9_.]+)",
     re.MULTILINE,
 )
 
@@ -118,13 +135,16 @@ _TEST_CONFIGS: frozenset[str] = frozenset(
 
 
 def _alias_to_accessor(alias: str) -> str:
-    """Return the dotted accessor form for *alias* (``-`` → ``.``, lowercased).
+    """Return the dotted accessor form for *alias* (``-``/``_`` → ``.``, lowercased).
 
-    Kept under the historical name so PR #2/#3 follow-ups (and existing
-    unit tests) keep working; ``_alias_to_camel`` is the camelCase
-    sibling introduced by RFC-0019 PR #1.
+    Both ``-`` and ``_`` are treated as separators per Gradle's catalog
+    accessor convention; ``foo_bar_baz`` and ``foo-bar-baz`` both yield
+    ``"foo.bar.baz"``. RFC-0022 added underscore support; pre-RFC-0022
+    underscore-only aliases never matched the dotted accessors used in
+    build files. ``_alias_to_camel`` is the camelCase sibling
+    introduced by RFC-0019 PR #1.
     """
-    return alias.replace("-", ".").lower()
+    return _SEPARATORS_RE.sub(".", alias).lower()
 
 
 def _alias_to_camel(alias: str) -> str:
@@ -134,13 +154,16 @@ def _alias_to_camel(alias: str) -> str:
     title-cased and concatenated::
 
         "androidx-core-ktx" → "androidxCoreKtx"
+        "internal_sdk_lib"  → "internalSdkLib"
         "retrofit"          → "retrofit"
         "okhttp"            → "okhttp"
 
-    Empty segments (from leading / trailing / consecutive ``-``) are
-    dropped, matching Gradle's behaviour for malformed aliases.
+    Both ``-`` and ``_`` split as separators per Gradle's catalog
+    convention (RFC-0022). Empty segments (from leading / trailing /
+    consecutive separators) are dropped, matching Gradle's behaviour
+    for malformed aliases.
     """
-    parts = [p for p in alias.split("-") if p]
+    parts = [p for p in _SEPARATORS_RE.split(alias) if p]
     if not parts:
         return alias
     head = parts[0].lower()

@@ -95,9 +95,20 @@ policy enforcement for CI/CD.
 | ✅ | Robust Version Detection (Rich Versions) | [RFC-0020](proposals/0020-rich-versions.md) |
 | 📋 | CI Gatekeeper (Policy Enforcement) | [RFC-0018](proposals/0018-ci-gatekeeper.md) |
 
+## Phase 6 — Real-world stress test follow-ups 🚧 In progress
+
+Findings surfaced while running the tool end-to-end against real
+multi-module Android projects. Each item is a narrow bug fix or UX
+improvement that materially changes report quality but doesn't
+merit its own feature phase.
+
+| Status | Item | Reference |
+|--------|------|-----------|
+| 📋 | Module Scanner — Accessor Coverage Follow-up (underscore aliases + `platform()` BoMs) | [RFC-0022](proposals/0022-module-scanner-accessor-coverage.md) |
+
 ## Backlog
 
-Items accepted into the roadmap, scheduled after Phase 5.
+Items accepted into the roadmap, scheduled after Phase 6.
 Ordering inside the backlog is not yet fixed; items here may be
 re-promoted into a later phase or split into sub-RFCs.
 
