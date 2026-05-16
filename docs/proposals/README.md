@@ -114,6 +114,7 @@ splitting into sub-RFCs.
 | [0019](0019-module-scanner.md) | High-Performance & Accurate Module Scanner | Proposed | 3, 5 |
 | [0020](0020-rich-versions.md) | Robust Version Detection (Rich Versions Support) | Proposed | 5 |
 | [0021](0021-user-guide.md) | Official User Guide | Proposed | 5 |
+| [0022](0022-module-scanner-accessor-coverage.md) | Module Scanner — Accessor Coverage Follow-up (underscore aliases + `platform()` BoMs) | Proposed | 3, 5 |
 
 > Lifecycle status (Accepted, In progress, Shipped) is tracked in
 > [`docs/roadmap.md`](../roadmap.md). The "Status" column above
