@@ -399,7 +399,10 @@ def _module_usage_section(usage_map: ModuleUsageMap | None) -> str:
     return (
         f"## Module Usage Map ({scanned} {'module' if scanned == 1 else 'modules'} scanned)\n\n"
         "> Static analysis of `build.gradle(.kts)` files. "
-        "Only the dotted-accessor form (`libs.foo.bar`) is matched.\n\n"
+        "Recognises every Gradle catalog accessor form: dotted "
+        "(`libs.foo.bar`), camelCase (`libs.fooBar`), bundle expansion "
+        "(`libs.bundles.<name>`), and BoM wrappers "
+        "(`platform(libs.x.bom)`, `enforcedPlatform(...)`).\n\n"
         f"{lib_table}\n\n"
         f"{mod_table}"
     )
