@@ -117,6 +117,7 @@ splitting into sub-RFCs.
 | [0022](0022-module-scanner-accessor-coverage.md) | Module Scanner — Accessor Coverage Follow-up (underscore aliases + `platform()` BoMs) | Proposed | 3, 5 |
 | [0023](0023-license-classpath-exception.md) | License Classifier — GPL with Classpath Exception | Proposed | 2, 5 |
 | [0024](0024-async-scanners-scraper-observability.md) | Async Vulnerability Scanners + Changelog Scraper Observability | Proposed | 5, 6 |
+| [0025](0025-parallel-use-case-orchestration.md) | Parallel Orchestration of Independent Adapter Stages | Proposed | 5, 6 |
 
 > Lifecycle status (Accepted, In progress, Shipped) is tracked in
 > [`docs/roadmap.md`](../roadmap.md). The "Status" column above
