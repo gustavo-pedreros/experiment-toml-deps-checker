@@ -135,6 +135,19 @@ be assigned once a stable public API is established.
   dependency graph at compile time. RFC-0019 PR #2.
 
 ### Changed
+- `GenerateFreezeReport.execute` now orchestrates its independent
+  adapter stages in parallel. The six adapters that consume the
+  enriched catalog without depending on each other (vulnerability
+  scanner, library health checker, changelog fetcher, module-usage
+  scanner, license checker, version-status resolver) run concurrently
+  via `asyncio.gather`; risk score still runs after them as it
+  consumes their output. Pre-fix each stage was awaited before the
+  next began, so wall-clock summed per-stage costs (5 s + 2 s + 2 s +
+  0.5 s + 3 s + 3 s ≈ 15 s of HTTP-bound work serialised at the
+  orchestration layer). Now wall-clock is dominated by the slowest
+  individual adapter. No port signature change, no domain model
+  change, no schema change — output is byte-identical to pre-RFC
+  runs. RFC-0025.
 - `GitHubAdvisoryScanner._scan_with` now runs per-library lookups in
   parallel with `asyncio.gather`, bounded to `_MAX_CONCURRENT_REQUESTS
   = 20` via an `asyncio.Semaphore`. Pre-fix the loop awaited each
