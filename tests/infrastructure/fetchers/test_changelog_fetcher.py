@@ -330,9 +330,12 @@ def _run_with_transport(
             entries = []
             for lib, latest in zip(libraries, latest_results, strict=False):
                 if latest and _major(latest) > _major(str(lib.version)):
-                    entry = await fetcher._build_entry(client, lib, latest)
-                    if entry:
-                        entries.append(entry)
+                    # RFC-0024 PR #2: ``_build_entry`` returns
+                    # ``(ChangelogEntry, classification_str)``; tests
+                    # care about the entry only, so unpack and discard
+                    # the classification here.
+                    entry, _classification = await fetcher._build_entry(client, lib, latest)
+                    entries.append(entry)
         return tuple(entries)
 
     return asyncio.get_event_loop().run_until_complete(_inner())
@@ -356,8 +359,11 @@ class TestChangelogFetcherNoUpgrade:
 
     def test_empty_libraries(self) -> None:
         fetcher = ChangelogFetcher()
-        result = _run(fetcher.fetch(()))
-        assert result == ()
+        # RFC-0024 PR #2: ``fetch`` now returns ``(entries, stats)``.
+        entries, stats = _run(fetcher.fetch(()))
+        assert entries == ()
+        assert stats.attempted == 0
+        assert stats.is_degraded is False
 
 
 class TestChangelogFetcherWithRelease:
