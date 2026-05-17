@@ -165,7 +165,20 @@ def _outdated_summary_section(report: FreezeReport) -> str:
     unknown = sum(1 for s in report.library_version_statuses if s.drift == VersionDrift.UNKNOWN)
     if unknown:
         parts.append(f"**{unknown}** unknown")
-    return "## Outdated summary\n\n" + ", ".join(parts) + f" out of {total} libraries."
+    # Issue #9 from the 2026-05 stress test menu: the Libraries table's
+    # "Drift" column shows the latest version including pre-releases (so
+    # an artifact pinned at ``8.13.2`` may show ``→ 9.3.0-alpha05``).
+    # The Major Upgrades section further down uses the latest STABLE
+    # major instead. The two values can disagree; explain it once so
+    # readers don't think the report is inconsistent.
+    banner = (
+        "\n\n> _Note: the **Drift** column in the Libraries table targets "
+        "the latest available version (including pre-releases); the "
+        "**Major Upgrades** section further down targets the latest "
+        "stable major. Where these disagree, the latter is the safer "
+        "upgrade target._"
+    )
+    return "## Outdated summary\n\n" + ", ".join(parts) + f" out of {total} libraries." + banner
 
 
 def _plugins_section(plugins: list[Plugin]) -> str:

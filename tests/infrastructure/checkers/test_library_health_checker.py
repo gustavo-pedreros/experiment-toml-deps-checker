@@ -19,6 +19,7 @@ from gradle_deps_monitor.domain.version import MavenVersion
 from gradle_deps_monitor.infrastructure.checkers.library_health_checker import (
     LibraryHealthChecker,
     _is_google_library,
+    _is_stable_by_design,
     _parse_last_updated,
     _parse_relocation,
 )
@@ -69,6 +70,34 @@ class TestIsGoogleLibrary:
     def test_prefix_not_included(self) -> None:
         # "com.androidmock" should NOT match "com.android"
         assert _is_google_library("com.androidmock") is False
+
+
+# ---------------------------------------------------------------------------
+# _is_stable_by_design (issue #10 from the 2026-05 stress test menu)
+# ---------------------------------------------------------------------------
+
+
+class TestIsStableByDesign:
+    def test_javax_inject(self) -> None:
+        """``javax.inject:javax.inject`` is the JSR-330 reference impl —
+        frozen by design, must not trigger the inactivity heuristic."""
+        assert _is_stable_by_design("javax.inject") is True
+
+    def test_javax_exact(self) -> None:
+        assert _is_stable_by_design("javax") is True
+
+    def test_jakarta_inject(self) -> None:
+        """The Jakarta EE namespace succeeded ``javax`` for the same kinds
+        of frozen spec libraries; treat both identically."""
+        assert _is_stable_by_design("jakarta.inject") is True
+
+    def test_non_spec_library(self) -> None:
+        assert _is_stable_by_design("com.squareup.retrofit2") is False
+
+    def test_prefix_not_overmatched(self) -> None:
+        """``javaxmock`` shouldn't trip the ``javax`` prefix — must be
+        either exact or followed by a dot."""
+        assert _is_stable_by_design("javaxmock") is False
 
 
 # ---------------------------------------------------------------------------

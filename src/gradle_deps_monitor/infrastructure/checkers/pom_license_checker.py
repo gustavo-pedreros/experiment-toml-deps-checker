@@ -91,6 +91,27 @@ _STRONG_COPYLEFT_KEYWORDS: tuple[str, ...] = (
     "general public license",  # ditto
 )
 
+# Issue #11 from the 2026-05 stress test menu: some POMs declare a
+# placeholder like ``<license><name>LICENSE</name>`` literally
+# instead of a real license name. Those strings carry zero information
+# (and look broken when echoed back in the report), so they're
+# normalised to ``None`` at finding-construction time — which causes
+# the writer to render ``_(not declared)_`` like any other missing-name
+# case. Match case-insensitively after stripping whitespace.
+_PLACEHOLDER_LICENSE_NAMES: frozenset[str] = frozenset(
+    {"", "license", "licence", "license.txt", "license.md", "see license"}
+)
+
+
+def _normalize_license_name(name: str | None) -> str | None:
+    """Drop placeholder strings that aren't real license names."""
+    if name is None:
+        return None
+    if name.strip().lower() in _PLACEHOLDER_LICENSE_NAMES:
+        return None
+    return name
+
+
 # Permissive: no restrictions on use in closed-source projects.
 _PERMISSIVE_KEYWORDS: tuple[str, ...] = (
     "apache",
@@ -267,13 +288,17 @@ class PomLicenseChecker:
 
         # Use the first declared license (most POMs declare exactly one).
         name, url = license_elements[0]
-        tier = _classify_license(name, url)
+        # Issue #11: drop placeholder names like literal "LICENSE" before
+        # they reach the writer (the URL is still passed to the
+        # classifier in case it carries the real signal).
+        normalised_name = _normalize_license_name(name)
+        tier = _classify_license(normalised_name, url)
 
         return LicenseFinding(
             alias=lib.alias,
             coordinate=coordinate,
             version=version,
-            license_name=name,
+            license_name=normalised_name,
             license_url=url,
             tier=tier,
         )
