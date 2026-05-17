@@ -15,6 +15,7 @@ from gradle_deps_monitor.infrastructure.checkers.pom_license_checker import (
     _classify_license,
     _is_google_library,
     _make_pom_xml,
+    _normalize_license_name,
     _parse_license_elements,
 )
 
@@ -397,3 +398,46 @@ class TestPomLicenseCheckerSorting:
         assert flagged[0].alias == "alpha"  # strong_copyleft, alias=alpha
         assert flagged[1].alias == "zoo"  # strong_copyleft, alias=zoo
         assert flagged[2].alias == "mid"  # weak_copyleft
+
+
+# ---------------------------------------------------------------------------
+# _normalize_license_name (issue #11 from the 2026-05 stress test menu)
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeLicenseName:
+    """Placeholder names like literal "LICENSE" carry zero information.
+    Pre-fix the report rendered them verbatim as the license name
+    column; now they collapse to ``None`` so the writer shows the
+    standard "_(not declared)_" placeholder.
+    """
+
+    def test_literal_license_uppercase(self) -> None:
+        assert _normalize_license_name("LICENSE") is None
+
+    def test_literal_license_lowercase(self) -> None:
+        assert _normalize_license_name("license") is None
+
+    def test_literal_license_titlecase(self) -> None:
+        assert _normalize_license_name("License") is None
+
+    def test_british_spelling(self) -> None:
+        assert _normalize_license_name("Licence") is None
+
+    def test_with_surrounding_whitespace(self) -> None:
+        assert _normalize_license_name("  LICENSE  ") is None
+
+    def test_license_filename_dot_txt(self) -> None:
+        assert _normalize_license_name("LICENSE.txt") is None
+
+    def test_license_filename_dot_md(self) -> None:
+        assert _normalize_license_name("LICENSE.md") is None
+
+    def test_real_license_name_preserved(self) -> None:
+        assert _normalize_license_name("Apache License 2.0") == "Apache License 2.0"
+
+    def test_none_passes_through(self) -> None:
+        assert _normalize_license_name(None) is None
+
+    def test_empty_string_normalises_to_none(self) -> None:
+        assert _normalize_license_name("") is None

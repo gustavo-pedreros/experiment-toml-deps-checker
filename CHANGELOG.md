@@ -28,6 +28,39 @@ be assigned once a stable public API is established.
   new field is always present (default zeros when no scraping ran).
 
 ### Fixed
+- `LibraryHealthChecker` no longer false-flags **JSR / Jakarta EE
+  reference implementations as abandoned**. Any library whose group is
+  exactly `javax`, `jakarta`, or a sub-namespace of either now skips
+  the inactivity heuristic — these specs are frozen by design, so a
+  5,780-day-old `javax.inject:javax.inject` is a feature, not a
+  signal. Issue #10 from the 2026-05 stress-test menu.
+- `PomLicenseChecker` no longer echoes placeholder names like literal
+  `LICENSE` / `LICENSE.txt` / `License` in the License Audit's name
+  column. Such values carry no information and look broken in the
+  report; they're now normalised to `None` at finding-construction
+  time, so the writer renders the standard `_(not declared)_`
+  placeholder instead. The classification still falls through to
+  `UNKNOWN` (unchanged). Issue #11.
+- `Library.is_bom_candidate` now recognises **release-line suffixed
+  BoM artifacts** like `compose-bom-alpha` / `foo-platform-rc1`.
+  Pre-fix the regex required an exact `-bom$` / `-platform$` ending,
+  so Compose's alpha BoM line was silently treated as a regular
+  library — module-usage already credited it (RFC-0022 PR fixed the
+  scanner side), but the **BoMs** report section and downstream BoM
+  enrichment skipped it. Issue #15.
+- Console `Outdated (N)` summary now matches the Markdown report's
+  total. Pre-fix the console count excluded libraries whose drift
+  resolved to `UNKNOWN` (e.g. artifacts hosted on non-standard
+  repositories), so the same run printed `Outdated (123)` in console
+  vs `135 of 170` in Markdown. The breakdown line now also shows the
+  unknown count when non-zero. Issue #12.
+- Markdown `Outdated summary` now carries a one-line note explaining
+  that the **Drift** column in the Libraries table targets the latest
+  available version (including pre-releases), whereas the **Major
+  Upgrades** section uses the latest stable major. Pre-fix the two
+  could disagree silently — e.g. an artifact pinned at 8.13.2 showing
+  `→ 9.3.0-alpha05` in Libraries vs `→ 9.2.1` in Major Upgrades — and
+  the reader had no way to tell which to trust. Issue #9.
 - `PomLicenseChecker` no longer false-positives on **GPL with
   Classpath Exception (CPE)**. The classifier now detects the
   qualifier (`"classpath exception"` / `"with classpath"` /

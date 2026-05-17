@@ -19,6 +19,7 @@ from gradle_deps_monitor.domain.severity import HasCommonSeverity
 from gradle_deps_monitor.domain.severity_style import style_for
 from gradle_deps_monitor.domain.toolchain import ToolchainSeverity
 from gradle_deps_monitor.domain.version import Stability
+from gradle_deps_monitor.domain.version_status import VersionDrift
 
 
 def _rich_style(severity: HasCommonSeverity) -> str:
@@ -82,14 +83,25 @@ def print_summary(
     # --- Outdated summary ---
     if report.library_version_statuses:
         outdated = report.outdated_libraries
+        # Issue #12: align with the Markdown writer's outdated summary,
+        # which includes libraries whose drift is UNKNOWN (e.g. resolved
+        # against a non-standard repository). Pre-fix the console total
+        # silently excluded them.
+        unknown_count = sum(
+            1 for s in report.library_version_statuses if s.drift == VersionDrift.UNKNOWN
+        )
         con.print()
-        if outdated:
-            con.print(f"[bold yellow]Outdated ({len(outdated)})[/bold yellow]")
-            con.print(
-                f"  [red]{report.major_outdated_count} major[/red]  "
-                f"[yellow]{report.minor_outdated_count} minor[/yellow]  "
-                f"[dim]{report.patch_outdated_count} patch[/dim]"
-            )
+        if outdated or unknown_count:
+            total = len(outdated) + unknown_count
+            con.print(f"[bold yellow]Outdated ({total})[/bold yellow]")
+            breakdown = [
+                f"[red]{report.major_outdated_count} major[/red]",
+                f"[yellow]{report.minor_outdated_count} minor[/yellow]",
+                f"[dim]{report.patch_outdated_count} patch[/dim]",
+            ]
+            if unknown_count:
+                breakdown.append(f"[dim]{unknown_count} unknown[/dim]")
+            con.print("  " + "  ".join(breakdown))
         else:
             con.print("[green]Versions[/green] — all libraries up to date")
 

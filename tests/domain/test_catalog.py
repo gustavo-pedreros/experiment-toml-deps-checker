@@ -92,6 +92,44 @@ def test_library_without_version_constraints_is_unchanged() -> None:
 
 
 # ---------------------------------------------------------------------------
+# is_bom_candidate (issue #15 from the 2026-05 stress test menu)
+# ---------------------------------------------------------------------------
+
+
+def test_is_bom_candidate_recognises_bom_suffix() -> None:
+    assert _lib("firebase-bom", artifact="firebase-bom").is_bom_candidate
+
+
+def test_is_bom_candidate_recognises_platform_suffix() -> None:
+    assert _lib("micrometer-bom", artifact="micrometer-platform").is_bom_candidate
+
+
+def test_is_bom_candidate_recognises_bom_alpha_suffix() -> None:
+    """RFC-0024 follow-up #15: Compose ships ``compose-bom-alpha`` as its
+    alpha-line BoM. Pre-fix the suffix didn't match the ``-bom$`` regex,
+    so the alpha BoM was silently treated as a plain library."""
+    assert _lib("compose-bom-alpha", artifact="compose-bom-alpha").is_bom_candidate
+
+
+def test_is_bom_candidate_recognises_bom_beta_suffix() -> None:
+    assert _lib("some-bom-beta", artifact="some-bom-beta").is_bom_candidate
+
+
+def test_is_bom_candidate_recognises_platform_rc_suffix() -> None:
+    assert _lib("foo-platform-rc1", artifact="foo-platform-rc1").is_bom_candidate
+
+
+def test_is_bom_candidate_negative_plain_artifact() -> None:
+    assert not _lib("retrofit", artifact="retrofit").is_bom_candidate
+
+
+def test_is_bom_candidate_negative_substring_only() -> None:
+    """``mybomb-3.0`` contains ``-bom`` as a substring inside a longer
+    word; must not match because the regex requires a hyphen boundary."""
+    assert not _lib("bomb", artifact="mybomb-3.0").is_bom_candidate
+
+
+# ---------------------------------------------------------------------------
 # Plugin
 # ---------------------------------------------------------------------------
 

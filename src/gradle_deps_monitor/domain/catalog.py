@@ -6,6 +6,7 @@ the structure of a ``libs.versions.toml`` file. No I/O; no TOML parsing.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -13,8 +14,12 @@ from gradle_deps_monitor.domain.bom import VersionSource
 from gradle_deps_monitor.domain.rich_version import RichVersion
 from gradle_deps_monitor.domain.version import MavenVersion
 
-# Suffixes that mark a library entry as a BoM by convention.
-_BOM_ARTIFACT_SUFFIXES: tuple[str, ...] = ("-bom", "-platform")
+# Suffixes that mark a library entry as a BoM by convention. The optional
+# trailing ``-<word>`` group catches Compose-style alpha BoM lines
+# (``compose-bom-alpha``) and any future suffix variants — issue #15 from
+# the 2026-05 stress test menu. False positives are unlikely because the
+# trailing group requires a hyphen separator.
+_BOM_ARTIFACT_RE = re.compile(r"(?:-bom|-platform)(?:-[a-z0-9]+)?$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -60,8 +65,13 @@ class Library:
 
     @property
     def is_bom_candidate(self) -> bool:
-        """``True`` when the artifact name marks this entry as a Maven BoM."""
-        return any(self.artifact.endswith(s) for s in _BOM_ARTIFACT_SUFFIXES)
+        """``True`` when the artifact name marks this entry as a Maven BoM.
+
+        Matches the canonical suffixes ``-bom`` / ``-platform`` plus any
+        single trailing release-line modifier (``-bom-alpha``,
+        ``-platform-beta``, etc.). See :data:`_BOM_ARTIFACT_RE`.
+        """
+        return bool(_BOM_ARTIFACT_RE.search(self.artifact))
 
     @property
     def version_source(self) -> VersionSource:

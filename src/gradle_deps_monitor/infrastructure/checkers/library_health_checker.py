@@ -44,6 +44,18 @@ _GOOGLE_GROUPS = frozenset(
     }
 )
 
+# Group prefixes for "stable by design" specifications whose reference
+# implementations are intentionally frozen and won't see new releases.
+# Skip the inactivity heuristic for these — a 5780-day-old artifact
+# under ``javax.inject`` is a feature of the JSR, not abandonment.
+# Issue #10 from the 2026-05 stress test menu.
+_STABLE_BY_DESIGN_GROUPS = frozenset(
+    {
+        "javax",  # all of javax.* — JSR specs (e.g. JSR-330 javax.inject)
+        "jakarta",  # Jakarta EE namespace successor to javax (also frozen-by-spec)
+    }
+)
+
 # ---------------------------------------------------------------------------
 # KB loading
 # ---------------------------------------------------------------------------
@@ -80,6 +92,17 @@ def _metadata_url(group: str, artifact: str) -> str:
 def _is_google_library(group: str) -> bool:
     """Return ``True`` for libraries hosted exclusively on Google Maven."""
     return any(group == g or group.startswith(g + ".") for g in _GOOGLE_GROUPS)
+
+
+def _is_stable_by_design(group: str) -> bool:
+    """Return ``True`` for "spec-frozen" libraries that shouldn't trigger
+    the inactivity heuristic.
+
+    JSR / Jakarta EE reference implementations (e.g. ``javax.inject``)
+    are intentionally frozen — their lack of recent releases is a
+    feature, not abandonment.
+    """
+    return any(group == g or group.startswith(g + ".") for g in _STABLE_BY_DESIGN_GROUPS)
 
 
 # ---------------------------------------------------------------------------
@@ -266,8 +289,11 @@ class LibraryHealthChecker:
                 replacement=replacement,
             )
 
-        # --- Inactivity check (skip Google-hosted libraries) ---
-        if _is_google_library(lib.group):
+        # --- Inactivity check ---
+        # Skip Google-hosted libraries (no maven-metadata.xml on Maven
+        # Central) and spec-frozen libraries (``javax.*`` / ``jakarta.*``
+        # — JSR reference implementations are intentionally inactive).
+        if _is_google_library(lib.group) or _is_stable_by_design(lib.group):
             return None
         return await self._fetch_inactivity(client, lib)
 
