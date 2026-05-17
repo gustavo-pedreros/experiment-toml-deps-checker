@@ -46,3 +46,44 @@ class ChangelogEntry:
     changelog_url: str | None = None
     breaking_signal: BreakingSignal = BreakingSignal.UNKNOWN
     snippet: str | None = None
+
+
+@dataclass(frozen=True)
+class ChangelogFetchStats:
+    """Per-fetch counters describing how the scrape pass classified each library.
+
+    Used by the presentation layer to surface silent degradation (notably
+    GitHub rate-limit exhaustion) that would otherwise just look like
+    ``BreakingSignal.UNKNOWN`` entries with bare repo URLs. RFC-0024 PR #2.
+
+    Counter semantics — exactly one of ``fetched``, ``fallback_url_only``,
+    ``rate_limited``, ``unknown_no_repo`` increments per attempted library:
+
+    - ``attempted``:         libraries with a candidate major upgrade.
+    - ``fetched``:           got release notes body + URL successfully.
+    - ``fallback_url_only``: GitHub repo found but no release notes
+                             retrieved; entry carries the bare repo URL.
+    - ``rate_limited``:      at least one request in the per-library
+                             pipeline returned a documented rate-limit
+                             response (HTTP 429, or 403 with
+                             ``X-RateLimit-Remaining: 0``).
+    - ``unknown_no_repo``:   POM had no SCM URL or the SCM URL didn't
+                             resolve to a GitHub repository.
+
+    Default-constructed instance has all counters at zero — used when no
+    scraping ran (no major upgrades, scraper disabled, etc.).
+    """
+
+    attempted: int = 0
+    fetched: int = 0
+    fallback_url_only: int = 0
+    rate_limited: int = 0
+    unknown_no_repo: int = 0
+
+    @property
+    def is_degraded(self) -> bool:
+        """``True`` when at least one library's outcome was rate-limited.
+
+        Drives the warning banner in the console and Markdown reports.
+        """
+        return self.rate_limited > 0

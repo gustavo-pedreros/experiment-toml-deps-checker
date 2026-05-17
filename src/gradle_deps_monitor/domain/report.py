@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from gradle_deps_monitor.domain.advisory import LibraryAdvisory
 from gradle_deps_monitor.domain.bom import BomResolution
 from gradle_deps_monitor.domain.catalog import Catalog
-from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
+from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry, ChangelogFetchStats
 from gradle_deps_monitor.domain.compliance import ComplianceFinding, ComplianceSeverity
 from gradle_deps_monitor.domain.finding import Finding
 from gradle_deps_monitor.domain.library_health import (
@@ -42,6 +42,7 @@ class FreezeReport:
     toolchain_findings: tuple[ToolchainFinding, ...] = field(default_factory=tuple)
     library_health_findings: tuple[LibraryHealthFinding, ...] = field(default_factory=tuple)
     changelog_entries: tuple[ChangelogEntry, ...] = field(default_factory=tuple)
+    changelog_stats: ChangelogFetchStats = field(default_factory=ChangelogFetchStats)
     module_usage_map: ModuleUsageMap | None = field(default=None)
     license_audit: LicenseAudit | None = field(default=None)
     risk_score_report: RiskScoreReport | None = field(default=None)

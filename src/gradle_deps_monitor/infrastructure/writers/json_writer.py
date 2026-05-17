@@ -25,7 +25,7 @@ from gradle_deps_monitor.domain.version_status import LibraryVersionStatus
 #   - MINOR (1.x.0): additive changes (new fields, new optional values)
 #   - PATCH (1.0.x): wire-format-equivalent changes
 # Consumers reading 1.x MUST tolerate unknown fields and unknown enum values.
-SCHEMA_VERSION = "1.5.0"
+SCHEMA_VERSION = "1.6.0"
 
 
 class JsonWriter:
@@ -94,6 +94,13 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
             "upgrade_count": len(report.changelog_entries),
             "has_breaking": report.has_breaking_upgrades,
             "entries": [_changelog_entry(e) for e in report.changelog_entries],
+            "changelog_stats": {
+                "attempted": report.changelog_stats.attempted,
+                "fetched": report.changelog_stats.fetched,
+                "fallback_url_only": report.changelog_stats.fallback_url_only,
+                "rate_limited": report.changelog_stats.rate_limited,
+                "unknown_no_repo": report.changelog_stats.unknown_no_repo,
+            },
         },
         "module_usage_map": _module_usage_map(report.module_usage_map),
         "license_audit": _license_audit(report.license_audit),

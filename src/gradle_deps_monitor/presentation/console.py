@@ -250,6 +250,16 @@ def print_summary(
         con.print(
             f"[bold]Major Upgrades[/bold] — {len(report.changelog_entries)} available: {ch_label}"
         )
+        # RFC-0024 PR #2: surface silent scraper degradation when the
+        # GitHub rate limit was hit during this run.
+        cs = report.changelog_stats
+        if cs.is_degraded:
+            con.print(
+                f"  [bold yellow]⚠ {cs.fetched} of {cs.attempted}[/bold yellow] "
+                f"release notes fetched; [bold yellow]{cs.rate_limited}[/bold yellow] "
+                "fell back to repo URL (GitHub rate limit — set "
+                "[cyan]GITHUB_TOKEN[/cyan] for full coverage)."
+            )
         for entry in sorted(report.changelog_entries, key=lambda e: e.alias):
             if entry.breaking_signal == BreakingSignal.LIKELY:
                 signal_str = "[bold red]BREAKING[/bold red]"

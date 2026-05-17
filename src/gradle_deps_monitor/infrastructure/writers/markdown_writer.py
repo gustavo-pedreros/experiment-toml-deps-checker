@@ -8,7 +8,7 @@ from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import LibraryAdvisory
 from gradle_deps_monitor.domain.bom import BomResolution, VersionSource
 from gradle_deps_monitor.domain.catalog import Bundle, Library, Plugin
-from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
+from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry, ChangelogFetchStats
 from gradle_deps_monitor.domain.compliance import ComplianceFinding
 from gradle_deps_monitor.domain.finding import Finding
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
@@ -58,7 +58,7 @@ def _render(report: FreezeReport) -> str:
         _active_rejections_section(list(report.catalog.libraries)),
         _toolchain_section(list(report.toolchain_findings)),
         _library_health_section(list(report.library_health_findings)),
-        _changelog_section(list(report.changelog_entries)),
+        _changelog_section(list(report.changelog_entries), report.changelog_stats),
         _module_usage_section(report.module_usage_map),
         _license_section(report.license_audit),
         _risk_score_section(report.risk_score_report),
@@ -312,7 +312,7 @@ _BREAKING_SIGNAL_ICON: dict[BreakingSignal, str] = {
 }
 
 
-def _changelog_section(entries: list[ChangelogEntry]) -> str:
+def _changelog_section(entries: list[ChangelogEntry], stats: ChangelogFetchStats) -> str:
     if not entries:
         return ""
     rows: list[str] = []
@@ -326,11 +326,27 @@ def _changelog_section(entries: list[ChangelogEntry]) -> str:
             f" |{link}{snippet} |"
         )
     noun = "upgrade" if len(entries) == 1 else "upgrades"
+
+    # RFC-0024 PR #2: surface silent scraper degradation. When the
+    # GitHub rate limit was hit, render an explicit warning instead of
+    # letting affected libraries silently appear as UNKNOWN with bare
+    # repo URLs.
+    rate_limit_warning = ""
+    if stats.is_degraded:
+        rate_limit_warning = (
+            f"> ⚠️ **{stats.fetched} of {stats.attempted}** release notes fetched; "
+            f"**{stats.rate_limited}** fell back to repo URL due to GitHub rate limit. "
+            "Set `GITHUB_TOKEN` to raise the limit (60 → 5 000 req/h) "
+            "and get full release-note coverage on the next run.\n\n"
+        )
+
     return (
         f"## Major Upgrades ({len(entries)} {noun} available)\n\n"
-        "> Breaking-change signal is a heuristic based on release note keywords.\n\n"
-        "| Alias | Coordinate | Pinned | Latest | Breaking? | Notes |\n"
-        "|---|---|---|---|---|---|\n" + "\n".join(rows)
+        + rate_limit_warning
+        + "> Breaking-change signal is a heuristic based on release note keywords.\n\n"
+        + "| Alias | Coordinate | Pinned | Latest | Breaking? | Notes |\n"
+        + "|---|---|---|---|---|---|\n"
+        + "\n".join(rows)
     )
 
 
