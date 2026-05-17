@@ -14,6 +14,11 @@ dependency_status.json
 # (committable freeze reports live under `freeze-reports/`, not `reports/`)
 reports/
 
+# Local stress-test corpora — kept out of the public repo. These are
+# user-private working trees (e.g. cloned open-source samples, private
+# Android catalogs) that the tool is exercised against during validation.
+external-project/
+
 # Claude Code per-project tooling.
 # Transient state (caches, file history, per-user overrides) stays local;
 # the shared parts (subagents, hooks, team-default settings) are versioned.
