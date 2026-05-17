@@ -85,6 +85,16 @@ be assigned once a stable public API is established.
   dependency graph at compile time. RFC-0019 PR #2.
 
 ### Changed
+- `GitHubAdvisoryScanner._scan_with` now runs per-library lookups in
+  parallel with `asyncio.gather`, bounded to `_MAX_CONCURRENT_REQUESTS
+  = 20` via an `asyncio.Semaphore`. Pre-fix the loop awaited each
+  query before starting the next, costing 30-50 seconds of wall-clock
+  on a cold cache for typical Android catalogs (measured: 39 s for 103
+  libraries, 59 s for 170 libraries — both with a valid GitHub token).
+  Output order matches input order (`gather` preserves submission
+  order); no consumer of the scanner output sees any contract change.
+  `OssIndexScanner` is unaffected — it already amortises per-library
+  cost by batching up to 128 PURLs per POST. RFC-0024 PR #1.
 - `GradleModuleScanner.scan` is now an `async def` coroutine. Per-module
   file reads + regex parsing run in parallel via `asyncio.to_thread`
   + `asyncio.gather`, so a 200-module project no longer pays a

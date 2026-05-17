@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,13 @@ _ECOSYSTEM = "maven"
 _CACHE_PREFIX = "ghsa"
 _DEFAULT_TTL = 86_400  # 24 hours
 _PER_PAGE = 100
+
+# RFC-0024 PR #1: cap concurrent per-library requests during a scan.
+# Authenticated GitHub API allows 5 000 req/h; 20 in-flight requests is
+# a polite burst that amortises round-trip latency without risking
+# secondary abuse limits. Unauthenticated 60 req/h is the bottleneck
+# regardless of concurrency.
+_MAX_CONCURRENT_REQUESTS = 20
 
 # Sentinel distinguishes cache miss from a cached empty list.
 _MISS = object()
@@ -84,18 +92,29 @@ class GitHubAdvisoryScanner:
         client: httpx.AsyncClient,
         libraries: tuple[Library, ...],
     ) -> tuple[LibraryAdvisory, ...]:
-        results: list[LibraryAdvisory] = []
-        for lib in libraries:
-            advisories = await self._advisories_for(client, lib)
-            results.append(
-                LibraryAdvisory(
-                    alias=lib.alias,
-                    coordinate=f"{lib.group}:{lib.artifact}",
-                    version=str(lib.version),
-                    advisories=tuple(advisories),
-                )
+        """Run per-library advisory lookups in parallel with bounded concurrency.
+
+        RFC-0024 PR #1: pre-fix this loop ran serially, costing 30-50 s
+        of wall-clock on a cold cache for typical Android catalogs
+        (100-200 libs). ``asyncio.gather`` over per-library coroutines
+        amortises round-trip latency; ``asyncio.Semaphore`` caps
+        in-flight requests at :data:`_MAX_CONCURRENT_REQUESTS` to stay
+        polite to GitHub's API. Output order matches input order
+        because ``gather`` preserves submission order.
+        """
+        sem = asyncio.Semaphore(_MAX_CONCURRENT_REQUESTS)
+
+        async def _one(lib: Library) -> LibraryAdvisory:
+            async with sem:
+                advisories = await self._advisories_for(client, lib)
+            return LibraryAdvisory(
+                alias=lib.alias,
+                coordinate=f"{lib.group}:{lib.artifact}",
+                version=str(lib.version),
+                advisories=tuple(advisories),
             )
-        return tuple(results)
+
+        return tuple(await asyncio.gather(*(_one(lib) for lib in libraries)))
 
     async def _advisories_for(
         self,

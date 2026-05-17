@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 from pathlib import Path
 
 import httpx
@@ -275,3 +277,61 @@ class TestGitHubAdvisoryScanner:
         results = await scanner.scan((lib,))
 
         assert results[0].is_vulnerable is False
+
+
+# ---------------------------------------------------------------------------
+# RFC-0024 PR #1 — bounded-concurrency scan
+# ---------------------------------------------------------------------------
+
+
+class TestGitHubAdvisoryScannerConcurrency:
+    """Per-library lookups must run with bounded concurrency, not
+    serially. Pre-RFC-0024 the scan loop awaited each
+    ``_advisories_for`` fully before starting the next, costing
+    30-50 s of wall-clock for typical Android catalogs on a cold
+    cache.
+    """
+
+    @pytest.fixture()
+    def tmp_cache(self, tmp_path: Path) -> Path:
+        return tmp_path / "ghsa_cache"
+
+    @pytest.mark.asyncio
+    async def test_parallel_scan_faster_than_serial(self, tmp_cache: Path) -> None:
+        """A 30-library scan with 50 ms artificial per-call latency
+        completes in materially less than the serial baseline of
+        ``30 * 0.05 = 1.5 s``. With the default semaphore of 20,
+        the expected wall-clock is ``2 waves * 0.05 = 0.1 s``;
+        the assertion uses generous slack (< 0.8 s) to avoid CI
+        flakiness while still proving the loop is no longer serial.
+        ``n_libs > 20`` is intentional so the semaphore bound is
+        actually exercised (not just the unbounded case).
+        """
+        per_call_sleep = 0.05
+        n_libs = 30
+
+        async def slow_handler(request: httpx.Request) -> httpx.Response:
+            await asyncio.sleep(per_call_sleep)
+            return httpx.Response(200, json=[])
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(slow_handler))
+        scanner = GitHubAdvisoryScanner(cache_dir=tmp_cache, client=client)
+        libs = tuple(_make_lib(f"lib{i}", "com.example", f"lib{i}", "1.0.0") for i in range(n_libs))
+
+        start = time.perf_counter()
+        results = await scanner.scan(libs)
+        elapsed = time.perf_counter() - start
+
+        await client.aclose()
+
+        # All libraries got a result, in input order.
+        assert len(results) == n_libs
+        for i, result in enumerate(results):
+            assert result.alias == f"lib{i}"
+
+        serial_baseline = n_libs * per_call_sleep
+        assert elapsed < 0.8, (
+            f"scan took {elapsed:.3f}s; serial baseline is "
+            f"{serial_baseline:.3f}s. RFC-0024 PR #1 promised parallel "
+            f"execution but the wall-clock suggests the loop is still serial."
+        )
