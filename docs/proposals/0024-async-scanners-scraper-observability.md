@@ -11,10 +11,10 @@ Two distinct HTTP-adapter reliability issues surfaced during
 cross-corpus stress testing (a ~200-module fintech-style Android
 project plus Google's open-source `nowinandroid`):
 
-### Bug A — `GitHubAdvisoryScanner` and `OssIndexScanner` are serial
+### Bug A — `GitHubAdvisoryScanner` is per-library serial
 
-Both scanners iterate over the library tuple with a plain `for` loop
-and `await` each request individually:
+The GHSA scanner iterates over the library tuple with a plain `for`
+loop and `await`s each request individually:
 
 ```python
 # github_advisory_scanner.py:88
@@ -24,8 +24,6 @@ async def _scan_with(self, client, libraries):
         advisories = await self._advisories_for(client, lib)
         results.append(...)
     return tuple(results)
-
-# oss_index_scanner.py:115 — same shape
 ```
 
 Despite being `async def`, the loop awaits each `_advisories_for`
@@ -44,8 +42,18 @@ for typical Android catalogs:
 
 This contradicts the project pattern set by RFC-0019 PR #3, where
 `GradleModuleScanner` was refactored from a serial loop to
-`asyncio.gather` over per-module workers. The vulnerability scanners
-were left as-is.
+`asyncio.gather` over per-module workers. The GHSA scanner was left
+as-is.
+
+**`OssIndexScanner` is NOT affected.** Closer reading reveals it
+batches uncached PURLs in groups of 128 per POST (constant
+`_BATCH_SIZE` in `oss_index_scanner.py`). For 170 libraries that's
+two sequential POSTs at most — total per-scanner overhead in the
+hundreds of milliseconds, not tens of seconds. Parallelising those
+two batches would save ~200 ms; not worth a PR. The visible serial
+`for` loop at line 115 is cache lookup, not network I/O. Out of
+scope for this RFC; can be revisited if catalogs grow large enough
+that 8+ batches become the bottleneck.
 
 ### Bug B — Changelog scraper degrades silently under GitHub rate limit
 
@@ -109,15 +117,11 @@ once per library; the burst is short). Without auth (60 req/h),
 the rate limit is the bottleneck and no amount of concurrency helps
 — but it doesn't make things *worse* either.
 
-### 2. Same refactor applied to `OssIndexScanner._scan_with`
+`OssIndexScanner` is intentionally NOT touched in this RFC — its
+existing batched POST design already amortises per-library cost (see
+"Bug A" above).
 
-OSS Index has its own batch endpoint and a slightly different
-internal structure (line 142 of `oss_index_scanner.py` is
-`_batch_fetch`), but the surrounding loop at line 115 is the same
-serial shape. Apply the identical semaphore + gather pattern,
-preserving its existing batch semantics.
-
-### 3. Rate-limit observability in `ChangelogFetcher`
+### 2. Rate-limit observability in `ChangelogFetcher`
 
 Add a small statistics tracker that the fetcher updates as it
 classifies each library's outcome:
@@ -183,24 +187,21 @@ Two PRs total. PR #1 ships the tracer (scanner perf refactor — the
 most user-felt cost). PR #2 ships the observability story end-to-end
 including JSON exposure.
 
-### PR #1 — Tracer: async refactor of both vulnerability scanners
+### PR #1 — Tracer: `GitHubAdvisoryScanner` async refactor
 
 - `_MAX_CONCURRENT_REQUESTS = 20` constant added at module level in
-  both `github_advisory_scanner.py` and `oss_index_scanner.py`.
-- `_scan_with` in each refactored to use an inner `_one` coroutine,
-  a per-scan `asyncio.Semaphore`, and `asyncio.gather`. Output
-  order matches input order (`gather` preserves submission order),
-  so no consumer of the scanner output sees any contract change.
-- `OssIndexScanner`'s existing `_batch_fetch` semantics are
-  preserved — only the outer loop is parallelised; batching inside
-  a single request stays unchanged.
+  `github_advisory_scanner.py`.
+- `_scan_with` refactored to use an inner `_one` coroutine, a
+  per-scan `asyncio.Semaphore`, and `asyncio.gather`. Output order
+  matches input order (`gather` preserves submission order), so no
+  consumer sees any contract change.
 - All existing tests continue to pass without modification.
-- One new concurrency-proof test per scanner, using
-  `httpx.MockTransport` with a fixed-sleep handler; asserts the
-  parallel run is materially faster than the serial baseline, with
-  generous slack to avoid CI flakiness.
+- One new concurrency-proof test using `httpx.MockTransport` with a
+  fixed-sleep handler; asserts the parallel run is materially
+  faster than the serial baseline, with generous slack to avoid CI
+  flakiness.
 - CHANGELOG entry under `[Unreleased] / Changed` describing the
-  perf improvement on both scanners.
+  perf improvement.
 
 ### PR #2 — Changelog scraper observability (stats + render + JSON)
 
@@ -318,7 +319,7 @@ surface change.
 
 ## Rollback strategy
 
-- Revert PR #1 → both scanners return to serial; the only
+- Revert PR #1 → GHSA scanner returns to serial; the only
   observable change is slower wall-clock on cold cache. No schema
   migration.
 - Revert PR #2 → warning lines disappear from console + Markdown;
@@ -333,13 +334,11 @@ a PR causes regressions, the multi-commit structure makes
 
 ## PR budget
 
-Estimated **2 PRs** from tracer to DoD. PR #1 bundles both scanner
-refactors because they share an identical concurrency pattern
-(`asyncio.gather` + `asyncio.Semaphore(20)`) and the second is
-mechanical once the first lands; bundling avoids two near-identical
-review cycles. PR #2 keeps the observability story (domain +
-application + presentation + JSON schema) intact in a single PR so
-the warning is wired end-to-end before it ships.
+Estimated **2 PRs** from tracer to DoD. PR #1 is scoped to GHSA
+alone (OSS Index's batched POST design already amortises per-library
+cost — see the "Bug A" analysis). PR #2 keeps the observability
+story (domain + application + presentation + JSON schema) intact in
+a single PR so the warning is wired end-to-end before it ships.
 
 ## Definition of Done (DoD)
 
