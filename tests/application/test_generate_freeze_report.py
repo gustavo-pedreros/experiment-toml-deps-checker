@@ -6,6 +6,8 @@ no mocking framework, no filesystem access.
 
 from __future__ import annotations
 
+import asyncio
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -271,3 +273,92 @@ async def test_scanner_findings_appended_after_existing_health_findings(
 
     rule_ids = [f.rule_id for f in report.health_findings]
     assert rule_ids == ["HDX-005", "MOD-001"]
+
+
+# ---------------------------------------------------------------------------
+# RFC-0025 — concurrency proof for Phase 1 fan-out
+# ---------------------------------------------------------------------------
+
+_FAKE_ADAPTER_SLEEP_S = 0.05
+
+
+class _SleepyVulnScanner:
+    async def scan(self, libraries):  # type: ignore[no-untyped-def]
+        await asyncio.sleep(_FAKE_ADAPTER_SLEEP_S)
+        return ()
+
+
+class _SleepyLibraryHealthChecker:
+    async def check(self, libraries):  # type: ignore[no-untyped-def]
+        await asyncio.sleep(_FAKE_ADAPTER_SLEEP_S)
+        return ()
+
+
+class _SleepyChangelogFetcher:
+    async def fetch(self, libraries):  # type: ignore[no-untyped-def]
+        from gradle_deps_monitor.domain.changelog import ChangelogFetchStats
+
+        await asyncio.sleep(_FAKE_ADAPTER_SLEEP_S)
+        return (), ChangelogFetchStats()
+
+
+class _SleepyModuleUsageScanner:
+    async def scan(self, catalog_path, catalog):  # type: ignore[no-untyped-def]
+        from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
+
+        await asyncio.sleep(_FAKE_ADAPTER_SLEEP_S)
+        return ModuleUsageMap(
+            library_usages=(), module_summaries=(), modules_scanned=0, findings=()
+        )
+
+
+class _SleepyLicenseChecker:
+    async def check(self, libraries):  # type: ignore[no-untyped-def]
+        from gradle_deps_monitor.domain.license import LicenseAudit
+
+        await asyncio.sleep(_FAKE_ADAPTER_SLEEP_S)
+        return LicenseAudit(findings=(), libraries_audited=0)
+
+
+class _SleepyVersionStatusResolver:
+    async def resolve(self, libraries):  # type: ignore[no-untyped-def]
+        await asyncio.sleep(_FAKE_ADAPTER_SLEEP_S)
+        return ()
+
+
+async def test_phase1_adapters_run_concurrently(empty_catalog: Catalog) -> None:
+    """RFC-0025: the six Phase 1 adapters fan out via ``asyncio.gather``.
+
+    Each fake adapter sleeps ``_FAKE_ADAPTER_SLEEP_S`` (50 ms) in its
+    async method. With six adapters, sequential execution would take
+    ~300 ms; the parallel fan-out should complete in roughly
+    ``max(t_i)`` plus overhead — well under 200 ms with comfortable
+    slack for CI noise.
+
+    The assertion compares wall-clock against ``serial_baseline / 2`` so
+    a regression to per-stage awaits would fail loudly without flaking
+    on a slow runner.
+    """
+    n_adapters = 6
+    serial_baseline = n_adapters * _FAKE_ADAPTER_SLEEP_S
+
+    use_case = GenerateFreezeReport(
+        _OkParser(empty_catalog),
+        vulnerability_scanner=_SleepyVulnScanner(),
+        library_health_checker=_SleepyLibraryHealthChecker(),
+        changelog_fetcher=_SleepyChangelogFetcher(),
+        module_usage_scanner=_SleepyModuleUsageScanner(),
+        license_checker=_SleepyLicenseChecker(),
+        version_status_resolver=_SleepyVersionStatusResolver(),
+    )
+
+    start = time.monotonic()
+    await use_case.execute(Path("/some/path"))
+    elapsed = time.monotonic() - start
+
+    assert elapsed < serial_baseline / 2, (
+        f"Phase 1 fan-out regressed to serial execution: "
+        f"elapsed={elapsed:.3f}s, serial_baseline={serial_baseline:.3f}s"
+    )
+    # Sanity: the sleeps actually happened (not all returning instantly).
+    assert elapsed >= _FAKE_ADAPTER_SLEEP_S

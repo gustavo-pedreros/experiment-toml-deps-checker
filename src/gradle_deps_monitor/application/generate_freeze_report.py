@@ -8,21 +8,34 @@ entry point now wraps the whole pipeline in one ``asyncio.run`` at the
 outermost layer, matching the convention every other async port in the
 project already follows.
 
-Why the change is worth the refactor: every adapter call used to spin
-up its own event loop, tear it down, and discard the connection pool
-inside. With one shared loop, the same ``httpx.AsyncClient`` and the
-same default thread pool persist across adapters, and individual
-sections of the report can in the future be awaited concurrently via
-``asyncio.gather`` without further plumbing.
+RFC-0025 then turned the orchestration itself parallel. The use case
+runs in three explicit phases:
 
-For now the implementation keeps the sequential ordering — BoM
-enrichment must finish before downstream adapters see the enriched
-catalog, and several adapters share read-only state — but the
-plumbing no longer prevents parallel scheduling.
+1. **Phase 0 — sequential prelude.** Catalog parsing, BoM resolution
+   + enrichment, and the cheap synchronous checks (health,
+   compliance, toolchain). Every downstream adapter reads the
+   enriched catalog, so this phase must complete first.
+2. **Phase 1 — parallel fan-out.** The six adapters that consume the
+   enriched catalog independently (vulnerability scanner, library
+   health checker, changelog fetcher, module-usage scanner, license
+   checker, version-status resolver) run concurrently via
+   ``asyncio.gather``. Each adapter is itself internally parallel
+   (its own ``gather`` over the library set), so the fan-out here
+   sums per-stage costs into a single wall-clock dominated by the
+   slowest adapter rather than ``sum(t_i)``.
+3. **Phase 2 — sequential consumer.** Risk score depends on every
+   Phase 1 output and must come last.
+
+Empirically: a 170-library catalog with a valid ``GITHUB_TOKEN`` on a
+cold cache dropped from 12.5 s (post-RFC-0024 PR #1, pre-RFC-0025) to
+single-digit seconds after this refactor — the floor is the slowest
+individual Phase 1 adapter. No port signature, domain model, or
+schema changes; pure orchestration.
 """
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from gradle_deps_monitor.application.bom_enrichment import enrich_catalog_with_boms
@@ -38,7 +51,7 @@ from gradle_deps_monitor.application.ports.module_usage_scanner import ModuleUsa
 from gradle_deps_monitor.application.ports.toolchain_checker import ToolchainChecker
 from gradle_deps_monitor.application.ports.version_status_resolver import VersionStatusResolver
 from gradle_deps_monitor.application.ports.vulnerability_scanner import VulnerabilityScanner
-from gradle_deps_monitor.domain import FreezeReport
+from gradle_deps_monitor.domain import Catalog, FreezeReport, Library
 from gradle_deps_monitor.domain.advisory import LibraryAdvisory
 from gradle_deps_monitor.domain.bom import BomResolution
 from gradle_deps_monitor.domain.changelog import ChangelogEntry, ChangelogFetchStats
@@ -111,11 +124,12 @@ class GenerateFreezeReport:
         CLI does this with a single ``asyncio.run`` at its entry point;
         tests do the same. See the module docstring for the rationale.
         """
+        # --- Phase 0 — sequential prelude ----------------------------------
         catalog = self._parser.parse(catalog_path)
 
-        # Resolve BoMs and enrich the catalog before any other step runs,
-        # so every downstream consumer (health checks, registries, scanners,
-        # writers) sees the same fully-resolved library set.
+        # BoM resolution must finish before downstream adapters see the
+        # enriched catalog. Anything that reads ``catalog.libraries``
+        # afterwards observes the resolved, member-included set.
         bom_resolutions: tuple[BomResolution, ...] = ()
         if self._bom_resolver is not None:
             bom_libraries = tuple(lib for lib in catalog.libraries if lib.is_bom_candidate)
@@ -123,53 +137,48 @@ class GenerateFreezeReport:
                 bom_resolutions = await self._bom_resolver.resolve(bom_libraries)
                 catalog = enrich_catalog_with_boms(catalog, bom_resolutions)
 
+        # Synchronous checks — microsecond-cost; keeping them in Phase 0
+        # is simpler and faster than wrapping them in ``asyncio.to_thread``.
         findings = self._health_checker(catalog) if self._health_checker else ()
+        compliance_findings: tuple[ComplianceFinding, ...] = (
+            self._compliance_checker.check(catalog) if self._compliance_checker else ()
+        )
+        toolchain_findings: tuple[ToolchainFinding, ...] = (
+            self._toolchain_checker.check(catalog) if self._toolchain_checker else ()
+        )
 
-        security_advisories: tuple[LibraryAdvisory, ...] = ()
-        if self._scanner is not None:
-            libraries = tuple(catalog.libraries)
-            security_advisories = await self._scanner.scan(libraries)
+        # --- Phase 1 — parallel fan-out -----------------------------------
+        # Every adapter below is internally parallel (its own
+        # ``asyncio.gather`` over the library set). Awaiting them at the
+        # orchestration level via a single ``gather`` collapses the
+        # per-stage wall-clocks into ``max(t_i)`` rather than ``sum(t_i)``.
+        libraries = tuple(catalog.libraries)
+        (
+            security_advisories,
+            library_health_findings,
+            (changelog_entries, changelog_stats),
+            module_usage_map,
+            license_audit,
+            library_version_statuses,
+        ) = await asyncio.gather(
+            self._safe_scan(libraries),
+            self._safe_library_health(libraries),
+            self._safe_changelog(libraries),
+            self._safe_module_usage(catalog_path, catalog),
+            self._safe_license(libraries),
+            self._safe_version_status(libraries),
+        )
 
-        compliance_findings: tuple[ComplianceFinding, ...] = ()
-        if self._compliance_checker is not None:
-            compliance_findings = self._compliance_checker.check(catalog)
+        # RFC-0019 PR #1 contract: scanner-emitted findings (e.g. MOD-001
+        # for unreadable build files) get appended to the existing
+        # health-findings channel. This merge happens after the fan-out
+        # because it consumes the scanner's output.
+        if module_usage_map is not None and module_usage_map.findings:
+            findings = findings + module_usage_map.findings
 
-        toolchain_findings: tuple[ToolchainFinding, ...] = ()
-        if self._toolchain_checker is not None:
-            toolchain_findings = self._toolchain_checker.check(catalog)
-
-        library_health_findings: tuple[LibraryHealthFinding, ...] = ()
-        if self._library_health_checker is not None:
-            libraries = tuple(catalog.libraries)
-            library_health_findings = await self._library_health_checker.check(libraries)
-
-        changelog_entries: tuple[ChangelogEntry, ...] = ()
-        changelog_stats = ChangelogFetchStats()
-        if self._changelog_fetcher is not None:
-            libraries = tuple(catalog.libraries)
-            changelog_entries, changelog_stats = await self._changelog_fetcher.fetch(libraries)
-
-        module_usage_map: ModuleUsageMap | None = None
-        if self._module_usage_scanner is not None:
-            module_usage_map = await self._module_usage_scanner.scan(catalog_path, catalog)
-            # RFC-0019 PR #1: scanner-emitted findings (e.g. ``MOD-001``
-            # for unreadable build files) are appended to the existing
-            # health findings channel, per the RFC's "via the existing
-            # findings channel" contract. They reuse the same Finding
-            # shape so writers don't need a dedicated section.
-            if module_usage_map is not None and module_usage_map.findings:
-                findings = findings + module_usage_map.findings
-
-        license_audit: LicenseAudit | None = None
-        if self._license_checker is not None:
-            libraries = tuple(catalog.libraries)
-            license_audit = await self._license_checker.check(libraries)
-
-        library_version_statuses: tuple[LibraryVersionStatus, ...] = ()
-        if self._version_status_resolver is not None:
-            libraries = tuple(catalog.libraries)
-            library_version_statuses = await self._version_status_resolver.resolve(libraries)
-
+        # --- Phase 2 — sequential consumer --------------------------------
+        # Risk score depends on every Phase 1 output; running it
+        # concurrently is impossible by data dependency.
         risk_score_report: RiskScoreReport | None = None
         if self._enable_risk_score:
             risk_score_report = score_libraries(
@@ -200,3 +209,45 @@ class GenerateFreezeReport:
             library_version_statuses=library_version_statuses,
             bom_resolutions=bom_resolutions,
         )
+
+    # ------------------------------------------------------------------
+    # Phase 1 wrappers — keep the ``gather`` call site free of None checks
+    # ------------------------------------------------------------------
+
+    async def _safe_scan(self, libraries: tuple[Library, ...]) -> tuple[LibraryAdvisory, ...]:
+        if self._scanner is None:
+            return ()
+        return await self._scanner.scan(libraries)
+
+    async def _safe_library_health(
+        self, libraries: tuple[Library, ...]
+    ) -> tuple[LibraryHealthFinding, ...]:
+        if self._library_health_checker is None:
+            return ()
+        return await self._library_health_checker.check(libraries)
+
+    async def _safe_changelog(
+        self, libraries: tuple[Library, ...]
+    ) -> tuple[tuple[ChangelogEntry, ...], ChangelogFetchStats]:
+        if self._changelog_fetcher is None:
+            return (), ChangelogFetchStats()
+        return await self._changelog_fetcher.fetch(libraries)
+
+    async def _safe_module_usage(
+        self, catalog_path: Path, catalog: Catalog
+    ) -> ModuleUsageMap | None:
+        if self._module_usage_scanner is None:
+            return None
+        return await self._module_usage_scanner.scan(catalog_path, catalog)
+
+    async def _safe_license(self, libraries: tuple[Library, ...]) -> LicenseAudit | None:
+        if self._license_checker is None:
+            return None
+        return await self._license_checker.check(libraries)
+
+    async def _safe_version_status(
+        self, libraries: tuple[Library, ...]
+    ) -> tuple[LibraryVersionStatus, ...]:
+        if self._version_status_resolver is None:
+            return ()
+        return await self._version_status_resolver.resolve(libraries)
