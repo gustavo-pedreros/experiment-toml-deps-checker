@@ -1,6 +1,6 @@
 # RFC-0024: Async Vulnerability Scanners + Changelog Scraper Observability
 
-**Status:** Proposed
+**Status:** Implemented (PRs #52 + #53 merged 2026-05-17)
 **Created:** 2026-05-17
 **Related JTBDs:** JTBD-5 (report accuracy), JTBD-6 (developer experience)
 **Depends on:** RFC-0001 (CVE scan), RFC-0004 (Changelog scraping)
