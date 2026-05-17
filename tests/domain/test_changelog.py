@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
+from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry, ChangelogFetchStats
 
 
 class TestBreakingSignal:
@@ -59,3 +59,42 @@ class TestChangelogEntry:
     def test_clean_entry(self) -> None:
         e = self._make(breaking_signal=BreakingSignal.CLEAN)
         assert e.breaking_signal == BreakingSignal.CLEAN
+
+
+class TestChangelogFetchStats:
+    """RFC-0024 PR #2: per-fetch counter dataclass."""
+
+    def test_default_all_zero(self) -> None:
+        stats = ChangelogFetchStats()
+        assert stats.attempted == 0
+        assert stats.fetched == 0
+        assert stats.fallback_url_only == 0
+        assert stats.rate_limited == 0
+        assert stats.unknown_no_repo == 0
+
+    def test_explicit_construction(self) -> None:
+        stats = ChangelogFetchStats(
+            attempted=10,
+            fetched=6,
+            fallback_url_only=2,
+            rate_limited=1,
+            unknown_no_repo=1,
+        )
+        assert stats.attempted == 10
+        assert stats.fetched == 6
+        assert stats.fallback_url_only == 2
+        assert stats.rate_limited == 1
+        assert stats.unknown_no_repo == 1
+
+    def test_is_degraded_false_when_no_rate_limit(self) -> None:
+        stats = ChangelogFetchStats(attempted=5, fetched=5)
+        assert stats.is_degraded is False
+
+    def test_is_degraded_true_when_any_rate_limit(self) -> None:
+        stats = ChangelogFetchStats(attempted=5, fetched=4, rate_limited=1)
+        assert stats.is_degraded is True
+
+    def test_frozen(self) -> None:
+        stats = ChangelogFetchStats()
+        with pytest.raises(AttributeError):
+            stats.attempted = 99  # type: ignore[misc]

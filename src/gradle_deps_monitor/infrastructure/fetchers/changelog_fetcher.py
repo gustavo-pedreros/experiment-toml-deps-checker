@@ -33,7 +33,7 @@ from typing import Any
 import httpx
 
 from gradle_deps_monitor.domain.catalog import Library
-from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry
+from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry, ChangelogFetchStats
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -63,6 +63,56 @@ _GOOGLE_GROUPS = frozenset(
         "com.google.mlkit",
     }
 )
+
+# RFC-0024 PR #2: classification strings used to bucket each library's
+# outcome at the end of its pipeline. The four values are mutually
+# exclusive — exactly one is assigned per attempted library. The
+# top-level ``fetch`` aggregates them into a :class:`ChangelogFetchStats`.
+_CLASS_FETCHED = "fetched"
+_CLASS_FALLBACK_URL_ONLY = "fallback_url_only"
+_CLASS_RATE_LIMITED = "rate_limited"
+_CLASS_UNKNOWN_NO_REPO = "unknown_no_repo"
+
+
+def _is_rate_limited(response: httpx.Response) -> bool:
+    """Return ``True`` for documented GitHub rate-limit responses.
+
+    RFC-0024 PR #2. Two conditions are treated as rate-limit hits:
+
+    - HTTP 429 (secondary / abuse-detection limit).
+    - HTTP 403 with the response header ``X-RateLimit-Remaining: 0``
+      (primary limit exhausted).
+
+    Plain 403 without the rate-limit header is intentionally NOT
+    counted — those can come from auth failures, blocked content, or
+    other causes that don't map to "set a token to fix this".
+    """
+    if response.status_code == 429:
+        return True
+    if response.status_code == 403:
+        return bool(response.headers.get("X-RateLimit-Remaining") == "0")
+    return False
+
+
+class _RateLimitTracker:
+    """Per-library mutable flag set during one ``_build_entry`` call.
+
+    Each HTTP response observed during the pipeline is fed through
+    :meth:`observe`; if any of them was a documented rate-limit
+    response, ``hit`` flips to ``True`` and the library is classified
+    as ``_CLASS_RATE_LIMITED``. Cheap wrapper; one instance per
+    library task.
+    """
+
+    __slots__ = ("hit",)
+
+    def __init__(self) -> None:
+        self.hit = False
+
+    def observe(self, response: httpx.Response) -> None:
+        if _is_rate_limited(response):
+            self.hit = True
+
 
 # Breaking-change heuristic — conservative: require explicit keywords.
 _BREAKING_RE = re.compile(
@@ -232,10 +282,20 @@ class ChangelogFetcher:
             hdrs["Authorization"] = f"Bearer {self._token}"
         return hdrs
 
-    async def fetch(self, libraries: tuple[Library, ...]) -> tuple[ChangelogEntry, ...]:
-        """Return changelog entries for libraries with a major upgrade available."""
+    async def fetch(
+        self, libraries: tuple[Library, ...]
+    ) -> tuple[tuple[ChangelogEntry, ...], ChangelogFetchStats]:
+        """Return changelog entries for libraries with a major upgrade available.
+
+        Also returns a :class:`ChangelogFetchStats` summarising the
+        outcomes of every per-library pipeline run, so the presentation
+        layer can surface silent degradation (notably GitHub
+        rate-limiting). RFC-0024 PR #2 made the return type a tuple of
+        ``(entries, stats)``; pre-PR-#2 callers receiving just
+        ``entries`` need to unpack the new tuple.
+        """
         if not libraries:
-            return ()
+            return (), ChangelogFetchStats()
 
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
             # Step 1: resolve latest stable versions for all libraries in parallel.
@@ -253,12 +313,21 @@ class ChangelogFetcher:
                     entry_tasks.append(self._build_entry(client, lib, latest))
 
             if not entry_tasks:
-                return ()
+                return (), ChangelogFetchStats()
 
-            entries: list[ChangelogEntry | None] = list(
+            outcomes: list[tuple[ChangelogEntry, str]] = list(
                 await asyncio.gather(*entry_tasks, return_exceptions=False)
             )
-        return tuple(e for e in entries if e is not None)
+
+        entries = tuple(entry for entry, _ in outcomes)
+        stats = ChangelogFetchStats(
+            attempted=len(outcomes),
+            fetched=sum(1 for _, c in outcomes if c == _CLASS_FETCHED),
+            fallback_url_only=sum(1 for _, c in outcomes if c == _CLASS_FALLBACK_URL_ONLY),
+            rate_limited=sum(1 for _, c in outcomes if c == _CLASS_RATE_LIMITED),
+            unknown_no_repo=sum(1 for _, c in outcomes if c == _CLASS_UNKNOWN_NO_REPO),
+        )
+        return entries, stats
 
     # ------------------------------------------------------------------
     # Step 1: latest version lookup
@@ -280,28 +349,43 @@ class ChangelogFetcher:
 
     async def _build_entry(
         self, client: httpx.AsyncClient, lib: Library, latest: str
-    ) -> ChangelogEntry | None:
+    ) -> tuple[ChangelogEntry, str]:
+        """Build one entry + its outcome classification.
+
+        Returns ``(entry, classification)`` where ``classification`` is
+        one of the ``_CLASS_*`` constants. The classification is the
+        worst observed outcome along the pipeline: if any HTTP response
+        was a documented rate-limit hit, the library is classified as
+        rate-limited even if a later fallback succeeded. This matches
+        the user-felt symptom — once rate-limited, the report quality
+        is suspect.
+        """
         coordinate = f"{lib.group}:{lib.artifact}"
+        tracker = _RateLimitTracker()
 
         # Step 3: fetch POM → SCM URL → GitHub repo
-        github_repo = await self._get_github_repo(client, lib, latest)
+        github_repo = await self._get_github_repo(client, lib, latest, tracker)
 
         if github_repo is None:
             # No GitHub repo found — return entry with UNKNOWN signal.
-            return ChangelogEntry(
+            entry = ChangelogEntry(
                 alias=lib.alias,
                 coordinate=coordinate,
                 pinned_version=str(lib.version),
                 latest_version=latest,
             )
+            classification = _CLASS_RATE_LIMITED if tracker.hit else _CLASS_UNKNOWN_NO_REPO
+            return entry, classification
 
         owner, repo = github_repo
 
         # Step 4: try GitHub Releases API
-        release_body, release_url = await self._fetch_github_release(client, owner, repo, latest)
+        release_body, release_url = await self._fetch_github_release(
+            client, owner, repo, latest, tracker
+        )
 
         if release_body is not None and release_url is not None:
-            return ChangelogEntry(
+            entry = ChangelogEntry(
                 alias=lib.alias,
                 coordinate=coordinate,
                 pinned_version=str(lib.version),
@@ -310,12 +394,17 @@ class ChangelogFetcher:
                 breaking_signal=_breaking_signal(release_body),
                 snippet=_make_snippet(release_body),
             )
+            # Even a "successful" fetch can have been preceded by a
+            # rate-limited response on another tag pattern; prefer the
+            # degraded classification so the warning surfaces.
+            classification = _CLASS_RATE_LIMITED if tracker.hit else _CLASS_FETCHED
+            return entry, classification
 
         # Step 5: fallback — CHANGELOG.md at repo root
-        changelog_body, changelog_url = await self._fetch_changelog_md(client, owner, repo)
+        changelog_body, changelog_url = await self._fetch_changelog_md(client, owner, repo, tracker)
 
         if changelog_body is not None and changelog_url is not None:
-            return ChangelogEntry(
+            entry = ChangelogEntry(
                 alias=lib.alias,
                 coordinate=coordinate,
                 pinned_version=str(lib.version),
@@ -324,25 +413,35 @@ class ChangelogFetcher:
                 breaking_signal=_breaking_signal(changelog_body),
                 snippet=_make_snippet(changelog_body),
             )
+            classification = _CLASS_RATE_LIMITED if tracker.hit else _CLASS_FETCHED
+            return entry, classification
 
         # GitHub repo found but no release notes retrieved.
         repo_url = f"https://github.com/{owner}/{repo}"
-        return ChangelogEntry(
+        entry = ChangelogEntry(
             alias=lib.alias,
             coordinate=coordinate,
             pinned_version=str(lib.version),
             latest_version=latest,
             changelog_url=repo_url,
         )
+        classification = _CLASS_RATE_LIMITED if tracker.hit else _CLASS_FALLBACK_URL_ONLY
+        return entry, classification
 
     async def _get_github_repo(
-        self, client: httpx.AsyncClient, lib: Library, latest: str
+        self,
+        client: httpx.AsyncClient,
+        lib: Library,
+        latest: str,
+        tracker: _RateLimitTracker | None = None,
     ) -> tuple[str, str] | None:
         url = _pom_url(lib.group, lib.artifact, latest)
         try:
             resp = await client.get(url)
         except httpx.HTTPError:
             return None
+        if tracker is not None:
+            tracker.observe(resp)
         if resp.status_code != 200:
             return None
         scm = _parse_scm_url(resp.text)
@@ -351,7 +450,12 @@ class ChangelogFetcher:
         return _extract_github_repo(scm)
 
     async def _fetch_github_release(
-        self, client: httpx.AsyncClient, owner: str, repo: str, version: str
+        self,
+        client: httpx.AsyncClient,
+        owner: str,
+        repo: str,
+        version: str,
+        tracker: _RateLimitTracker | None = None,
     ) -> tuple[str | None, str | None]:
         """Try common tag patterns and return ``(body, html_url)`` or ``(None, None)``."""
         for tag in (f"v{version}", version, f"release-{version}", f"{repo}-{version}"):
@@ -360,6 +464,8 @@ class ChangelogFetcher:
                 resp = await client.get(url, headers=self._headers)
             except httpx.HTTPError:
                 continue
+            if tracker is not None:
+                tracker.observe(resp)
             if resp.status_code == 200:
                 data: dict[str, Any] = resp.json()
                 body = data.get("body") or ""
@@ -369,7 +475,11 @@ class ChangelogFetcher:
         return None, None
 
     async def _fetch_changelog_md(
-        self, client: httpx.AsyncClient, owner: str, repo: str
+        self,
+        client: httpx.AsyncClient,
+        owner: str,
+        repo: str,
+        tracker: _RateLimitTracker | None = None,
     ) -> tuple[str | None, str | None]:
         """Fetch CHANGELOG.md from the default branch. Returns ``(content, url)``."""
         # Resolve default branch
@@ -377,6 +487,8 @@ class ChangelogFetcher:
         branch = "main"
         try:
             resp = await client.get(api_url, headers=self._headers)
+            if tracker is not None:
+                tracker.observe(resp)
             if resp.status_code == 200:
                 branch = resp.json().get("default_branch", "main")
         except httpx.HTTPError:
@@ -388,6 +500,8 @@ class ChangelogFetcher:
                 resp = await client.get(raw_url)
             except httpx.HTTPError:
                 continue
+            if tracker is not None:
+                tracker.observe(resp)
             if resp.status_code == 200 and resp.text.strip():
                 html_url = f"https://github.com/{owner}/{repo}/blob/{branch}/{filename}"
                 return resp.text, html_url

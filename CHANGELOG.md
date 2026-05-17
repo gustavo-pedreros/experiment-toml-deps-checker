@@ -10,6 +10,23 @@ be assigned once a stable public API is established.
 
 ## [Unreleased]
 
+### Added
+- `ChangelogFetcher` now tracks per-library outcomes during scraping
+  and returns a new `ChangelogFetchStats` alongside the entries
+  (attempted / fetched / fallback_url_only / rate_limited /
+  unknown_no_repo counters). Both the console summary and the
+  Markdown report's **Major Upgrades** section render an explicit
+  warning when `rate_limited > 0`, pointing the user at the
+  `GITHUB_TOKEN` mitigation. Pre-fix the scraper degraded silently
+  under the 60 req/h unauthenticated GitHub limit — affected
+  libraries flipped from `BREAKING`/`CLEAN` (with full release-note
+  URLs) to `UNKNOWN` (with bare repo URLs) between runs with no
+  signal in the report that data quality had dropped. RFC-0024 PR #2.
+- `freeze.json` schema bumped to `1.6.0` (MINOR per ADR-0008). Adds
+  optional `changelog_stats` object under `major_upgrades` with the
+  five counters above. Consumers reading `1.x` continue to work; the
+  new field is always present (default zeros when no scraping ran).
+
 ### Fixed
 - `PomLicenseChecker` no longer false-positives on **GPL with
   Classpath Exception (CPE)**. The classifier now detects the

@@ -41,7 +41,7 @@ from gradle_deps_monitor.application.ports.vulnerability_scanner import Vulnerab
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.advisory import LibraryAdvisory
 from gradle_deps_monitor.domain.bom import BomResolution
-from gradle_deps_monitor.domain.changelog import ChangelogEntry
+from gradle_deps_monitor.domain.changelog import ChangelogEntry, ChangelogFetchStats
 from gradle_deps_monitor.domain.compliance import ComplianceFinding
 from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
 from gradle_deps_monitor.domain.license import LicenseAudit
@@ -144,9 +144,10 @@ class GenerateFreezeReport:
             library_health_findings = await self._library_health_checker.check(libraries)
 
         changelog_entries: tuple[ChangelogEntry, ...] = ()
+        changelog_stats = ChangelogFetchStats()
         if self._changelog_fetcher is not None:
             libraries = tuple(catalog.libraries)
-            changelog_entries = await self._changelog_fetcher.fetch(libraries)
+            changelog_entries, changelog_stats = await self._changelog_fetcher.fetch(libraries)
 
         module_usage_map: ModuleUsageMap | None = None
         if self._module_usage_scanner is not None:
@@ -192,6 +193,7 @@ class GenerateFreezeReport:
             toolchain_findings=toolchain_findings,
             library_health_findings=library_health_findings,
             changelog_entries=changelog_entries,
+            changelog_stats=changelog_stats,
             module_usage_map=module_usage_map,
             license_audit=license_audit,
             risk_score_report=risk_score_report,

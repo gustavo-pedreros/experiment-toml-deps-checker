@@ -18,11 +18,13 @@ from gradle_deps_monitor.infrastructure.fetchers.changelog_fetcher import (
     _breaking_signal,
     _extract_github_repo,
     _is_google,
+    _is_rate_limited,
     _is_stable,
     _major,
     _make_snippet,
     _parse_latest_stable,
     _parse_scm_url,
+    _RateLimitTracker,
 )
 
 # ---------------------------------------------------------------------------
@@ -93,6 +95,68 @@ class TestIsGoogle:
 
     def test_com_google_firebase(self) -> None:
         assert _is_google("com.google.firebase") is True
+
+
+class TestIsRateLimited:
+    """RFC-0024 PR #2 rate-limit detection helper."""
+
+    def test_429_is_rate_limited(self) -> None:
+        """HTTP 429 is the secondary / abuse-detection rate limit."""
+        resp = httpx.Response(429)
+        assert _is_rate_limited(resp) is True
+
+    def test_403_with_remaining_zero_is_rate_limited(self) -> None:
+        """HTTP 403 + ``X-RateLimit-Remaining: 0`` is the primary limit."""
+        resp = httpx.Response(403, headers={"X-RateLimit-Remaining": "0"})
+        assert _is_rate_limited(resp) is True
+
+    def test_403_without_header_is_not_rate_limited(self) -> None:
+        """Plain 403 can be auth failure / blocked content — not counted."""
+        resp = httpx.Response(403)
+        assert _is_rate_limited(resp) is False
+
+    def test_403_with_remaining_above_zero_is_not_rate_limited(self) -> None:
+        """403 with remaining > 0 is not a rate-limit hit (and shouldn't happen
+        in practice — included for completeness)."""
+        resp = httpx.Response(403, headers={"X-RateLimit-Remaining": "42"})
+        assert _is_rate_limited(resp) is False
+
+    def test_200_is_not_rate_limited(self) -> None:
+        resp = httpx.Response(200)
+        assert _is_rate_limited(resp) is False
+
+    def test_404_is_not_rate_limited(self) -> None:
+        """404 is "no such tag / branch / repo" — distinct from rate-limit."""
+        resp = httpx.Response(404)
+        assert _is_rate_limited(resp) is False
+
+
+class TestRateLimitTracker:
+    """Per-library mutable flag used to classify pipeline outcomes."""
+
+    def test_default_is_not_hit(self) -> None:
+        tracker = _RateLimitTracker()
+        assert tracker.hit is False
+
+    def test_observe_non_rate_limited_response_keeps_clear(self) -> None:
+        tracker = _RateLimitTracker()
+        tracker.observe(httpx.Response(200))
+        tracker.observe(httpx.Response(404))
+        assert tracker.hit is False
+
+    def test_observe_rate_limited_response_flips_hit(self) -> None:
+        tracker = _RateLimitTracker()
+        tracker.observe(httpx.Response(429))
+        assert tracker.hit is True
+
+    def test_hit_stays_true_once_flipped(self) -> None:
+        """A later success doesn't un-flip the rate-limit signal — once a
+        library's pipeline saw a rate-limit, the report should warn
+        regardless of what came after."""
+        tracker = _RateLimitTracker()
+        tracker.observe(httpx.Response(429))
+        tracker.observe(httpx.Response(200))
+        assert tracker.hit is True
 
 
 class TestParseLatestStable:
