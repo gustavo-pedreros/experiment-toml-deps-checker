@@ -51,8 +51,20 @@ _GOOGLE_GROUPS = frozenset(
 # ---------------------------------------------------------------------------
 # License keyword lists
 # Order matters: LGPL must appear before GPL so that LGPL is not misclassified
-# as STRONG_COPYLEFT. Similarly EUPL is checked before GPL.
+# as STRONG_COPYLEFT. Similarly EUPL is checked before GPL. Classpath
+# Exception (RFC-0023) is checked even earlier — before any cascade fires —
+# because it's a qualifier that neutralises the linking restriction of the
+# license it's attached to (notably GPL-2.0).
 # ---------------------------------------------------------------------------
+
+# Classpath Exception markers (RFC-0023). When present, the license is
+# functionally permissive for application linking even if the base license
+# name is GPL. Match BEFORE the weak/strong cascade.
+_CLASSPATH_EXCEPTION_KEYWORDS: tuple[str, ...] = (
+    "classpath exception",
+    "with classpath",  # SPDX-style: "GPL-2.0 WITH Classpath-exception-2.0"
+    "classpath-exception",
+)
 
 # Weak copyleft: linking is generally permitted; modifications must be shared.
 _WEAK_COPYLEFT_KEYWORDS: tuple[str, ...] = (
@@ -122,12 +134,27 @@ def _classify_license(license_name: str | None, license_url: str | None) -> Lice
     and *url* (both lowercased).  When neither value is provided the result
     is :attr:`~...domain.license.LicenseTier.UNKNOWN`.
 
-    Keyword order matters — ``lgpl`` is checked before ``gpl`` so that LGPL
-    licenses are not promoted to STRONG_COPYLEFT.
+    Check order matters and is intentional:
+
+    1. **Classpath Exception** (RFC-0023) — a qualifier that neutralises
+       the linking restriction of the base license (typically GPL-2.0).
+       Detect before the cascade so GPL+CPE doesn't fall into
+       STRONG_COPYLEFT via the bare ``gpl`` keyword.
+    2. **Weak copyleft** — covers LGPL/EUPL/MPL/EPL/CDDL. Must run
+       before the strong check because LGPL and EUPL both contain the
+       ``gpl`` substring.
+    3. **Strong copyleft** — vanilla GPL, AGPL, SSPL.
+    4. **Permissive** — Apache, MIT, BSD, ISC, etc.
+    5. **Unknown** — falls through when nothing matches.
     """
     text = f"{license_name or ''} {license_url or ''}".lower()
     if not text.strip():
         return LicenseTier.UNKNOWN
+
+    # RFC-0023: GPL with Classpath Exception is functionally permissive
+    # for application linking. Detect BEFORE the GPL keyword check fires.
+    if any(kw in text for kw in _CLASSPATH_EXCEPTION_KEYWORDS):
+        return LicenseTier.PERMISSIVE
 
     if any(kw in text for kw in _WEAK_COPYLEFT_KEYWORDS):
         return LicenseTier.WEAK_COPYLEFT

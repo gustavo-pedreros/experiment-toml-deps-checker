@@ -11,6 +11,16 @@ be assigned once a stable public API is established.
 ## [Unreleased]
 
 ### Fixed
+- `PomLicenseChecker` no longer false-positives on **GPL with
+  Classpath Exception (CPE)**. The classifier now detects the
+  qualifier (`"classpath exception"` / `"with classpath"` /
+  `"classpath-exception"`) before the GPL keyword cascade fires and
+  downgrades the result to `PERMISSIVE` — which is what the exception
+  is designed to be for application linking. Pre-fix, libraries like
+  `com.android.tools:desugar_jdk_libs` (Google's mandatory desugaring
+  library for projects targeting API < 26) were flagged as 🔴 Strong
+  Copyleft, suggesting they had to be removed. The fix mirrors the
+  existing LGPL-before-GPL precedence already in place. RFC-0023.
 - `GradleModuleScanner` now matches catalog aliases that use only
   underscores (e.g. `internal_sdk_android`) against the dotted
   accessors build files actually reference (`libs.internal.sdk.android`).

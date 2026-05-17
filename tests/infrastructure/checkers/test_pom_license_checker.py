@@ -152,6 +152,52 @@ class TestClassifyLicense:
         tier = _classify_license(None, "https://www.gnu.org/licenses/gpl-3.0.html")
         assert tier == LicenseTier.STRONG_COPYLEFT
 
+    # --- Classpath Exception (RFC-0023) ---
+    def test_classpath_exception_full_prose(self) -> None:
+        """The form Maven POMs typically declare for ``desugar_jdk_libs``
+        and other OpenJDK-derived artifacts."""
+        tier = _classify_license(
+            "GNU General Public License, version 2, with the Classpath Exception",
+            None,
+        )
+        assert tier == LicenseTier.PERMISSIVE
+
+    def test_classpath_exception_spdx_expression(self) -> None:
+        """The SPDX-style expression seen in modern POM ``<name>`` fields."""
+        tier = _classify_license("GPL-2.0 WITH Classpath-exception-2.0", None)
+        assert tier == LicenseTier.PERMISSIVE
+
+    def test_classpath_exception_url_only(self) -> None:
+        """Name is absent; URL carries the qualifier. Must still trip the
+        pre-check before the GPL keyword in the URL hits STRONG_COPYLEFT."""
+        tier = _classify_license(
+            None,
+            "https://example.com/licenses/gpl-2.0-with-classpath-exception.html",
+        )
+        assert tier == LicenseTier.PERMISSIVE
+
+    def test_classpath_exception_mixed_case(self) -> None:
+        """The pre-check operates on the already-lowercased text; a
+        mixed-case input must classify identically to its lowercased
+        equivalent."""
+        tier = _classify_license("GPL-2.0 WITH Classpath-Exception-2.0", None)
+        assert tier == LicenseTier.PERMISSIVE
+
+    def test_vanilla_gpl_still_strong_after_cpe_check(self) -> None:
+        """Pre-check guard: a plain GPL string without the Classpath
+        Exception qualifier must continue to land in STRONG_COPYLEFT.
+        Pins that the new pre-check doesn't over-trigger."""
+        tier = _classify_license("GPL-2.0-only", None)
+        assert tier == LicenseTier.STRONG_COPYLEFT
+
+    def test_vanilla_lgpl_still_weak_after_cpe_check(self) -> None:
+        """Pre-check guard: LGPL without Classpath Exception continues
+        to land in WEAK_COPYLEFT via the existing cascade. The
+        Classpath Exception pre-check must not interfere with the
+        LGPL-before-GPL precedence."""
+        tier = _classify_license("LGPL-3.0-or-later", None)
+        assert tier == LicenseTier.WEAK_COPYLEFT
+
     # --- Unknown ---
     def test_none_none(self) -> None:
         assert _classify_license(None, None) == LicenseTier.UNKNOWN
