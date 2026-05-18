@@ -28,6 +28,16 @@ be assigned once a stable public API is established.
   release exposed the parameter.
 
 ### Added
+- **Composition-root unit tests** (RFC-0031, Phase 7 — Stability
+  Hardening). New `tests/test_bootstrap.py` covers four wiring
+  contracts that were previously visible only through CLI integration
+  tests: scanner-selection priority (no creds / `GITHUB_TOKEN` /
+  `GH_TOKEN` alias / OSS Index / both → `CompositeScanner`), cache-root
+  lifecycle (default / `--no-cache` ephemeral / `--clear-cache` purge /
+  explicit `[cache] root` from TOML), `check` and `diff` writers-list
+  invariants (exact filenames + order), and opt-in flag wiring
+  (`--module-usage`, `--risk-score`). 18 tests, all offline. Closes
+  audit risk R9.
 - **`MavenBomResolver` migrated to the resilient transport**
   (RFC-0030 PR3 catch-up). It was overlooked in PR2 because it
   lives under `infrastructure/resolvers/` (not `scanners/` or
