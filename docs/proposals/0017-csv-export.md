@@ -24,7 +24,7 @@ in the validation corpus):
    manually correlate.
 3. **Cross-section signal lost in narrative format.** Concrete
    example from the stress test (issue #13): the catalog has
-   `core_okhttp 5.3.2` + `segpass_okhttp 4.2.2` → Catalog Health
+   `core_okhttp 5.3.2` + `legacy_okhttp 4.2.2` → Catalog Health
    flags duplicate; Security separately flags a CVE on the older
    version. Both findings are correct individually, but the
    compound story ("the duplicate is the reason you're exposed to
@@ -202,7 +202,7 @@ corpus) and the 170-library fintech-style corpus. Confirm:
 - For `nowinandroid` post-RFC-0027 (`com.google.protobuf:protoc`):
   `latest_stable` column shows the 4.x.y line, not `21.0-rc-1`
 - For the fintech-style corpus: `duplicate_of` column lights up
-  for `core_okhttp` ↔ `segpass_okhttp` (the issue #13 case)
+  for `core_okhttp` ↔ `legacy_okhttp` (the issue #13 case)
 
 ## Rollback strategy
 

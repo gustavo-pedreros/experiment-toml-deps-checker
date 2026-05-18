@@ -138,15 +138,15 @@ For TTL:
 
 ## Definition of done
 
-- [ ] `domain/config.py` exports `CacheConfig`; `AppConfig.cache: CacheConfig = field(default_factory=CacheConfig)`.
-- [ ] `infrastructure/cache/cache_paths.py` exists with the four functions above + unit tests.
-- [ ] `infrastructure/config/loader.py` parses `[cache]` section; unknown keys warn; tests cover missing / empty / valid / typo cases.
-- [ ] `infrastructure/registries/_base.py` uses `:ok:` / `:404:` key prefixes; `clear_negative_entries()` method added with a unit test.
-- [ ] `bootstrap.py` `create_check_command` accepts the three flag parameters, computes cache root once via `resolve_cache_root`, wires *all three* cache sites consistently.
-- [ ] `cli.py` `check` exposes `--no-cache` / `--clear-cache` / `--cache-ttl`; CLI tests confirm the flags reach bootstrap.
-- [ ] `CHANGELOG.md` `[Unreleased]` ### Added entry mentions the three flags, the env-var, and the `[cache]` TOML section. ### Fixed entry mentions the GHSA + OSS Index `_CACHE_ROOT` wiring bug.
-- [ ] `README.md` Credentials/Configuration sections gain a one-paragraph cache subsection.
-- [ ] All five quality stages pass on Py 3.11/3.12/3.13/3.14 CI matrix.
+- [x] `domain/config.py` exports `CacheConfig`; `AppConfig.cache: CacheConfig = field(default_factory=CacheConfig)`.
+- [x] `infrastructure/cache/cache_paths.py` exists with the four functions above + unit tests.
+- [x] `infrastructure/config/loader.py` parses `[cache]` section; unknown keys warn; tests cover missing / empty / valid / typo cases.
+- [x] `infrastructure/registries/_base.py` uses `:ok:` / `:404:` key prefixes; `clear_negative_entries()` method added with a unit test.
+- [x] `bootstrap.py` `create_check_command` accepts the three flag parameters, computes cache root once via `resolve_cache_root`, wires *all three* cache sites consistently.
+- [x] `cli.py` `check` exposes `--no-cache` / `--clear-cache` / `--cache-ttl`; CLI tests confirm the flags reach bootstrap.
+- [x] `CHANGELOG.md` `[Unreleased]` ### Added entry mentions the three flags, the env-var, and the `[cache]` TOML section. ### Fixed entry mentions the GHSA + OSS Index `_CACHE_ROOT` wiring bug.
+- [x] `README.md` Credentials/Configuration sections gain a one-paragraph cache subsection.
+- [x] All five quality stages pass on Py 3.11/3.12/3.13/3.14 CI matrix.
 
 ## Open questions
 
