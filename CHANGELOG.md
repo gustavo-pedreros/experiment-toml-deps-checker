@@ -11,6 +11,19 @@ be assigned once a stable public API is established.
 ## [Unreleased]
 
 ### Added
+- **Shared HTTP resilience layer** (RFC-0030 PR1, Phase 7 — Stability
+  Hardening). New `infrastructure/_shared/http/` package exposing
+  `HttpPolicy` (timeout / max_attempts / backoff / concurrency tunables),
+  `ResilientTransport` (a stateless `httpx.AsyncBaseTransport` wrapper
+  adding retry-on-transient-failure, exponential backoff with full
+  jitter, and `Retry-After` honoring for 429 / 5xx responses and
+  `httpx.RequestError` network errors), `is_rate_limited` (lifted from
+  the changelog fetcher), and a `make_resilient_client` factory. Only
+  `GitHubAdvisoryScanner` adopts it in this release; OSS Index, the
+  changelog fetcher, the Maven registries, and the POM checkers
+  migrate in follow-up PRs (RFC-0030 PR2 + PR3). Transparent to
+  callers — same exception types, same return shapes, just fewer
+  transient failures bubble up.
 - **Cache controls** (RFC-0029, Phase 7 — Stability Hardening). Three new
   CLI flags on `check`: `--no-cache` bypasses the persistent on-disk cache
   for one run (adapters write to a tempdir cleaned up at exit; the
