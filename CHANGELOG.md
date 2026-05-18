@@ -10,6 +10,39 @@ be assigned once a stable public API is established.
 
 ## [Unreleased]
 
+### Changed
+- The Markdown report no longer **silently elides empty sections**.
+  Catalog Health, Play Store Compliance, Toolchain Compatibility,
+  Library Health, and Major Upgrades each render a `✅ no findings`
+  placeholder when their adapter ran and produced nothing, rather
+  than disappearing from `freeze.md`. Pre-fix readers couldn't
+  distinguish "didn't scan" from "scanned, clean". Security gets
+  two distinct placeholders: `⊘ scan not configured` (with the
+  `GITHUB_TOKEN` / `OSS_INDEX_*` remediation hint) when no scanner
+  was injected, and `✅ no known security advisories` when a scanner
+  ran and found nothing. The distinction is driven by a new
+  authoritative `security_scanned` flag on `FreezeReport`, set by
+  `GenerateFreezeReport.execute` from adapter presence at
+  construction time. RFC-0028 / issue #5 from the 2026-05
+  stress-test menu.
+- The `security.scanned` field in `freeze.json` now sources from
+  the authoritative `security_scanned` flag instead of the
+  `len(security_advisories) > 0` heuristic. Field name, type, and
+  documented meaning unchanged; semantics tightened so a degenerate
+  "scanner ran on a catalog with no advisories" case correctly
+  reports `scanned: true`. No schema-version bump (wire format
+  unchanged).
+- Console **Risk Score** and **Security** summary lines now
+  enumerate every populated severity bucket (`N critical,
+  M high, K medium, L low`) instead of collapsing
+  non-CRITICAL/non-HIGH entries into `N other`. Pre-fix when no
+  CRITICAL/HIGH existed the entire tail bucketed as `other`,
+  hiding the medium/low split (stress test: console said
+  `157 other` while the Markdown report showed `137 medium +
+  20 low`). Major Upgrades retains its `N likely breaking, M other`
+  template — "other" there is semantically correct (CLEAN /
+  UNKNOWN signal). RFC-0028 / issue #7.
+
 ### Added
 - `freeze-inventory.csv` enriched from the PR-#1 tracer's 3 columns
   to **15 columns** — every dimension joined per library: `alias`,

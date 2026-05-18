@@ -208,6 +208,13 @@ class GenerateFreezeReport:
             risk_score_report=risk_score_report,
             library_version_statuses=library_version_statuses,
             bom_resolutions=bom_resolutions,
+            # RFC-0028: authoritative "scanner was injected" signal,
+            # consumed by writers to differentiate "scan not configured"
+            # from "scanned, no advisories" when rendering the Security
+            # section placeholder. Set from adapter presence at
+            # construction time so a degenerate empty-catalog run with
+            # a real scanner is still reported as scanned.
+            security_scanned=self._scanner is not None,
         )
 
     # ------------------------------------------------------------------

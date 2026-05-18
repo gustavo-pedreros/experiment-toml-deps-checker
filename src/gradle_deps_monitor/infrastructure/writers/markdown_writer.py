@@ -53,7 +53,7 @@ def _render(report: FreezeReport) -> str:
         _plugins_section(plugins),
         _bundles_section(bundles),
         _health_section(list(report.health_findings)),
-        _security_section(list(report.vulnerable_libraries)),
+        _security_section(list(report.vulnerable_libraries), report.security_scanned),
         _compliance_section(list(report.compliance_findings)),
         _active_rejections_section(list(report.catalog.libraries)),
         _toolchain_section(list(report.toolchain_findings)),
@@ -205,9 +205,21 @@ def _bundles_section(bundles: list[Bundle]) -> str:
     return f"## Bundles ({len(bundles)})\n\n| Alias | Members |\n|---|---|\n{rows}"
 
 
-def _security_section(vulnerable: list[LibraryAdvisory]) -> str:
+def _security_section(vulnerable: list[LibraryAdvisory], scanned: bool) -> str:
+    # RFC-0028: render explicit placeholder for both "not configured"
+    # and "scanned, no findings" cases instead of eliding when empty.
+    # The scanned flag is the authoritative signal — see FreezeReport
+    # for why we can't derive it from ``len(vulnerable) > 0``.
     if not vulnerable:
-        return ""
+        if not scanned:
+            return (
+                "## Security\n\n"
+                "> ⊘ Security scan not configured — set `GITHUB_TOKEN` "
+                "to enable the GitHub Advisory Database integration, or "
+                "`OSS_INDEX_USER` + `OSS_INDEX_API_KEY` to enable Sonatype "
+                "OSS Index. Re-run to populate this section."
+            )
+        return "## Security\n\n> ✅ No known security advisories for any pinned version."
     rows: list[str] = []
     for la in sorted(vulnerable, key=lambda x: x.alias):
         for adv in sorted(la.advisories, key=lambda a: a.severity):
@@ -230,8 +242,11 @@ def _security_section(vulnerable: list[LibraryAdvisory]) -> str:
 
 
 def _compliance_section(findings: list[ComplianceFinding]) -> str:
+    # RFC-0028: always render — Compliance checker is unconditionally
+    # injected at the composition root, so "no findings" always means
+    # "scanned, found nothing" (never "didn't scan").
     if not findings:
-        return ""
+        return "## Play Store Compliance\n\n> ✅ No Play Store compliance issues found."
     rows: list[str] = []
     for f in findings:
         icon = style_for(f.severity.to_common()).md_emoji
@@ -286,8 +301,10 @@ def _active_rejections_section(libraries: list[Library]) -> str:
 
 
 def _toolchain_section(findings: list[ToolchainFinding]) -> str:
+    # RFC-0028: always render — Toolchain checker is unconditionally
+    # injected at the composition root.
     if not findings:
-        return ""
+        return "## Toolchain Compatibility\n\n> ✅ No toolchain compatibility issues detected."
     rows: list[str] = []
     for f in findings:
         icon = style_for(f.severity.to_common()).md_emoji
@@ -303,8 +320,10 @@ def _toolchain_section(findings: list[ToolchainFinding]) -> str:
 
 
 def _health_section(findings: list[Finding]) -> str:
+    # RFC-0028: always render — Catalog Health checker is unconditionally
+    # invoked at the composition root.
     if not findings:
-        return ""
+        return "## Catalog Health\n\n> ✅ No catalog health issues detected."
     rows = "\n".join(
         f"| {style_for(f.severity.to_common()).md_emoji} {f.severity.value} "
         f"| `{f.rule_id}` | {f.message} |"
@@ -326,8 +345,15 @@ _BREAKING_SIGNAL_ICON: dict[BreakingSignal, str] = {
 
 
 def _changelog_section(entries: list[ChangelogEntry], stats: ChangelogFetchStats) -> str:
+    # RFC-0028: always render — ChangelogFetcher is unconditionally
+    # injected at the composition root (token only affects rate-limit
+    # headroom, surfaced separately via stats.is_degraded).
     if not entries:
-        return ""
+        return (
+            "## Major Upgrades\n\n"
+            "> ✅ No major upgrades available — every catalog library "
+            "is pinned at or above the latest stable major."
+        )
     rows: list[str] = []
     for e in sorted(entries, key=lambda x: x.alias):
         icon = _BREAKING_SIGNAL_ICON.get(e.breaking_signal, "⚪")
@@ -364,8 +390,12 @@ def _changelog_section(entries: list[ChangelogEntry], stats: ChangelogFetchStats
 
 
 def _library_health_section(findings: list[LibraryHealthFinding]) -> str:
+    # RFC-0028: always render — LibraryHealthChecker is unconditionally
+    # injected at the composition root.
     if not findings:
-        return ""
+        return (
+            "## Library Health\n\n> ✅ No deprecation, relocation, or inactivity signals detected."
+        )
     rows: list[str] = []
     for f in sorted(findings, key=lambda x: (x.severity, x.alias)):
         icon = style_for(f.severity.to_common()).md_emoji

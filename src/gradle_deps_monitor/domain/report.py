@@ -48,6 +48,12 @@ class FreezeReport:
     risk_score_report: RiskScoreReport | None = field(default=None)
     library_version_statuses: tuple[LibraryVersionStatus, ...] = field(default_factory=tuple)
     bom_resolutions: tuple[BomResolution, ...] = field(default_factory=tuple)
+    # RFC-0028: whether the vulnerability scanner was injected at use-case
+    # construction time. Distinct from ``len(security_advisories) > 0``
+    # because the latter is False both for "no scanner" and for "scanner
+    # ran on an empty catalog". Writers consult this flag to render the
+    # correct Security placeholder when there are no advisories.
+    security_scanned: bool = False
 
     def __post_init__(self) -> None:
         if self.generated_at.tzinfo is None:

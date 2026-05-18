@@ -71,7 +71,12 @@ def _serialise(report: FreezeReport) -> dict[str, Any]:
             "findings": [_finding(f) for f in report.health_findings],
         },
         "security": {
-            "scanned": len(report.security_advisories) > 0,
+            # RFC-0028: source is the authoritative flag set by the use
+            # case from adapter presence at construction time. Pre-fix
+            # this was derived from ``len(security_advisories) > 0`` —
+            # a heuristic that returned False both for "no scanner" and
+            # for "scanner ran on an empty catalog".
+            "scanned": report.security_scanned,
             "vulnerable_count": len(report.vulnerable_libraries),
             "libraries": [_library_advisory(la) for la in report.vulnerable_libraries],
         },

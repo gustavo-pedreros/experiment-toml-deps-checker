@@ -353,12 +353,17 @@ def test_markdown_health_section_contains_rule_id(
     assert "catalog.missing-plugins" in dest.read_text(encoding="utf-8")
 
 
-def test_markdown_omits_health_section_when_no_findings(
+def test_markdown_renders_catalog_health_section_when_no_findings(
     full_report: FreezeReport, tmp_path: Path
 ) -> None:
+    """RFC-0028: Catalog Health is unconditionally rendered with a
+    "no findings" placeholder rather than elided when empty, so readers
+    can distinguish "scanned, clean" from "skipped"."""
     dest = tmp_path / "freeze.md"
     MarkdownWriter().write(full_report, dest)
-    assert "## Catalog Health" not in dest.read_text(encoding="utf-8")
+    content = dest.read_text(encoding="utf-8")
+    assert "## Catalog Health" in content
+    assert "No catalog health issues detected" in content
 
 
 # ---------------------------------------------------------------------------
@@ -507,3 +512,116 @@ def test_markdown_active_rejections_singular_noun(tmp_path: Path) -> None:
     MarkdownWriter().write(report, dest)
     text = dest.read_text(encoding="utf-8")
     assert "Active Rejections (1 rejection)" in text
+
+
+# ---------------------------------------------------------------------------
+# RFC-0028 — empty-section placeholders + security scanned distinction
+# ---------------------------------------------------------------------------
+
+
+def test_markdown_security_section_renders_not_configured_when_scanner_absent(
+    full_report: FreezeReport, tmp_path: Path
+) -> None:
+    """No scanner injected → MD must show the remediation placeholder.
+
+    Pre-fix the section elided entirely, making the report look
+    identical to a clean security scan.
+    """
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(full_report, dest)  # security_scanned defaults to False
+    text = dest.read_text(encoding="utf-8")
+    assert "## Security" in text
+    assert "scan not configured" in text
+    assert "GITHUB_TOKEN" in text
+
+
+def test_markdown_security_section_renders_clean_when_scanned_no_findings(
+    tmp_path: Path,
+) -> None:
+    """Scanner injected and ran with zero advisories → clean placeholder."""
+    catalog = Catalog(
+        source_path=tmp_path / "libs.versions.toml",
+        libraries=(Library("lib", "g", "art", MavenVersion("1.0.0")),),
+        plugins=(),
+        bundles=(),
+    )
+    report = FreezeReport(catalog=catalog, generated_at=_TS, security_scanned=True)
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(report, dest)
+    text = dest.read_text(encoding="utf-8")
+    assert "## Security" in text
+    assert "No known security advisories" in text
+    assert "GITHUB_TOKEN" not in text
+
+
+def test_markdown_compliance_section_renders_placeholder_when_empty(
+    full_report: FreezeReport, tmp_path: Path
+) -> None:
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(full_report, dest)
+    text = dest.read_text(encoding="utf-8")
+    assert "## Play Store Compliance" in text
+    assert "No Play Store compliance issues found" in text
+
+
+def test_markdown_toolchain_section_renders_placeholder_when_empty(
+    full_report: FreezeReport, tmp_path: Path
+) -> None:
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(full_report, dest)
+    text = dest.read_text(encoding="utf-8")
+    assert "## Toolchain Compatibility" in text
+    assert "No toolchain compatibility issues detected" in text
+
+
+def test_markdown_library_health_section_renders_placeholder_when_empty(
+    full_report: FreezeReport, tmp_path: Path
+) -> None:
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(full_report, dest)
+    text = dest.read_text(encoding="utf-8")
+    assert "## Library Health" in text
+    assert "No deprecation, relocation, or inactivity signals detected" in text
+
+
+def test_markdown_changelog_section_renders_placeholder_when_empty(
+    full_report: FreezeReport, tmp_path: Path
+) -> None:
+    dest = tmp_path / "freeze.md"
+    MarkdownWriter().write(full_report, dest)
+    text = dest.read_text(encoding="utf-8")
+    assert "## Major Upgrades" in text
+    assert "No major upgrades available" in text
+
+
+def test_json_security_scanned_source_is_authoritative_flag(tmp_path: Path) -> None:
+    """RFC-0028: json security.scanned now reflects the use-case flag,
+    not the ``len(security_advisories) > 0`` heuristic."""
+    catalog = Catalog(
+        source_path=tmp_path / "libs.versions.toml",
+        libraries=(Library("lib", "g", "art", MavenVersion("1.0.0")),),
+        plugins=(),
+        bundles=(),
+    )
+    # Scanner ran on a catalog where no library produced advisories
+    # (degenerate "all-clean" case that pre-RFC reported scanned=false).
+    report = FreezeReport(catalog=catalog, generated_at=_TS, security_scanned=True)
+    dest = tmp_path / "freeze.json"
+    JsonWriter().write(report, dest)
+    data = json.loads(dest.read_text(encoding="utf-8"))
+    assert data["security"]["scanned"] is True
+    assert data["security"]["vulnerable_count"] == 0
+
+
+def test_json_security_scanned_false_when_flag_default(tmp_path: Path) -> None:
+    catalog = Catalog(
+        source_path=tmp_path / "libs.versions.toml",
+        libraries=(Library("lib", "g", "art", MavenVersion("1.0.0")),),
+        plugins=(),
+        bundles=(),
+    )
+    report = FreezeReport(catalog=catalog, generated_at=_TS)  # security_scanned defaults False
+    dest = tmp_path / "freeze.json"
+    JsonWriter().write(report, dest)
+    data = json.loads(dest.read_text(encoding="utf-8"))
+    assert data["security"]["scanned"] is False
