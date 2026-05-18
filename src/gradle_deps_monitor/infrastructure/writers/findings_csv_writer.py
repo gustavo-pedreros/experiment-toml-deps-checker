@@ -31,6 +31,7 @@ from pathlib import Path
 
 from gradle_deps_monitor.domain import FreezeReport
 from gradle_deps_monitor.domain.severity import CommonSeverity
+from gradle_deps_monitor.infrastructure.writers._atomic import atomic_write
 
 _COLUMNS: tuple[str, ...] = (
     "section",
@@ -57,12 +58,10 @@ class FindingsCsvWriter:
 
     def write(self, report: FreezeReport, dest: Path) -> None:
         """Write *report* to *dest*, creating parent directories as needed."""
-        dest.parent.mkdir(parents=True, exist_ok=True)
-
         rows = list(_iter_rows(report))
         rows.sort(key=lambda r: (r[0], r[4], r[1]))  # section, target, rule_id
 
-        with dest.open("w", encoding="utf-8", newline="") as fh:
+        with atomic_write(dest, newline="") as fh:
             writer = csv.writer(fh, quoting=csv.QUOTE_MINIMAL)
             writer.writerow(_COLUMNS)
             writer.writerows(rows)

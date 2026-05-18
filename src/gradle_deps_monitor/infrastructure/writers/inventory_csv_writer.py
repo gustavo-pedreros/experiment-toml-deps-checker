@@ -33,6 +33,7 @@ from gradle_deps_monitor.domain.library_health import LibraryHealthFinding
 from gradle_deps_monitor.domain.module_usage import LibraryUsage
 from gradle_deps_monitor.domain.risk_score import LibraryRiskScore
 from gradle_deps_monitor.domain.version_status import LibraryVersionStatus
+from gradle_deps_monitor.infrastructure.writers._atomic import atomic_write
 
 # Column order is part of the file's contract. Append new columns at
 # the end in future revisions; never reorder or rename without a
@@ -62,11 +63,8 @@ class InventoryCsvWriter:
 
     def write(self, report: FreezeReport, dest: Path) -> None:
         """Write *report* to *dest*, creating parent directories as needed."""
-        dest.parent.mkdir(parents=True, exist_ok=True)
-
         index = _Indexes(report)
-
-        with dest.open("w", encoding="utf-8", newline="") as fh:
+        with atomic_write(dest, newline="") as fh:
             writer = csv.writer(fh, quoting=csv.QUOTE_MINIMAL)
             writer.writerow(_COLUMNS)
             for lib in sorted(report.catalog.libraries, key=lambda lib: lib.alias):

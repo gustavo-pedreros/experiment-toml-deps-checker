@@ -18,6 +18,7 @@ from gradle_deps_monitor.domain.risk_score import RiskLevel, RiskScoreReport
 from gradle_deps_monitor.domain.severity_style import style_for
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 from gradle_deps_monitor.domain.version_status import LibraryVersionStatus, VersionDrift
+from gradle_deps_monitor.infrastructure.writers._atomic import atomic_write
 
 
 class MarkdownWriter:
@@ -25,8 +26,8 @@ class MarkdownWriter:
 
     def write(self, report: FreezeReport, dest: Path) -> None:
         """Write *report* to *dest*, creating parent directories as needed."""
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(_render(report), encoding="utf-8")
+        with atomic_write(dest) as fh:
+            fh.write(_render(report))
 
 
 # ---------------------------------------------------------------------------

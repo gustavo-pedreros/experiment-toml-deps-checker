@@ -11,6 +11,15 @@ be assigned once a stable public API is established.
 ## [Unreleased]
 
 ### Changed
+- **Atomic report writes** (RFC-0032, Phase 7 — Stability Hardening).
+  All 8 writers (Markdown / JSON / Slack for both `check` and `diff`,
+  plus inventory and findings CSV) now serialise through a shared
+  `atomic_write` context manager that buffers output to a sibling
+  temp file and renames it into place via `os.replace`. A process
+  killed mid-write (SIGTERM, OOM, Ctrl-C, runner timeout) no longer
+  leaves a half-rendered `freeze.md` / `freeze.json` / `freeze-*.csv`
+  behind — the previous file (if any) is left untouched, and no
+  temp file survives. Closes audit risk R8.
 - **HTTP-resilience policy consolidated** (RFC-0030 PR3, closes RFC).
   Every adapter's per-module `_HTTP_TIMEOUT = …` constant was
   retired — call sites now construct `HttpPolicy(timeout_seconds=…)`
