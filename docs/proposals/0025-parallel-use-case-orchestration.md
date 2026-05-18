@@ -1,7 +1,8 @@
 # RFC-0025: Parallel Orchestration of Independent Adapter Stages
 
-**Status:** Proposed
+**Status:** Implemented
 **Created:** 2026-05-17
+**Shipped:** 2026-05-17 (PR #55)
 **Related JTBDs:** JTBD-5 (report accuracy), JTBD-6 (developer experience)
 **Depends on:** RFC-0019 (async scan pipeline), RFC-0024 PR #1 (async GHSA scanner)
 

@@ -107,7 +107,7 @@ merit its own feature phase.
 | ✅ | Module Scanner — Accessor Coverage Follow-up (underscore aliases + `platform()` BoMs) | [RFC-0022](proposals/0022-module-scanner-accessor-coverage.md) |
 | ✅ | License Classifier — GPL with Classpath Exception | [RFC-0023](proposals/0023-license-classpath-exception.md) |
 | ✅ | Async Vulnerability Scanners + Changelog Scraper Observability | [RFC-0024](proposals/0024-async-scanners-scraper-observability.md) |
-| 🚧 | Parallel Orchestration of Independent Adapter Stages | [RFC-0025](proposals/0025-parallel-use-case-orchestration.md) |
+| ✅ | Parallel Orchestration of Independent Adapter Stages | [RFC-0025](proposals/0025-parallel-use-case-orchestration.md) |
 
 ## Backlog
 
