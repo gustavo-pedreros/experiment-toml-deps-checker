@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
+import pytest
 from typer.testing import CliRunner
 
+from gradle_deps_monitor import bootstrap as bootstrap_module
 from gradle_deps_monitor.cli import app
 
 runner = CliRunner()
@@ -154,3 +157,89 @@ def test_check_short_flag_o_works(tmp_path: Path) -> None:
     result = runner.invoke(app, ["check", str(gradle_dir), "-o", str(out)])
     assert result.exit_code == 0
     assert (out / "freeze.md").exists()
+
+
+# ---------------------------------------------------------------------------
+# RFC-0029 — cache flags wire into bootstrap
+# ---------------------------------------------------------------------------
+
+
+class _CaptureCheckCommand:
+    """Stand-in CheckCommand whose ``run`` returns an empty FreezeReport."""
+
+    def run(self, catalog_path: Path, _output_dir: Path) -> tuple[Any, list[Path]]:
+        from gradle_deps_monitor.domain.catalog import Catalog
+        from gradle_deps_monitor.domain.report import FreezeReport
+
+        empty_catalog = Catalog(source_path=catalog_path, libraries=(), plugins=(), bundles=())
+        return FreezeReport(catalog=empty_catalog), []
+
+
+def _capture_create_check_command_kwargs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> dict[str, Any]:
+    captured: dict[str, Any] = {}
+
+    def _spy(**kwargs: Any) -> _CaptureCheckCommand:
+        captured.update(kwargs)
+        return _CaptureCheckCommand()
+
+    monkeypatch.setattr(bootstrap_module, "create_check_command", _spy)
+    return captured
+
+
+def test_no_cache_flag_reaches_bootstrap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = _capture_create_check_command_kwargs(monkeypatch)
+    gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
+    result = runner.invoke(
+        app, ["check", str(gradle_dir), "--out", str(tmp_path / "out"), "--no-cache"]
+    )
+    assert result.exit_code == 0, result.output
+    assert captured["no_cache"] is True
+    assert captured["clear_cache_first"] is False
+    assert captured["cache_ttl_override"] is None
+
+
+def test_clear_cache_flag_reaches_bootstrap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured = _capture_create_check_command_kwargs(monkeypatch)
+    gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
+    result = runner.invoke(
+        app, ["check", str(gradle_dir), "--out", str(tmp_path / "out"), "--clear-cache"]
+    )
+    assert result.exit_code == 0
+    assert captured["clear_cache_first"] is True
+    assert captured["no_cache"] is False
+
+
+def test_cache_ttl_flag_reaches_bootstrap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = _capture_create_check_command_kwargs(monkeypatch)
+    gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
+    result = runner.invoke(
+        app,
+        ["check", str(gradle_dir), "--out", str(tmp_path / "out"), "--cache-ttl", "60"],
+    )
+    assert result.exit_code == 0
+    assert captured["cache_ttl_override"] == 60
+
+
+def test_cache_ttl_rejects_negative(tmp_path: Path) -> None:
+    gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
+    result = runner.invoke(
+        app,
+        ["check", str(gradle_dir), "--out", str(tmp_path / "out"), "--cache-ttl", "-1"],
+    )
+    assert result.exit_code != 0
+    # Typer's range validation message.
+    assert "must be" in result.output.lower() or "invalid" in result.output.lower()
+
+
+def test_default_flags_are_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = _capture_create_check_command_kwargs(monkeypatch)
+    gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
+    result = runner.invoke(app, ["check", str(gradle_dir), "--out", str(tmp_path / "out")])
+    assert result.exit_code == 0
+    assert captured["no_cache"] is False
+    assert captured["clear_cache_first"] is False
+    assert captured["cache_ttl_override"] is None

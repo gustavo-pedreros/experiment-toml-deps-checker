@@ -10,6 +10,37 @@ be assigned once a stable public API is established.
 
 ## [Unreleased]
 
+### Added
+- **Cache controls** (RFC-0029, Phase 7 — Stability Hardening). Three new
+  CLI flags on `check`: `--no-cache` bypasses the persistent on-disk cache
+  for one run (adapters write to a tempdir cleaned up at exit; the
+  persistent cache is left untouched); `--clear-cache` purges the
+  persistent cache before the run; `--cache-ttl SECONDS` overrides every
+  adapter's cache TTL for the run. A new env var
+  `GRADLE_DEPS_MONITOR_CACHE_ROOT` overrides the cache root (default
+  `~/.cache/gradle-deps-monitor`) so CI runners with read-only `$HOME` or
+  nix-style isolation can redirect cache state. The
+  `gradle-deps-monitor.toml` `[cache]` section (previously reserved) now
+  accepts `root`, `ttl_seconds_maven`, and `ttl_seconds_advisory` keys
+  per the documented resolution order
+  (env var > config file > built-in default).
+- **Negative-cache namespacing** in `MavenMetadataRegistry`
+  (RFC-0029). Cache keys for 404 negatives now use a distinct `:404:`
+  prefix from `:ok:` positives, so a future `--clear-negatives` operation
+  can purge stale 404s without invalidating valid version entries.
+  Internal `clear_negative_entries()` API exposed for that future flag;
+  the CLI does not yet invoke it.
+
+### Fixed
+- **`_CACHE_ROOT` wiring bug** for GitHub Advisory + OSS Index scanners
+  (RFC-0029). Both scanners previously fell back to their constructor
+  default `cache_dir` of `Path(".cache/ghsa")` / `Path(".cache/ossindex")`
+  — relative paths resolved against the CLI's working directory — while
+  the Maven resolver was correctly wired to
+  `~/.cache/gradle-deps-monitor/maven`. Cache state was therefore split
+  across three different directories depending on where the operator
+  invoked the CLI from. All three sites now share the resolved cache root.
+
 ### Changed
 - The Markdown report no longer **silently elides empty sections**.
   Catalog Health, Play Store Compliance, Toolchain Compatibility,

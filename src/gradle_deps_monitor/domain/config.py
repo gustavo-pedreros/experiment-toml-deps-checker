@@ -22,8 +22,30 @@ Higher steps override lower ones.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from gradle_deps_monitor.domain.risk_score import RiskThresholds, RiskWeights
+
+
+@dataclass(frozen=True)
+class CacheConfig:
+    """Persistent-cache tunables (RFC-0029).
+
+    ``root`` is the on-disk directory the diskcache layers write into;
+    when ``None``, the application resolves a default at runtime
+    (``GRADLE_DEPS_MONITOR_CACHE_ROOT`` env var, then
+    ``~/.cache/gradle-deps-monitor``).
+
+    ``ttl_seconds_maven`` applies to Maven Central + Google Maven
+    metadata; ``ttl_seconds_advisory`` applies to GitHub Advisory DB
+    and OSS Index responses. Bypass / purge / per-run TTL override are
+    not exposed here — those are per-invocation CLI flags handled in
+    :mod:`gradle_deps_monitor.bootstrap`.
+    """
+
+    root: Path | None = None
+    ttl_seconds_maven: int = 3600
+    ttl_seconds_advisory: int = 86_400
 
 
 @dataclass(frozen=True)
@@ -40,7 +62,10 @@ class AppConfig:
                             :class:`~gradle_deps_monitor.domain.risk_score.RiskWeights`.
     :param risk_thresholds: Score cutoffs that map a numeric score to a
                             :class:`~gradle_deps_monitor.domain.risk_score.RiskLevel`.
+    :param cache:           Persistent-cache configuration. See
+                            :class:`CacheConfig`.
     """
 
     risk_weights: RiskWeights = field(default_factory=RiskWeights)
     risk_thresholds: RiskThresholds = field(default_factory=RiskThresholds)
+    cache: CacheConfig = field(default_factory=CacheConfig)

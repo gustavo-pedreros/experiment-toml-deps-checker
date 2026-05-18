@@ -8,13 +8,20 @@ the import-linter contracts in ``pyproject.toml``.
 
 from __future__ import annotations
 
+import atexit
 import os
+import shutil
 from pathlib import Path
 
 from gradle_deps_monitor.application.compute_freeze_diff import ComputeFreezeDiff
 from gradle_deps_monitor.application.generate_freeze_report import GenerateFreezeReport
 from gradle_deps_monitor.checks.runner import run_all as _run_health_checks
 from gradle_deps_monitor.domain.config import AppConfig
+from gradle_deps_monitor.infrastructure.cache.cache_paths import (
+    clear_cache,
+    ephemeral_cache_root,
+    resolve_cache_root,
+)
 from gradle_deps_monitor.infrastructure.checkers.library_health_checker import (
     LibraryHealthChecker,
 )
@@ -54,14 +61,10 @@ _REPORT_STEM = "freeze"
 # Default stem for diff report output files.
 _DIFF_STEM = "freeze-diff"
 
-# On-disk cache for HTTP fetches (Maven metadata, advisory queries).
-# Reusing a single root directory keeps unrelated runs from invalidating
-# each other and matches the convention used by the OSS Index and GitHub
-# Advisory adapters.
-_CACHE_ROOT = Path.home() / ".cache" / "gradle-deps-monitor"
 
-
-def _build_scanner() -> CompositeScanner | GitHubAdvisoryScanner | OssIndexScanner | None:
+def _build_scanner(
+    cache_root: Path, ttl_advisory: int
+) -> CompositeScanner | GitHubAdvisoryScanner | OssIndexScanner | None:
     """Return the best available vulnerability scanner based on env vars.
 
     Priority:
@@ -69,18 +72,58 @@ def _build_scanner() -> CompositeScanner | GitHubAdvisoryScanner | OssIndexScann
     2. GitHub token only → :class:`GitHubAdvisoryScanner`
     3. OSS Index credentials only → :class:`OssIndexScanner`
     4. No credentials → ``None`` (security section omitted from reports)
+
+    Both scanners receive ``cache_root / "ghsa"`` / ``cache_root / "ossindex"``
+    so the persistent cache always lives under the resolved cache root
+    (RFC-0029). Prior to RFC-0029 the scanners silently fell back to
+    constructor defaults of ``.cache/ghsa`` / ``.cache/ossindex`` relative
+    to CWD, splitting cache state across three different directories.
     """
     gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     oss_user = os.environ.get("OSSINDEX_USER")
     oss_key = os.environ.get("OSSINDEX_API_KEY")
 
-    gh_scanner = GitHubAdvisoryScanner(token=gh_token) if gh_token else None
+    gh_scanner = (
+        GitHubAdvisoryScanner(token=gh_token, cache_dir=cache_root / "ghsa", ttl=ttl_advisory)
+        if gh_token
+        else None
+    )
     has_oss_creds = bool(oss_user and oss_key)
-    oss_scanner = OssIndexScanner(username=oss_user, api_key=oss_key) if has_oss_creds else None
+    oss_scanner = (
+        OssIndexScanner(
+            username=oss_user, api_key=oss_key, cache_dir=cache_root / "ossindex", ttl=ttl_advisory
+        )
+        if has_oss_creds
+        else None
+    )
 
     if gh_scanner and oss_scanner:
         return CompositeScanner(scanners=(gh_scanner, oss_scanner))
     return gh_scanner or oss_scanner
+
+
+def _prepare_cache_root(app_config: AppConfig, *, no_cache: bool, clear_cache_first: bool) -> Path:
+    """Apply the RFC-0029 cache-root resolution + lifecycle flags.
+
+    Returns the cache root the adapters should use for this run:
+
+    - ``no_cache=True`` → :func:`ephemeral_cache_root` (tempdir),
+      cleaned up at process exit. The persistent cache is left
+      untouched.
+    - ``clear_cache_first=True`` and not ``no_cache`` →
+      :func:`clear_cache` against the resolved persistent root,
+      then return that same root for the adapters to rebuild into.
+    - otherwise → the resolved persistent root.
+    """
+    if no_cache:
+        ephemeral = ephemeral_cache_root()
+        atexit.register(shutil.rmtree, ephemeral, ignore_errors=True)
+        return ephemeral
+
+    persistent = resolve_cache_root(app_config.cache)
+    if clear_cache_first:
+        clear_cache(persistent)
+    return persistent
 
 
 def create_check_command(
@@ -88,6 +131,9 @@ def create_check_command(
     module_usage: bool = False,
     risk_score: bool = False,
     app_config: AppConfig | None = None,
+    no_cache: bool = False,
+    clear_cache_first: bool = False,
+    cache_ttl_override: int | None = None,
 ) -> CheckCommand:
     """Return a fully wired :class:`~...presentation.commands.check_command.CheckCommand`.
 
@@ -99,9 +145,16 @@ def create_check_command(
         computation (opt-in; experimental — see ADR-0004).
         Defaults to ``False``.
     :param app_config: RFC-0012 application configuration. When ``None``,
-        defaults are used. The ``risk_weights`` and ``risk_thresholds``
-        sections are forwarded to the risk score; other sections are
-        reserved for future RFCs.
+        defaults are used. The ``risk_weights``, ``risk_thresholds``, and
+        ``cache`` sections are forwarded to the risk score and the cache
+        layer; other sections are reserved for future RFCs.
+    :param no_cache: RFC-0029 — bypass the persistent cache for this run.
+        The adapters write to an ephemeral tempdir cleaned up at exit;
+        the persistent cache is left untouched.
+    :param clear_cache_first: RFC-0029 — purge the persistent cache
+        before constructing adapters. No-op when ``no_cache=True``.
+    :param cache_ttl_override: RFC-0029 — when not ``None``, applies the
+        same TTL to every adapter (overrides per-source defaults).
 
     Concrete adapters created here:
 
@@ -113,10 +166,19 @@ def create_check_command(
     - :class:`~...infrastructure.writers.findings_csv_writer.FindingsCsvWriter`
     """
     cfg = app_config or AppConfig()
+    cache_root = _prepare_cache_root(cfg, no_cache=no_cache, clear_cache_first=clear_cache_first)
+    ttl_maven = (
+        cache_ttl_override if cache_ttl_override is not None else cfg.cache.ttl_seconds_maven
+    )
+    ttl_advisory = (
+        cache_ttl_override if cache_ttl_override is not None else cfg.cache.ttl_seconds_advisory
+    )
     parser = TomlCatalogParser()
-    scanner = _build_scanner()
+    scanner = _build_scanner(cache_root, ttl_advisory)
     gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    version_status_resolver = MavenVersionStatusResolver(cache_dir=_CACHE_ROOT / "maven")
+    version_status_resolver = MavenVersionStatusResolver(
+        cache_dir=cache_root / "maven", ttl=ttl_maven
+    )
     bom_resolver = MavenBomResolver()
     use_case = GenerateFreezeReport(
         catalog_parser=parser,
