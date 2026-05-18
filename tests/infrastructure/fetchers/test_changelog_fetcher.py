@@ -37,7 +37,7 @@ def _lib(alias: str, group: str, artifact: str, version: str = "2.9.0") -> Libra
 
 
 def _run(coro: Any) -> Any:
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 def _mock_transport(responses: dict[str, tuple[int, str | dict]]) -> httpx.MockTransport:
@@ -338,7 +338,7 @@ def _run_with_transport(
                     entries.append(entry)
         return tuple(entries)
 
-    return asyncio.get_event_loop().run_until_complete(_inner())
+    return asyncio.run(_inner())
 
 
 class TestChangelogFetcherNoUpgrade:

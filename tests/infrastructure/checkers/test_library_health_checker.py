@@ -40,7 +40,7 @@ def _lib(alias: str, group: str, artifact: str, version: str = "1.0.0") -> Libra
 
 
 def _run(coro: Any) -> Any:
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +326,7 @@ class TestPomRelocation:
                 results = await checker._run_http_checks(client, list(libraries))
             return tuple(results)
 
-        return asyncio.get_event_loop().run_until_complete(_inner())
+        return asyncio.run(_inner())
 
     def test_relocation_finding(self) -> None:
         checker = self._checker()
@@ -370,7 +370,7 @@ class TestInactivity:
                 results = await checker._run_http_checks(client, list(libraries))
             return tuple(results)
 
-        return asyncio.get_event_loop().run_until_complete(_inner())
+        return asyncio.run(_inner())
 
     def test_inactive_library_produces_finding(self) -> None:
         checker = self._checker()
