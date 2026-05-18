@@ -11,6 +11,33 @@ be assigned once a stable public API is established.
 ## [Unreleased]
 
 ### Added
+- `freeze-inventory.csv` enriched from the PR-#1 tracer's 3 columns
+  to **15 columns** — every dimension joined per library: `alias`,
+  `coordinate`, `version`, `stability_tier`, `latest_stable`,
+  `drift`, `risk_score`, `risk_level`, `usage_count`,
+  `vulnerability_count`, `compliance_issues`, `license_tier`,
+  `health_status`, `bom_parent`, **`duplicate_of`**. The new
+  `duplicate_of` column lists other catalog aliases sharing the
+  same `group:artifact` — closes issue #13 from the 2026-05
+  stress-test menu by making the compound story ("the duplicate
+  is the reason you're exposed to the older CVE") visible
+  at-a-glance when readers filter `vulnerability_count > 0` in
+  Excel. Empty-cell semantics: empty = "this dimension didn't
+  run / not applicable" (e.g. `risk_score` empty when
+  `--risk-score` flag is off); zero or value = "ran, this is the
+  result". RFC-0017 PR #2.
+- New `FindingsCsvWriter` emits `freeze-findings.csv` — one flat
+  row per finding across every section (Catalog Health,
+  Compliance, Toolchain, Library Health, Security, License,
+  Changelog). Columns: `section`, `rule_id`, `severity`,
+  `common_severity`, `target`, `message`, `recommendation`. Rows
+  sorted by `(section, target, rule_id)` for stable diff-able
+  output. Sections without a native `rule_id` field (Library
+  Health, License, Changelog-breaking) get a synthetic stable ID
+  derived from the finding subtype (e.g.
+  `library-health.inactive`, `license.strong_copyleft`,
+  `changelog.breaking`). Wired in the composition root alongside
+  the inventory writer. RFC-0017 PR #2 closes the RFC.
 - New `InventoryCsvWriter` emits `freeze-inventory.csv` alongside
   the existing `freeze.md` / `freeze.json` / `freeze-slack.json`
   outputs on every `check` run. Tracer scope (RFC-0017 PR #1 of 2):

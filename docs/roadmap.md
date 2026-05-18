@@ -89,7 +89,7 @@ policy enforcement for CI/CD.
 
 | Status | Item | Reference |
 |--------|------|-----------|
-| 🚧 | Comprehensive CSV Export (Inventory & Findings) | [RFC-0017](proposals/0017-csv-export.md) |
+| ✅ | Comprehensive CSV Export (Inventory & Findings) | [RFC-0017](proposals/0017-csv-export.md) |
 | 📋 | Official User Guide (English) | [RFC-0021](proposals/0021-user-guide.md) |
 | ✅ | High-Performance & Accurate Module Scanner | [RFC-0019](proposals/0019-module-scanner.md) |
 | ✅ | Robust Version Detection (Rich Versions) | [RFC-0020](proposals/0020-rich-versions.md) |
