@@ -54,6 +54,71 @@ _METADATA_WITHOUT_RELEASE = """\
 
 _METADATA_BAD_XML = "this is not xml <<<"
 
+# RFC-0027: the publisher sets <release> to a pre-release version
+# while the actual stable line continues in <versions>. Modelled on
+# the live com.google.protobuf:protoc metadata as observed on
+# 2026-05-17, where <release>21.0-rc-1</release> coexisted with
+# a 4.x.y stable line.
+_METADATA_PROTOC_SHAPE = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>com.google.protobuf</groupId>
+  <artifactId>protoc</artifactId>
+  <versioning>
+    <latest>21.0-rc-1</latest>
+    <release>21.0-rc-1</release>
+    <versions>
+      <version>4.29.2</version>
+      <version>4.30.0</version>
+      <version>4.34.0-RC1</version>
+      <version>4.34.1</version>
+      <version>4.35.0-RC2</version>
+      <version>21.0-rc-1</version>
+    </versions>
+    <lastUpdated>20260506230320</lastUpdated>
+  </versioning>
+</metadata>
+"""
+
+# RFC-0027: every version is a pre-release (alpha/beta/RC). After
+# the stability gate we must fall back to <release> rather than
+# returning None, so libraries that only ever publish pre-releases
+# continue to surface a usable "latest" string.
+_METADATA_NO_STABLE = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>com.example</groupId>
+  <artifactId>alpha-only-lib</artifactId>
+  <versioning>
+    <latest>1.0.0-alpha03</latest>
+    <release>1.0.0-alpha03</release>
+    <versions>
+      <version>1.0.0-alpha01</version>
+      <version>1.0.0-alpha02</version>
+      <version>1.0.0-alpha03</version>
+    </versions>
+  </versioning>
+</metadata>
+"""
+
+# RFC-0027: every version is 0.x.y (PRE_1_0 per RFC-0026). The
+# stability gate skips them all; fallback returns <release>.
+_METADATA_PRE_1_0_ONLY = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>com.example</groupId>
+  <artifactId>young-lib</artifactId>
+  <versioning>
+    <release>0.6.0</release>
+    <versions>
+      <version>0.1.0</version>
+      <version>0.5.0</version>
+      <version>0.6.0</version>
+    </versions>
+  </versioning>
+</metadata>
+"""
+
 # ---------------------------------------------------------------------------
 # Transport helpers
 # ---------------------------------------------------------------------------
@@ -130,7 +195,54 @@ async def test_returns_none_when_no_release_tag(cls: type, tmp_path: Path) -> No
         registry = _make(cls, c, tmp_path)
         result = await registry.get_latest("com.example", "lib")
 
-    assert result is None
+    # Versions list contains "1.0.0" (stable) — stability gate scans
+    # it and returns the latest stable per RFC-0027.
+    assert result == MavenVersion("1.0.0")
+
+
+# ---------------------------------------------------------------------------
+# RFC-0027 — stability-gated <release> fallback
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("cls", REGISTRY_CLASSES)
+async def test_falls_back_to_versions_when_release_is_prerelease(cls: type, tmp_path: Path) -> None:
+    """Live-observed protoc shape: <release> = RC, scan finds stable."""
+    async with _client({"maven-metadata.xml": (200, _METADATA_PROTOC_SHAPE)}) as c:
+        registry = _make(cls, c, tmp_path)
+        result = await registry.get_latest("com.google.protobuf", "protoc")
+
+    assert isinstance(result, MavenVersion)
+    # Reverse document order skips 21.0-rc-1 (RC) and 4.35.0-RC2 (RC),
+    # lands on 4.34.1 — the most recently published stable entry.
+    assert str(result) == "4.34.1"
+    assert result.stability is Stability.STABLE
+
+
+@pytest.mark.parametrize("cls", REGISTRY_CLASSES)
+async def test_falls_back_to_release_when_no_stable_in_versions(cls: type, tmp_path: Path) -> None:
+    """Alpha-only library: preserve current behaviour, return <release>."""
+    async with _client({"maven-metadata.xml": (200, _METADATA_NO_STABLE)}) as c:
+        registry = _make(cls, c, tmp_path)
+        result = await registry.get_latest("com.example", "alpha-only-lib")
+
+    assert isinstance(result, MavenVersion)
+    assert str(result) == "1.0.0-alpha03"
+    assert result.stability is Stability.ALPHA
+
+
+@pytest.mark.parametrize("cls", REGISTRY_CLASSES)
+async def test_pre_1_0_only_falls_back_to_release(cls: type, tmp_path: Path) -> None:
+    """PRE_1_0-only library: stability gate skips all, fallback returns <release>."""
+    async with _client({"maven-metadata.xml": (200, _METADATA_PRE_1_0_ONLY)}) as c:
+        registry = _make(cls, c, tmp_path)
+        result = await registry.get_latest("com.example", "young-lib")
+
+    assert isinstance(result, MavenVersion)
+    # Same final string as today, just via the fallback path. Per
+    # RFC-0026 this is PRE_1_0, not STABLE.
+    assert str(result) == "0.6.0"
+    assert result.stability is Stability.PRE_1_0
 
 
 # ---------------------------------------------------------------------------
