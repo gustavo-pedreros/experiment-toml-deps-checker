@@ -95,12 +95,15 @@ policy enforcement for CI/CD.
 | ✅ | Robust Version Detection (Rich Versions) | [RFC-0020](proposals/0020-rich-versions.md) |
 | 📋 | CI Gatekeeper (Policy Enforcement) | [RFC-0018](proposals/0018-ci-gatekeeper.md) |
 
-## Phase 6 — Real-world stress test follow-ups 🚧 In progress
+## Phase 6 — Real-world stress test follow-ups ✅ Closed (2026-05-18)
 
 Findings surfaced while running the tool end-to-end against real
 multi-module Android projects. Each item is a narrow bug fix or UX
 improvement that materially changes report quality but doesn't
-merit its own feature phase.
+merit its own feature phase. All seven items shipped; the original
+15-item stress-test menu was either resolved directly by one of
+these RFCs or rolled into RFC-0017 (CSV export) / RFC-0028
+(empty-section + console-bucket wrap-up).
 
 | Status | Item | Reference |
 |--------|------|-----------|
