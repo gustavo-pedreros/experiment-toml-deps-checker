@@ -107,7 +107,7 @@ placeholder and the CVE dimension of the risk score is zero.
 ## Configuration
 
 Drop a `gradle-deps-monitor.toml` next to your Gradle directory to override
-risk-score weights and thresholds. Every section is optional.
+risk-score weights, thresholds, and cache behaviour. Every section is optional.
 
 ```toml
 [risk_weights]      # must sum to 100
@@ -122,10 +122,28 @@ license      = 5
 critical = 80
 high     = 60
 medium   = 40
+
+[cache]             # all keys optional
+root                 = "~/.cache/gradle-deps-monitor"
+ttl_seconds_maven    = 3600         # Maven Central + Google Maven metadata
+ttl_seconds_advisory = 86400        # GitHub Advisory DB + OSS Index
 ```
 
 Resolution order: built-in defaults → `gradle-deps-monitor.toml` →
 environment variables → CLI flags ([RFC-0012](docs/proposals/0012-layered-configuration.md)).
+
+## Cache
+
+HTTP responses (Maven metadata, advisory queries) are cached on disk per the
+TTLs above. Three CLI flags adjust behaviour per run, and one env var
+relocates the cache root:
+
+| Knob | Effect |
+|---|---|
+| `--no-cache` | Bypass the persistent cache for this run. Adapters write to a tempdir cleaned up at exit; the persistent cache is left untouched. |
+| `--clear-cache` | Purge the persistent cache before the run. Adapters rebuild from fresh HTTP. |
+| `--cache-ttl SECONDS` | Override every adapter's TTL for this run. |
+| `GRADLE_DEPS_MONITOR_CACHE_ROOT` *(env)* | Override the cache root. Useful for CI runners with read-only `$HOME` or nix-style isolation. |
 
 ## Architecture
 

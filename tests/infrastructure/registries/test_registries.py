@@ -317,6 +317,55 @@ async def test_cache_stores_not_found(cls: type, tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# RFC-0029 — negative-cache namespacing
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("cls", REGISTRY_CLASSES)
+async def test_clear_negative_entries_purges_404s_only(cls: type, tmp_path: Path) -> None:
+    """``clear_negative_entries`` removes 404 entries; positives survive."""
+
+    call_count = {"hits": 0}
+
+    class _MixedTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+            call_count["hits"] += 1
+            url = str(request.url)
+            if "okhttp" in url:
+                return httpx.Response(200, text=_METADATA_WITH_RELEASE)
+            return httpx.Response(404)
+
+    async with httpx.AsyncClient(transport=_MixedTransport()) as c:
+        registry = _make(cls, c, tmp_path)
+        # Populate one positive + one negative cache entry.
+        await registry.get_latest("com.squareup.okhttp3", "okhttp")
+        await registry.get_latest("com.example", "missing")
+        baseline_hits = call_count["hits"]
+
+        removed = registry.clear_negative_entries()
+        assert removed == 1
+
+        # Positive entry still served from cache.
+        first = await registry.get_latest("com.squareup.okhttp3", "okhttp")
+        assert first == MavenVersion("4.12.0")
+        assert call_count["hits"] == baseline_hits  # no extra network call
+
+        # Negative entry was purged → triggers a fresh HTTP call.
+        second = await registry.get_latest("com.example", "missing")
+        assert second is None
+        assert call_count["hits"] == baseline_hits + 1
+
+
+@pytest.mark.parametrize("cls", REGISTRY_CLASSES)
+async def test_clear_negative_entries_returns_zero_on_clean_cache(
+    cls: type, tmp_path: Path
+) -> None:
+    async with _client({}) as c:
+        registry = _make(cls, c, tmp_path)
+        assert registry.clear_negative_entries() == 0
+
+
+# ---------------------------------------------------------------------------
 # URL construction
 # ---------------------------------------------------------------------------
 

@@ -96,6 +96,39 @@ def check(
             ),
         ),
     ] = False,
+    no_cache: Annotated[
+        bool,
+        typer.Option(
+            "--no-cache",
+            help=(
+                "Bypass the persistent on-disk cache for this run. Adapters write to "
+                "a tempdir cleaned up at exit; the persistent cache is left untouched. "
+                "RFC-0029."
+            ),
+        ),
+    ] = False,
+    clear_cache: Annotated[
+        bool,
+        typer.Option(
+            "--clear-cache",
+            help=(
+                "Purge the persistent cache before this run. Adapters rebuild the cache "
+                "from fresh HTTP responses. No-op when combined with --no-cache."
+            ),
+        ),
+    ] = False,
+    cache_ttl: Annotated[
+        int | None,
+        typer.Option(
+            "--cache-ttl",
+            help=(
+                "Override every adapter's cache TTL for this run (seconds). When unset, "
+                "per-source defaults apply (Maven 3600s, advisory 86400s) and may be "
+                "overridden via [cache] in gradle-deps-monitor.toml."
+            ),
+            min=0,
+        ),
+    ] = None,
 ) -> None:
     """Generate a freeze report for the given Gradle catalog directory."""
     if risk_score and not _has_cve_credentials():
@@ -120,6 +153,9 @@ def check(
             module_usage=module_usage,
             risk_score=risk_score,
             app_config=app_config,
+            no_cache=no_cache,
+            clear_cache_first=clear_cache,
+            cache_ttl_override=cache_ttl,
         ).run(catalog_path, output_dir)
     except CatalogParseError as exc:
         typer.echo(f"Error: {exc}", err=True)

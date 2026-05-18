@@ -19,7 +19,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from gradle_deps_monitor.domain.config import AppConfig
+from gradle_deps_monitor.domain.config import AppConfig, CacheConfig
 from gradle_deps_monitor.domain.risk_score import RiskThresholds, RiskWeights
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,8 +79,9 @@ def load_config(project_root: Path) -> AppConfig:
 
     weights = _parse_risk_weights(data.get("risk_weights"), config_path)
     thresholds = _parse_risk_thresholds(data.get("risk_thresholds"), config_path)
+    cache = _parse_cache(data.get("cache"), config_path)
 
-    return AppConfig(risk_weights=weights, risk_thresholds=thresholds)
+    return AppConfig(risk_weights=weights, risk_thresholds=thresholds, cache=cache)
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +153,61 @@ def _parse_risk_thresholds(section: Any, path: Path) -> RiskThresholds:
         return RiskThresholds(**values)
     except ValueError as exc:
         raise ConfigError(f"Invalid [risk_thresholds] in {path}: {exc}") from exc
+
+
+def _parse_cache(section: Any, path: Path) -> CacheConfig:
+    """Build a :class:`CacheConfig` from the optional ``[cache]`` table.
+
+    Recognised keys: ``root`` (string path), ``ttl_seconds_maven``
+    (int seconds), ``ttl_seconds_advisory`` (int seconds). Unknown
+    keys emit a warning and are ignored.
+    """
+    if section is None:
+        return CacheConfig()
+    if not isinstance(section, dict):
+        raise ConfigError(
+            f"Section [cache] in {path} must be a TOML table, got {type(section).__name__}."
+        )
+
+    defaults = CacheConfig()
+    field_names = ("root", "ttl_seconds_maven", "ttl_seconds_advisory")
+
+    root_value: Path | None = defaults.root
+    if "root" in section:
+        raw_root = section["root"]
+        if not isinstance(raw_root, str) or not raw_root.strip():
+            raise ConfigError(
+                f"Value for cache.root in {path} must be a non-empty string, "
+                f"got {type(raw_root).__name__} {raw_root!r}."
+            )
+        root_value = Path(raw_root).expanduser()
+
+    ttl_maven = (
+        _coerce_int(section["ttl_seconds_maven"], path, "cache.ttl_seconds_maven")
+        if "ttl_seconds_maven" in section
+        else defaults.ttl_seconds_maven
+    )
+    ttl_advisory = (
+        _coerce_int(section["ttl_seconds_advisory"], path, "cache.ttl_seconds_advisory")
+        if "ttl_seconds_advisory" in section
+        else defaults.ttl_seconds_advisory
+    )
+
+    if ttl_maven < 0 or ttl_advisory < 0:
+        raise ConfigError(
+            f"Cache TTL values in {path} must be >= 0 "
+            f"(ttl_seconds_maven={ttl_maven}, ttl_seconds_advisory={ttl_advisory})."
+        )
+
+    unknown = set(section) - set(field_names)
+    if unknown:
+        _LOGGER.warning("Unknown keys in [cache] in %s: %s (ignored)", path, sorted(unknown))
+
+    return CacheConfig(
+        root=root_value,
+        ttl_seconds_maven=ttl_maven,
+        ttl_seconds_advisory=ttl_advisory,
+    )
 
 
 # ---------------------------------------------------------------------------

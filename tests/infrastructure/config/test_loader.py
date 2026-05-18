@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from gradle_deps_monitor.domain.config import AppConfig
+from gradle_deps_monitor.domain.config import AppConfig, CacheConfig
 from gradle_deps_monitor.domain.risk_score import RiskThresholds, RiskWeights
 from gradle_deps_monitor.infrastructure.config.loader import (
     CONFIG_FILENAME,
@@ -228,13 +228,14 @@ foo = "bar"
         tmp_path: Path,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """``[cache]``, ``[output]``, ``[library_health]`` are reserved for future RFCs."""
+        """``[output]`` and ``[library_health]`` are reserved for future RFCs.
+
+        ``[cache]`` is no longer "reserved-but-unused"; it is wired in
+        RFC-0029 and has its own dedicated tests below.
+        """
         _write(
             tmp_path,
             """
-[cache]
-ttl_seconds = 7200
-
 [output]
 default_dir = "freeze-reports"
 
@@ -244,8 +245,10 @@ extra_kb_path = "ops/extra.yaml"
         )
         with caplog.at_level(logging.WARNING):
             cfg = load_config(tmp_path)
-        assert cfg == AppConfig()  # nothing wired yet
-        assert "cache" not in caplog.text.lower() or "ignored" not in caplog.text.lower()
+        # Risk weights and risk thresholds use defaults; cache also uses defaults.
+        assert cfg == AppConfig()
+        assert "output" not in caplog.text.lower() or "ignored" not in caplog.text.lower()
+        assert "library_health" not in caplog.text.lower() or "ignored" not in caplog.text.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -269,3 +272,75 @@ class TestMalformedInput:
     def test_empty_file_returns_defaults(self, tmp_path: Path) -> None:
         _write(tmp_path, "")
         assert load_config(tmp_path) == AppConfig()
+
+
+# ---------------------------------------------------------------------------
+# [cache] section (RFC-0029)
+# ---------------------------------------------------------------------------
+
+
+class TestCacheSection:
+    def test_missing_section_uses_defaults(self, tmp_path: Path) -> None:
+        _write(tmp_path, "")
+        cfg = load_config(tmp_path)
+        assert cfg.cache == CacheConfig()
+
+    def test_full_section_parsed(self, tmp_path: Path) -> None:
+        _write(
+            tmp_path,
+            """
+[cache]
+root = "/var/cache/gradle-deps-monitor"
+ttl_seconds_maven = 7200
+ttl_seconds_advisory = 3600
+""",
+        )
+        cfg = load_config(tmp_path)
+        assert cfg.cache.root == Path("/var/cache/gradle-deps-monitor")
+        assert cfg.cache.ttl_seconds_maven == 7200
+        assert cfg.cache.ttl_seconds_advisory == 3600
+
+    def test_partial_section_preserves_other_defaults(self, tmp_path: Path) -> None:
+        _write(tmp_path, "[cache]\nttl_seconds_advisory = 600\n")
+        cfg = load_config(tmp_path)
+        defaults = CacheConfig()
+        assert cfg.cache.root is None
+        assert cfg.cache.ttl_seconds_maven == defaults.ttl_seconds_maven
+        assert cfg.cache.ttl_seconds_advisory == 600
+
+    def test_unknown_keys_warn(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+        _write(tmp_path, "[cache]\nttl_seconds = 60\n")  # typo: no _maven / _advisory
+        with caplog.at_level(logging.WARNING):
+            load_config(tmp_path)
+        assert "ttl_seconds" in caplog.text
+        assert "ignored" in caplog.text
+
+    def test_section_must_be_table(self, tmp_path: Path) -> None:
+        _write(tmp_path, 'cache = "oops"')
+        with pytest.raises(ConfigError, match=r"\[cache\].*must be a TOML table"):
+            load_config(tmp_path)
+
+    def test_root_must_be_non_empty_string(self, tmp_path: Path) -> None:
+        _write(tmp_path, '[cache]\nroot = ""\n')
+        with pytest.raises(ConfigError, match="non-empty string"):
+            load_config(tmp_path)
+
+    def test_root_rejects_non_string(self, tmp_path: Path) -> None:
+        _write(tmp_path, "[cache]\nroot = 42\n")
+        with pytest.raises(ConfigError, match="non-empty string"):
+            load_config(tmp_path)
+
+    def test_ttl_must_be_integer(self, tmp_path: Path) -> None:
+        _write(tmp_path, "[cache]\nttl_seconds_maven = true\n")
+        with pytest.raises(ConfigError, match="must be an integer"):
+            load_config(tmp_path)
+
+    def test_negative_ttl_rejected(self, tmp_path: Path) -> None:
+        _write(tmp_path, "[cache]\nttl_seconds_maven = -1\n")
+        with pytest.raises(ConfigError, match="must be >= 0"):
+            load_config(tmp_path)
+
+    def test_root_with_tilde_is_expanded(self, tmp_path: Path) -> None:
+        _write(tmp_path, '[cache]\nroot = "~/.custom-cache"\n')
+        cfg = load_config(tmp_path)
+        assert cfg.cache.root == Path.home() / ".custom-cache"
