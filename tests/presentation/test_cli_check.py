@@ -60,19 +60,21 @@ def test_check_exits_zero_for_valid_catalog(tmp_path: Path) -> None:
     assert result.exit_code == 0
 
 
-def test_check_exits_nonzero_for_missing_toml(tmp_path: Path) -> None:
+def test_check_exits_config_error_for_missing_toml(tmp_path: Path) -> None:
+    """RFC-0018: parse failures map to exit code 3 (config error)."""
     gradle_dir = tmp_path / "gradle"
     gradle_dir.mkdir()  # no libs.versions.toml inside
     out = tmp_path / "reports"
     result = runner.invoke(app, ["check", str(gradle_dir), "--out", str(out)])
-    assert result.exit_code == 1
+    assert result.exit_code == 3
 
 
-def test_check_exits_nonzero_for_malformed_toml(tmp_path: Path) -> None:
+def test_check_exits_config_error_for_malformed_toml(tmp_path: Path) -> None:
+    """RFC-0018: parse failures map to exit code 3 (config error)."""
     gradle_dir = _make_gradle_dir(tmp_path, _MALFORMED_TOML)
     out = tmp_path / "reports"
     result = runner.invoke(app, ["check", str(gradle_dir), "--out", str(out)])
-    assert result.exit_code == 1
+    assert result.exit_code == 3
 
 
 # ---------------------------------------------------------------------------
@@ -243,3 +245,173 @@ def test_default_flags_are_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert captured["no_cache"] is False
     assert captured["clear_cache_first"] is False
     assert captured["cache_ttl_override"] is None
+
+
+# ---------------------------------------------------------------------------
+# RFC-0018 — CI Gatekeeper v1 (--fail-on-errors, --warn-on, exit codes)
+# ---------------------------------------------------------------------------
+
+
+def _stub_check_command_with(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    advisories: tuple[Any, ...] = (),
+) -> None:
+    """Replace ``bootstrap.create_check_command`` so the CLI returns a
+    pre-built FreezeReport whose ``has_*`` properties match the test
+    scenario, without touching the network or the real composition root."""
+    from gradle_deps_monitor.domain.catalog import Catalog
+    from gradle_deps_monitor.domain.report import FreezeReport
+
+    class _Stub:
+        def run(self, catalog_path: Path, _output_dir: Path) -> tuple[Any, list[Path]]:
+            empty_catalog = Catalog(source_path=catalog_path, libraries=(), plugins=(), bundles=())
+            return FreezeReport(catalog=empty_catalog, security_advisories=advisories), []
+
+    monkeypatch.setattr(bootstrap_module, "create_check_command", lambda **_: _Stub())
+
+
+def _critical_advisory_fixture() -> Any:
+    from gradle_deps_monitor.domain.advisory import (
+        Advisory,
+        AdvisorySeverity,
+        LibraryAdvisory,
+    )
+
+    return LibraryAdvisory(
+        alias="lib-a",
+        coordinate="g:art",
+        version="1.0.0",
+        advisories=(
+            Advisory(
+                ghsa_id="GHSA-aaaa-bbbb-cccc",
+                cve_id="CVE-2026-0001",
+                severity=AdvisorySeverity.CRITICAL,
+                summary="example",
+                fixed_version="2.0.0",
+                url="https://example.test/advisory",
+                source="github",
+            ),
+        ),
+    )
+
+
+def test_fail_on_errors_default_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """No flag → exit 0 even with critical CVE in report."""
+    _stub_check_command_with(monkeypatch, advisories=(_critical_advisory_fixture(),))
+    gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
+    result = runner.invoke(app, ["check", str(gradle_dir), "--out", str(tmp_path / "out")])
+    assert result.exit_code == 0
+
+
+def test_fail_on_errors_exits_one_with_critical_cve(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub_check_command_with(monkeypatch, advisories=(_critical_advisory_fixture(),))
+    gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
+    result = runner.invoke(
+        app,
+        ["check", str(gradle_dir), "--out", str(tmp_path / "out"), "--fail-on-errors"],
+    )
+    assert result.exit_code == 1
+    assert "Policy violations" in result.output
+
+
+def test_fail_on_errors_exits_zero_when_clean(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub_check_command_with(monkeypatch, advisories=())
+    gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
+    result = runner.invoke(
+        app,
+        ["check", str(gradle_dir), "--out", str(tmp_path / "out"), "--fail-on-errors"],
+    )
+    assert result.exit_code == 0
+
+
+def test_warn_on_exits_zero_even_with_warnings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from gradle_deps_monitor.domain.advisory import (
+        Advisory,
+        AdvisorySeverity,
+        LibraryAdvisory,
+    )
+
+    high = LibraryAdvisory(
+        alias="lib-h",
+        coordinate="g:art",
+        version="1.0",
+        advisories=(
+            Advisory(
+                ghsa_id="GHSA-hhhh",
+                cve_id=None,
+                severity=AdvisorySeverity.HIGH,
+                summary="example high",
+                fixed_version=None,
+                url="https://example.test/h",
+                source="github",
+            ),
+        ),
+    )
+    _stub_check_command_with(monkeypatch, advisories=(high,))
+    gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
+    result = runner.invoke(
+        app,
+        [
+            "check",
+            str(gradle_dir),
+            "--out",
+            str(tmp_path / "out"),
+            "--warn-on",
+            "high-vulnerability",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "Policy warnings" in result.output
+
+
+def test_warn_on_unknown_category_is_usage_error(tmp_path: Path) -> None:
+    """Unknown ``--warn-on`` value → exit code 2 (usage)."""
+    gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
+    result = runner.invoke(
+        app,
+        [
+            "check",
+            str(gradle_dir),
+            "--out",
+            str(tmp_path / "out"),
+            "--warn-on",
+            "not-a-real-category",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "not-a-real-category" in result.output
+
+
+def test_github_actions_annotation_emitted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """When running under GHA, each violation gets an ``::error`` line."""
+    _stub_check_command_with(monkeypatch, advisories=(_critical_advisory_fixture(),))
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
+    result = runner.invoke(
+        app,
+        ["check", str(gradle_dir), "--out", str(tmp_path / "out"), "--fail-on-errors"],
+    )
+    assert result.exit_code == 1
+    assert "::error file=" in result.output
+    assert "[security]" in result.output
+
+
+def test_github_actions_annotation_silent_when_env_unset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub_check_command_with(monkeypatch, advisories=(_critical_advisory_fixture(),))
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    gradle_dir = _make_gradle_dir(tmp_path, _ONE_LIBRARY_TOML)
+    result = runner.invoke(
+        app,
+        ["check", str(gradle_dir), "--out", str(tmp_path / "out"), "--fail-on-errors"],
+    )
+    assert result.exit_code == 1
+    assert "::error file=" not in result.output

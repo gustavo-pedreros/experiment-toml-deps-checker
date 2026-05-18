@@ -12,9 +12,21 @@ from typing import Annotated
 import typer
 
 from gradle_deps_monitor import __version__, bootstrap
+from gradle_deps_monitor.application.evaluate_policy import PolicyEvaluator
 from gradle_deps_monitor.application.ports.catalog_parser import CatalogParseError
+from gradle_deps_monitor.domain.policy import Policy, WarningCategory
 from gradle_deps_monitor.infrastructure.config.loader import ConfigError, load_config
 from gradle_deps_monitor.presentation.console import print_diff_summary, print_summary
+from gradle_deps_monitor.presentation.policy_output import (
+    emit_github_actions_annotations,
+    print_policy_section,
+)
+
+# Exit codes (RFC-0018 v1, ``sysexits.h`` style).
+_EXIT_OK = 0
+_EXIT_POLICY_VIOLATION = 1
+_EXIT_USAGE = 2
+_EXIT_CONFIG = 3
 
 
 def _has_cve_credentials() -> bool:
@@ -129,6 +141,29 @@ def check(
             min=0,
         ),
     ] = None,
+    fail_on_errors: Annotated[
+        bool,
+        typer.Option(
+            "--fail-on-errors",
+            help=(
+                "Exit with code 1 when any error-level finding is present "
+                "(critical CVE, compliance violation, toolchain error, "
+                "strong-copyleft license). RFC-0018."
+            ),
+        ),
+    ] = False,
+    warn_on: Annotated[
+        str | None,
+        typer.Option(
+            "--warn-on",
+            help=(
+                "Comma-separated warning categories to surface in a 'Policy "
+                "warnings' section (does not change exit code). Valid: "
+                "high-vulnerability, compliance, toolchain, library-health, "
+                "deprecated, breaking, license. RFC-0018."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Generate a freeze report for the given Gradle catalog directory."""
     if risk_score and not _has_cve_credentials():
@@ -140,13 +175,15 @@ def check(
             err=True,
         )
 
+    warn_categories = _parse_warn_on(warn_on)
+
     try:
         # The Gradle directory's parent is the project root by convention
         # (e.g. ``app/gradle`` → project root ``app``). RFC-0012.
         app_config = load_config(catalog_path.parent)
     except ConfigError as exc:
         typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+        raise typer.Exit(code=_EXIT_CONFIG) from exc
 
     try:
         report, written_files = bootstrap.create_check_command(
@@ -159,9 +196,41 @@ def check(
         ).run(catalog_path, output_dir)
     except CatalogParseError as exc:
         typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+        raise typer.Exit(code=_EXIT_CONFIG) from exc
 
     print_summary(report, written_files)
+
+    if fail_on_errors or warn_categories:
+        policy = Policy(
+            fail_on_errors=fail_on_errors,
+            warn_on=frozenset(warn_categories),
+        )
+        result = PolicyEvaluator().evaluate(report, policy)
+        print_policy_section(result)
+        emit_github_actions_annotations(result, catalog_path)
+        if result.should_fail:
+            raise typer.Exit(code=_EXIT_POLICY_VIOLATION)
+
+
+def _parse_warn_on(value: str | None) -> tuple[WarningCategory, ...]:
+    """Parse ``--warn-on a,b,c`` into a tuple of :class:`WarningCategory`.
+
+    Unknown categories raise :class:`typer.BadParameter`, which Typer
+    converts to exit code ``2`` (usage error per RFC-0018 v1).
+    """
+    if not value:
+        return ()
+    raw = [piece.strip() for piece in value.split(",") if piece.strip()]
+    out: list[WarningCategory] = []
+    valid = {c.value for c in WarningCategory}
+    for piece in raw:
+        if piece not in valid:
+            raise typer.BadParameter(
+                f"Unknown warning category {piece!r}. Valid: {', '.join(sorted(valid))}.",
+                param_hint="--warn-on",
+            )
+        out.append(WarningCategory(piece))
+    return tuple(out)
 
 
 @app.command()

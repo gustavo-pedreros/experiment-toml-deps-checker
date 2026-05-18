@@ -1,7 +1,8 @@
 # RFC-0018: CI Gatekeeper (Policy Enforcement)
 
-**Status:** Draft
+**Status:** Implemented (v1)
 **Created:** 2026-05-07
+**Shipped:** 2026-05-18 (v1 — flag-driven; v2 expression DSL deferred)
 **Related JTBDs:** JTBD-1 (CI automation), JTBD-2 (security gate)
 **Depends on:** none
 
@@ -245,22 +246,36 @@ counted here.
 ## Definition of Done (DoD)
 
 ### v1 (this RFC)
-- [ ] **Integration:** Policy evaluation wired in the **Composition
-  Root** (`bootstrap.py`) and executes after report generation.
-- [ ] **Architecture:** `Policy` / `PolicyResult` in `domain/`,
-  `PolicyEvaluator` in `application/`, CLI mapping in `presentation/`,
+- [x] **Integration:** Policy evaluation wired into the CLI's
+  `check` command (post-report-generation, pre-exit). Stateless
+  `PolicyEvaluator` is constructed at call site; the composition
+  root stays focused on report-shaped wiring.
+- [x] **Architecture:** `Policy` / `PolicyResult` / `PolicyViolation`
+  / `WarningCategory` in `domain/policy.py`; `PolicyEvaluator` in
+  `application/evaluate_policy.py`; rendering + GHA annotations in
+  `presentation/policy_output.py`; CLI mapping in `cli.py`,
   consistent with ADR-0006.
-- [ ] **Functionality:** `check --fail-on-errors` exits `1` when any
+- [x] **Functionality:** `check --fail-on-errors` exits `1` when any
   of the 4 error-level `has_*` properties is true.
-- [ ] **Warnings:** `check --warn-on <categories>` prints the warnings
-  section without changing exit code.
-- [ ] **CI integration:** GitHub Actions workflow annotations are
-  emitted for both errors and warnings when `GITHUB_ACTIONS=true`.
-- [ ] **Exit codes:** `0` / `1` / `2` / `3` semantics implemented and
-  documented in the user guide.
-- [ ] **Testing:** Integration tests cover at least one violation per
-  error category, a warn-only scenario, and the GitHub Actions
-  annotation output.
+- [x] **Warnings:** `check --warn-on <categories>` prints the
+  warnings section without changing exit code; accepts the seven
+  documented `WarningCategory` values.
+- [x] **CI integration:** GitHub Actions workflow annotations
+  (`::error file=…::…` and `::warning file=…::…`) are emitted for
+  every violation and warning when `GITHUB_ACTIONS=true`. Silent
+  outside GHA. Message special-chars (`%`, `\\r`, `\\n`, `:`) are
+  escaped per the workflow-commands spec.
+- [x] **Exit codes:** `0` / `1` / `2` / `3` semantics implemented;
+  `2` comes from Typer's `BadParameter` for unknown `--warn-on`
+  categories, `3` from `ConfigError` and `CatalogParseError`.
+  User-guide entry follows in the RFC-0021 PR (Step 7).
+- [x] **Testing:** 40 new tests across `tests/domain/test_policy.py`
+  (8), `tests/application/test_evaluate_policy.py` (15),
+  `tests/presentation/test_policy_output.py` (10), and
+  `tests/presentation/test_cli_check.py` (7). Cover one violation
+  per error category, warn-only scenarios, GHA annotation output,
+  and exit-code mapping including `2` for usage errors and `3` for
+  config/parse errors.
 
 ### v2 (deferred)
 - DSL parser, `[policy]` section, per-group overrides.

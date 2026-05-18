@@ -10,7 +10,30 @@ be assigned once a stable public API is established.
 
 ## [Unreleased]
 
+### Added
+- **CI Gatekeeper v1** (RFC-0018, closes one of two Phase 5
+  commitments). Two new opt-in flags on `check`:
+  `--fail-on-errors` exits with code `1` when any error-level
+  finding is present (critical CVE, compliance violation, toolchain
+  error, strong-copyleft license); `--warn-on <category[,…]>`
+  surfaces a `Policy warnings` console section without changing the
+  exit code, accepting any of `high-vulnerability`, `compliance`,
+  `toolchain`, `library-health`, `deprecated`, `breaking`,
+  `license`. Under GitHub Actions (`GITHUB_ACTIONS=true`), the CLI
+  also emits one `::error file=…::…` or `::warning file=…::…`
+  annotation per finding so reviewers see them inline on the PR
+  diff. v2 expression DSL (`--fail-on "risk_score > 80"`) stays
+  deferred to a follow-up RFC.
+
 ### Changed
+- **Exit-code semantics tightened** to match RFC-0018 v1
+  (`sysexits.h`-style): `0` success, `1` policy violation,
+  `2` usage error (e.g. unknown `--warn-on` category), `3`
+  configuration error (TOML unreadable, malformed, or
+  `libs.versions.toml` missing). Pre-fix configuration errors and
+  parse errors both exited with code `1`, conflating "broken
+  catalog" with "the gatekeeper said no". Pre-1.0 break — no
+  shipped release exposed the previous mapping.
 - **Atomic report writes** (RFC-0032, Phase 7 — Stability Hardening).
   All 8 writers (Markdown / JSON / Slack for both `check` and `diff`,
   plus inventory and findings CSV) now serialise through a shared
