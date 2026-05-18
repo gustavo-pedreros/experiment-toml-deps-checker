@@ -109,6 +109,7 @@ merit its own feature phase.
 | ✅ | Async Vulnerability Scanners + Changelog Scraper Observability | [RFC-0024](proposals/0024-async-scanners-scraper-observability.md) |
 | ✅ | Parallel Orchestration of Independent Adapter Stages | [RFC-0025](proposals/0025-parallel-use-case-orchestration.md) |
 | ✅ | `PRE_1_0` Stability Tier for `0.x.y` Versions | [RFC-0026](proposals/0026-pre-1-0-stability-tier.md) |
+| 🚧 | Stability-Gated `<release>` Fallback in Version Registries | [RFC-0027](proposals/0027-version-registry-stability-gate.md) |
 
 ## Backlog
 

@@ -76,9 +76,40 @@ class MavenMetadataRegistry:
 
 
 def _parse_release(xml_text: str, group: str, artifact: str) -> str | None:
-    """Extract the ``<release>`` version from Maven metadata XML."""
+    """Extract the latest stable version from Maven metadata XML.
+
+    Trusts the publisher's ``<versioning><release>`` tag when it
+    classifies as :attr:`~...domain.version.Stability.STABLE`. When
+    the publisher tags a pre-release as ``<release>`` (live observed
+    for ``com.google.protobuf:protoc`` where ``<release>`` was set
+    to ``21.0-rc-1``), falls back to scanning
+    ``<versioning><versions><version>`` in reverse document order
+    for the most recent stable entry. Maven Central writes
+    ``<version>`` entries in publishing order, so reverse iteration
+    yields the most recently released stable artifact across all
+    release lines maintained at the coordinate.
+
+    Preserves today's behaviour for the edge cases where no stable
+    is available: returns the original ``<release>`` tag (or
+    ``None`` when also missing) rather than ``None`` outright, so
+    libraries that only ever publish alpha/beta releases continue
+    to surface a usable "latest" string instead of collapsing to
+    drift = UNKNOWN. RFC-0027.
+    """
     try:
         root = ET.fromstring(xml_text)
-        return root.findtext("versioning/release") or None
     except ET.ParseError as exc:
         raise VersionRegistryError(f"XML parse error for {group}:{artifact}: {exc}") from exc
+
+    release = root.findtext("versioning/release") or None
+    if release and MavenVersion(release).is_stable:
+        return release
+
+    # Publisher tag missing or pre-release — scan versions list in
+    # reverse document order for the latest stable entry.
+    for v in reversed(root.findall("versioning/versions/version")):
+        text = v.text
+        if text and MavenVersion(text).is_stable:
+            return text
+
+    return release

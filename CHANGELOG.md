@@ -46,6 +46,28 @@ be assigned once a stable public API is established.
   new field is always present (default zeros when no scraping ran).
 
 ### Fixed
+- `MavenMetadataRegistry._parse_release` no longer reports
+  **pre-release versions as "latest"** when the publisher sets
+  the `<release>` tag to one. Pre-fix the resolver trusted
+  `<versioning><release>` verbatim, which produced actively wrong
+  reports for libraries whose publishers tagged an RC/alpha as
+  `<release>`. Live-validated case:
+  `com.google.protobuf:protoc` had both `<latest>21.0-rc-1</latest>`
+  and `<release>21.0-rc-1</release>` (Mar 2022, RC) while the
+  actual stable line continued in 4.x.y up to `4.34.1`. A user
+  pinned at `4.29.2` was told "17 majors behind" pointing at a
+  release 2.5 years older than what they had. Post-fix: if
+  `MavenVersion(<release>).is_stable` is False, the resolver
+  scans `<versioning><versions><version>` in reverse document
+  order for the latest stable entry. Maven Central writes versions
+  in publishing order so reverse iteration yields the most
+  recently released stable artifact across all release lines.
+  Falls back to the original `<release>` tag when no stable
+  exists in the versions list, so alpha-only libraries continue
+  to surface a usable "latest" string. Side benefit: a missing
+  `<release>` tag with a populated `<versions>` list now also
+  resolves to the latest stable instead of returning None.
+  RFC-0027 / issue #14 from the 2026-05 stress-test menu.
 - `LibraryHealthChecker` no longer false-flags **JSR / Jakarta EE
   reference implementations as abandoned**. Any library whose group is
   exactly `javax`, `jakarta`, or a sub-namespace of either now skips

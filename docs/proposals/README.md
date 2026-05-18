@@ -119,6 +119,7 @@ splitting into sub-RFCs.
 | [0024](0024-async-scanners-scraper-observability.md) | Async Vulnerability Scanners + Changelog Scraper Observability | Proposed | 5, 6 |
 | [0025](0025-parallel-use-case-orchestration.md) | Parallel Orchestration of Independent Adapter Stages | Proposed | 5, 6 |
 | [0026](0026-pre-1-0-stability-tier.md) | `PRE_1_0` Stability Tier for `0.x.y` Versions | Proposed | 1, 5 |
+| [0027](0027-version-registry-stability-gate.md) | Stability-Gated `<release>` Fallback in Version Registries | Proposed | 1, 5 |
 
 > Lifecycle status (Accepted, In progress, Shipped) is tracked in
 > [`docs/roadmap.md`](../roadmap.md). The "Status" column above
