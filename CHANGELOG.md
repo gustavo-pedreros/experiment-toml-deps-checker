@@ -11,6 +11,18 @@ be assigned once a stable public API is established.
 ## [Unreleased]
 
 ### Added
+- New `InventoryCsvWriter` emits `freeze-inventory.csv` alongside
+  the existing `freeze.md` / `freeze.json` / `freeze-slack.json`
+  outputs on every `check` run. Tracer scope (RFC-0017 PR #1 of 2):
+  three columns — `alias`, `coordinate`, `version` — one row per
+  catalog library, header row included. Excel-compatible CSV via
+  the stdlib `csv` module with `QUOTE_MINIMAL`; UTF-8 without BOM
+  (the BOM breaks Python consumers). Subsequent PR #2 enriches
+  inventory with drift, risk score, vulnerability count, license
+  tier, BoM parent, and a `duplicate_of` column that cross-section-
+  joins Catalog Health's duplicate-library finding with per-library
+  CVE data (addressing issue #13 from the 2026-05 stress-test
+  menu). RFC-0017 PR #1.
 - New `Stability.PRE_1_0` enum value for naked `0.x.y` numeric
   versions. Per SemVer §4 ("major version zero is for initial
   development; anything may change at any time") a `0.5.0` pin
