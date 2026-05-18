@@ -19,6 +19,7 @@ class Stability(StrEnum):
     """Coarse-grained stability tier of a Maven version string."""
 
     STABLE = "stable"
+    PRE_1_0 = "pre_1_0"
     RC = "rc"
     BETA = "beta"
     ALPHA = "alpha"
@@ -33,7 +34,10 @@ class MavenVersion:
 
     Parsing stays intentionally simple: no full Maven version-ordering
     semantics. The :attr:`stability` property covers the common Android/
-    Kotlin pre-release naming conventions (alpha, beta, rc, dev, SNAPSHOT).
+    Kotlin pre-release naming conventions (alpha, beta, rc, dev, SNAPSHOT)
+    and treats naked ``0.x.y`` numeric versions as :attr:`Stability.PRE_1_0`
+    per SemVer §4 ("major version zero is for initial development; anything
+    may change at any time").
     """
 
     raw: str
@@ -51,6 +55,11 @@ class MavenVersion:
         if _DEV.search(self.raw):
             return Stability.DEV
         if _NUMERIC_ONLY.match(self.raw):
+            # SemVer §4: a ``0.y.z`` release explicitly disclaims API
+            # stability. Suffix-qualified ``0.x.y-*`` already classified
+            # above by the suffix (the qualifier is the stronger signal).
+            if self.raw.split(".", 1)[0] == "0":
+                return Stability.PRE_1_0
             return Stability.STABLE
         return Stability.UNKNOWN
 
@@ -60,7 +69,12 @@ class MavenVersion:
 
     @property
     def is_prerelease(self) -> bool:
-        return self.stability not in {Stability.STABLE, Stability.UNKNOWN}
+        # PRE_1_0 is intentionally excluded: ``is_prerelease`` means
+        # "the publisher tagged this artifact with a pre-release
+        # suffix" (alpha/beta/rc/dev/snapshot), not "the publisher
+        # hasn't reached their first stable major". The two axes are
+        # tracked separately.
+        return self.stability not in {Stability.STABLE, Stability.PRE_1_0, Stability.UNKNOWN}
 
     def __str__(self) -> str:
         return self.raw

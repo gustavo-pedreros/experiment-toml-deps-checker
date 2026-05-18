@@ -25,7 +25,7 @@ from gradle_deps_monitor.domain.version_status import LibraryVersionStatus
 #   - MINOR (1.x.0): additive changes (new fields, new optional values)
 #   - PATCH (1.0.x): wire-format-equivalent changes
 # Consumers reading 1.x MUST tolerate unknown fields and unknown enum values.
-SCHEMA_VERSION = "1.6.0"
+SCHEMA_VERSION = "1.7.0"
 
 
 class JsonWriter:
