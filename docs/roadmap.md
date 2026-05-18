@@ -108,7 +108,7 @@ merit its own feature phase.
 | ✅ | License Classifier — GPL with Classpath Exception | [RFC-0023](proposals/0023-license-classpath-exception.md) |
 | ✅ | Async Vulnerability Scanners + Changelog Scraper Observability | [RFC-0024](proposals/0024-async-scanners-scraper-observability.md) |
 | ✅ | Parallel Orchestration of Independent Adapter Stages | [RFC-0025](proposals/0025-parallel-use-case-orchestration.md) |
-| 🚧 | `PRE_1_0` Stability Tier for `0.x.y` Versions | [RFC-0026](proposals/0026-pre-1-0-stability-tier.md) |
+| ✅ | `PRE_1_0` Stability Tier for `0.x.y` Versions | [RFC-0026](proposals/0026-pre-1-0-stability-tier.md) |
 
 ## Backlog
 

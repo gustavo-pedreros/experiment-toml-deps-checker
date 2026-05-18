@@ -1,7 +1,8 @@
 # RFC-0026: `PRE_1_0` Stability Tier for `0.x.y` Versions
 
-**Status:** Proposed
+**Status:** Implemented
 **Created:** 2026-05-17
+**Shipped:** 2026-05-17 (PR #56)
 **Related JTBDs:** JTBD-5 (report accuracy), JTBD-1 (informed upgrade decisions)
 **Depends on:** RFC-0008 (JSON schema SemVer convention)
 
