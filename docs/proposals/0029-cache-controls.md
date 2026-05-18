@@ -1,7 +1,8 @@
 # RFC-0029: Cache Controls — CLI Flags, Env-Var Root, Per-Source TTL, Negative-Cache Namespacing
 
-**Status:** Proposed
+**Status:** Implemented
 **Created:** 2026-05-18
+**Shipped:** 2026-05-18 (PR #63)
 **Related JTBDs:** JTBD-3 (reproducible runs), JTBD-5 (operator control)
 **Depends on:** RFC-0012 (layered configuration), ADR-0006 (clean architecture)
 
