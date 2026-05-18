@@ -31,8 +31,6 @@ from gradle_deps_monitor.infrastructure.registries._base import MavenMetadataReg
 from gradle_deps_monitor.infrastructure.registries.google_maven import GoogleMavenRegistry
 from gradle_deps_monitor.infrastructure.registries.maven_central import MavenCentralRegistry
 
-_HTTP_TIMEOUT_SECONDS = 10.0
-
 # Group prefixes that are first-class on Google Maven. Hits to Maven
 # Central for these groups will frequently 404, so trying Google first
 # saves a round-trip on the common case.
@@ -62,8 +60,9 @@ class MavenVersionStatusResolver:
         # RFC-0030: the resilient transport handles transient 429 / 5xx
         # and network blips; per-library errors that still surface get
         # the existing fallback (UNKNOWN drift) in ``_resolve_one``.
-        policy = HttpPolicy(timeout_seconds=_HTTP_TIMEOUT_SECONDS)
-        async with make_resilient_client(policy=policy) as client:
+        # 10 s timeout matches the BoM resolver — both hit the same
+        # Maven registries from the same use case.
+        async with make_resilient_client(policy=HttpPolicy(timeout_seconds=10.0)) as client:
             mc = MavenCentralRegistry(client, self._cache_dir, self._ttl)
             gm = GoogleMavenRegistry(client, self._cache_dir, self._ttl)
             tasks = [self._resolve_one(lib, mc, gm) for lib in libraries]

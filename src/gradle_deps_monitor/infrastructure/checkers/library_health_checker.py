@@ -29,8 +29,6 @@ _MAVEN_CENTRAL_BASE = "https://repo1.maven.org/maven2"
 _INACTIVE_DAYS = 730  # 24 months → MEDIUM
 _ABANDONED_DAYS = 1095  # 36 months → HIGH
 
-# HTTP request timeout (seconds).
-_HTTP_TIMEOUT = 15.0
 # RFC-0030: cap concurrent per-library Maven-metadata + POM requests
 # during ``_run_http_checks`` so a 170-library catalog doesn't open
 # 170 simultaneous connections to Maven Central.
@@ -230,9 +228,9 @@ class LibraryHealthChecker:
             # RFC-0030: resilient transport adds retry/backoff;
             # ``_run_http_checks`` caps concurrency to
             # ``_MAX_CONCURRENT_REQUESTS`` via Semaphore.
-            policy = HttpPolicy(
-                timeout_seconds=_HTTP_TIMEOUT, max_concurrency=_MAX_CONCURRENT_REQUESTS
-            )
+            # RFC-0030: 15 s tolerates Maven Central tail latency on
+            # POM + maven-metadata.xml fetches.
+            policy = HttpPolicy(timeout_seconds=15.0, max_concurrency=_MAX_CONCURRENT_REQUESTS)
             async with make_resilient_client(policy=policy) as client:
                 http_findings = await self._run_http_checks(client, unchecked)
                 findings.extend(http_findings)

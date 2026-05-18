@@ -10,7 +10,30 @@ be assigned once a stable public API is established.
 
 ## [Unreleased]
 
+### Changed
+- **HTTP-resilience policy consolidated** (RFC-0030 PR3, closes RFC).
+  Every adapter's per-module `_HTTP_TIMEOUT = …` constant was
+  retired — call sites now construct `HttpPolicy(timeout_seconds=…)`
+  inline with a one-line comment naming the rationale. Per-adapter
+  rationale was lifted into the `HttpPolicy` docstring at
+  `infrastructure/_shared/http/policy.py`; the `_shared/http/`
+  package docstring now lists every adopter. Behaviour-preserving;
+  the consolidation reduces three sources of truth (the constant,
+  the call site, and any half-stale docstring) to one.
+- **`PomLicenseChecker.__init__` no longer accepts `http_timeout`**.
+  The parameter was unused by every caller (bootstrap + tests
+  always used the default). Removing it keeps the constructor in
+  step with the other adapters that get their timeout exclusively
+  from `HttpPolicy`. Acceptable breakage at pre-1.0 — no shipped
+  release exposed the parameter.
+
 ### Added
+- **`MavenBomResolver` migrated to the resilient transport**
+  (RFC-0030 PR3 catch-up). It was overlooked in PR2 because it
+  lives under `infrastructure/resolvers/` (not `scanners/` or
+  `fetchers/`). It hits the same Maven registries as
+  `MavenVersionStatusResolver`, so it now shares the same 10 s
+  policy.
 - **HTTP resilience rolled out across every outbound adapter**
   (RFC-0030 PR2, Phase 7 — Stability Hardening). `OssIndexScanner`,
   `ChangelogFetcher`, `MavenVersionStatusResolver` (which owns both

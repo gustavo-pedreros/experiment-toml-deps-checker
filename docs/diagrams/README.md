@@ -25,6 +25,16 @@ underlying structure shifts, edit the SVG directly.
 - **Dashed red arrows** = forbidden import direction (enforced by `import-linter`)
 - **Orange** = external HTTP services (Maven Central, etc.)
 
+## HTTP resilience
+
+Every outbound HTTP adapter on diagram 03 (`infrastructure/_shared/http`
+arrow targets) builds its `httpx.AsyncClient` through
+`make_resilient_client(...)`. The shared transport handles retry on
+429 / 5xx / `RequestError`, exponential backoff with full jitter, and
+`Retry-After` honoring. See `docs/proposals/0030-http-resilience.md`
+and the docstrings under `src/gradle_deps_monitor/infrastructure/_shared/http/`
+for per-adapter timeout rationale.
+
 ## Regenerating
 
 These SVGs are source-of-truth artefacts — no build step. To update,

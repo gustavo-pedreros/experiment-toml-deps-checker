@@ -1,7 +1,8 @@
 # RFC-0030: HTTP Resilience — Shared Transport with Retry, Backoff, Rate-Limit Awareness
 
-**Status:** Proposed
+**Status:** Implemented
 **Created:** 2026-05-18
+**Shipped:** 2026-05-18 (PR #64 tracer + PR #65 rollout + this PR cleanup)
 **Related JTBDs:** JTBD-3 (reproducible runs), JTBD-1 (informed decisions)
 **Depends on:** ADR-0006 (clean architecture), RFC-0024 (async scanners observability)
 
