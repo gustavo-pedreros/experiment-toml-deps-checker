@@ -18,8 +18,6 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-import httpx
-
 from gradle_deps_monitor.application.ports.version_registry import VersionRegistryError
 from gradle_deps_monitor.domain.catalog import Library
 from gradle_deps_monitor.domain.version import MavenVersion
@@ -28,11 +26,12 @@ from gradle_deps_monitor.domain.version_status import (
     VersionDrift,
     compute_drift,
 )
+from gradle_deps_monitor.infrastructure._shared.http import HttpPolicy, make_resilient_client
 from gradle_deps_monitor.infrastructure.registries._base import MavenMetadataRegistry
 from gradle_deps_monitor.infrastructure.registries.google_maven import GoogleMavenRegistry
 from gradle_deps_monitor.infrastructure.registries.maven_central import MavenCentralRegistry
 
-_HTTP_TIMEOUT = httpx.Timeout(10.0)
+_HTTP_TIMEOUT_SECONDS = 10.0
 
 # Group prefixes that are first-class on Google Maven. Hits to Maven
 # Central for these groups will frequently 404, so trying Google first
@@ -60,7 +59,11 @@ class MavenVersionStatusResolver:
         if not libraries:
             return ()
 
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+        # RFC-0030: the resilient transport handles transient 429 / 5xx
+        # and network blips; per-library errors that still surface get
+        # the existing fallback (UNKNOWN drift) in ``_resolve_one``.
+        policy = HttpPolicy(timeout_seconds=_HTTP_TIMEOUT_SECONDS)
+        async with make_resilient_client(policy=policy) as client:
             mc = MavenCentralRegistry(client, self._cache_dir, self._ttl)
             gm = GoogleMavenRegistry(client, self._cache_dir, self._ttl)
             tasks = [self._resolve_one(lib, mc, gm) for lib in libraries]

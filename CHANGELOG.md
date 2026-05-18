@@ -11,6 +11,22 @@ be assigned once a stable public API is established.
 ## [Unreleased]
 
 ### Added
+- **HTTP resilience rolled out across every outbound adapter**
+  (RFC-0030 PR2, Phase 7 — Stability Hardening). `OssIndexScanner`,
+  `ChangelogFetcher`, `MavenVersionStatusResolver` (which owns both
+  `MavenCentralRegistry` and `GoogleMavenRegistry`), `PomLicenseChecker`,
+  and `LibraryHealthChecker` now build their `httpx.AsyncClient` via
+  `make_resilient_client(...)`. Transient 429 / 5xx / network errors
+  retry with full-jitter exponential backoff and `Retry-After` honoring
+  before bubbling up. Per-adapter policy: timeouts unchanged from
+  pre-RFC values (10 s Maven, 15 s changelog/license/library-health,
+  30 s OSS Index) — the cleanup PR (Step 3c) will consolidate them.
+- **Concurrency caps for previously-unbounded adapters** (RFC-0030 PR2).
+  `ChangelogFetcher` and `LibraryHealthChecker._run_http_checks` wrap
+  their per-library `asyncio.gather` calls in an `asyncio.Semaphore`
+  bounded by `_MAX_CONCURRENT_REQUESTS = 20`, matching
+  `GitHubAdvisoryScanner`'s pattern. A 170-library catalog no longer
+  fans out 170 simultaneous Maven / GitHub connections.
 - **Shared HTTP resilience layer** (RFC-0030 PR1, Phase 7 — Stability
   Hardening). New `infrastructure/_shared/http/` package exposing
   `HttpPolicy` (timeout / max_attempts / backoff / concurrency tunables),

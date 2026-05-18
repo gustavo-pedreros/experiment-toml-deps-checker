@@ -17,6 +17,7 @@ from gradle_deps_monitor.domain.library_health import (
     LibraryHealthFinding,
     LibraryHealthSeverity,
 )
+from gradle_deps_monitor.infrastructure._shared.http import HttpPolicy, make_resilient_client
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -30,6 +31,10 @@ _ABANDONED_DAYS = 1095  # 36 months → HIGH
 
 # HTTP request timeout (seconds).
 _HTTP_TIMEOUT = 15.0
+# RFC-0030: cap concurrent per-library Maven-metadata + POM requests
+# during ``_run_http_checks`` so a 170-library catalog doesn't open
+# 170 simultaneous connections to Maven Central.
+_MAX_CONCURRENT_REQUESTS = 20
 
 # Groups published exclusively on Google Maven — skip inactivity check.
 _GOOGLE_GROUPS = frozenset(
@@ -222,7 +227,13 @@ class LibraryHealthChecker:
         unchecked = [lib for lib in libraries if lib.alias not in curated_aliases]
 
         if unchecked:
-            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+            # RFC-0030: resilient transport adds retry/backoff;
+            # ``_run_http_checks`` caps concurrency to
+            # ``_MAX_CONCURRENT_REQUESTS`` via Semaphore.
+            policy = HttpPolicy(
+                timeout_seconds=_HTTP_TIMEOUT, max_concurrency=_MAX_CONCURRENT_REQUESTS
+            )
+            async with make_resilient_client(policy=policy) as client:
                 http_findings = await self._run_http_checks(client, unchecked)
                 findings.extend(http_findings)
 
@@ -255,8 +266,18 @@ class LibraryHealthChecker:
     async def _run_http_checks(
         self, client: httpx.AsyncClient, libraries: list[Library]
     ) -> list[LibraryHealthFinding]:
-        tasks = [self._check_library(client, lib) for lib in libraries]
-        results: list[LibraryHealthFinding | None] = await asyncio.gather(*tasks)
+        # RFC-0030: cap per-library concurrency. Maven Central tolerates
+        # bursts but a 170-library catalog would otherwise open 170
+        # simultaneous connections.
+        sem = asyncio.Semaphore(_MAX_CONCURRENT_REQUESTS)
+
+        async def _one(lib: Library) -> LibraryHealthFinding | None:
+            async with sem:
+                return await self._check_library(client, lib)
+
+        results: list[LibraryHealthFinding | None] = await asyncio.gather(
+            *(_one(lib) for lib in libraries)
+        )
         return [f for f in results if f is not None]
 
     async def _check_library(

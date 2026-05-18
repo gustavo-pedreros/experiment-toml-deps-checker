@@ -15,6 +15,7 @@ from gradle_deps_monitor.domain.advisory import (
     LibraryAdvisory,
 )
 from gradle_deps_monitor.domain.catalog import Library
+from gradle_deps_monitor.infrastructure._shared.http import HttpPolicy, make_resilient_client
 
 _API_URL = "https://ossindex.sonatype.org/api/v3/component-report"
 _CACHE_PREFIX = "ossidx"
@@ -100,7 +101,11 @@ class OssIndexScanner:
         if self._client is not None:
             return await self._scan_with(self._client, libraries)
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # RFC-0030: resilient transport adds retry/backoff/Retry-After
+        # honoring transparently. OSS Index batches sequentially in
+        # ``_batch_fetch`` (line ~150), so no Semaphore is needed here.
+        policy = HttpPolicy(timeout_seconds=30.0)
+        async with make_resilient_client(policy=policy) as client:
             return await self._scan_with(client, libraries)
 
     async def _scan_with(

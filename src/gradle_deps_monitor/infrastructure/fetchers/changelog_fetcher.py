@@ -34,6 +34,7 @@ import httpx
 
 from gradle_deps_monitor.domain.catalog import Library
 from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry, ChangelogFetchStats
+from gradle_deps_monitor.infrastructure._shared.http import HttpPolicy, make_resilient_client
 from gradle_deps_monitor.infrastructure._shared.http.rate_limit import (
     is_rate_limited as _shared_is_rate_limited,
 )
@@ -48,6 +49,10 @@ _GITHUB_API_BASE = "https://api.github.com"
 _GITHUB_RAW_BASE = "https://raw.githubusercontent.com"
 
 _HTTP_TIMEOUT = 15.0
+# RFC-0030: cap concurrent requests so a catalog with 50+ major
+# upgrades doesn't open 50+ simultaneous GitHub Releases API
+# connections. Matches the GitHub Advisory Scanner's cap.
+_MAX_CONCURRENT_REQUESTS = 20
 
 # Characters of release-note body to scan for the breaking heuristic.
 _SCAN_CHARS = 5000
@@ -288,20 +293,35 @@ class ChangelogFetcher:
         if not libraries:
             return (), ChangelogFetchStats()
 
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+        # RFC-0030: resilient transport handles transient 429 / 5xx /
+        # network blips. The per-library Semaphore caps concurrency for
+        # both gather batches so a 170-lib catalog doesn't fan out 170
+        # simultaneous Maven + GitHub requests.
+        policy = HttpPolicy(timeout_seconds=_HTTP_TIMEOUT, max_concurrency=_MAX_CONCURRENT_REQUESTS)
+        async with make_resilient_client(policy=policy) as client:
+            sem = asyncio.Semaphore(_MAX_CONCURRENT_REQUESTS)
+
+            async def _bounded_latest(lib: Library) -> str | None:
+                async with sem:
+                    return await self._get_latest(client, lib)
+
             # Step 1: resolve latest stable versions for all libraries in parallel.
-            latest_tasks = [self._get_latest(client, lib) for lib in libraries]
+            latest_tasks = [_bounded_latest(lib) for lib in libraries]
             latest_results: list[str | None] = list(
                 await asyncio.gather(*latest_tasks, return_exceptions=False)
             )
 
             # Step 2: for each library with a major upgrade, build an entry.
+            async def _bounded_entry(lib: Library, latest: str) -> tuple[ChangelogEntry, str]:
+                async with sem:
+                    return await self._build_entry(client, lib, latest)
+
             entry_tasks = []
             for lib, latest in zip(libraries, latest_results, strict=False):
                 if latest is None:
                     continue
                 if _major(latest) > _major(str(lib.version)):
-                    entry_tasks.append(self._build_entry(client, lib, latest))
+                    entry_tasks.append(_bounded_entry(lib, latest))
 
             if not entry_tasks:
                 return (), ChangelogFetchStats()
