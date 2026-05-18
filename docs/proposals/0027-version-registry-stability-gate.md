@@ -1,7 +1,8 @@
 # RFC-0027: Stability-Gated `<release>` Fallback in Version Registries
 
-**Status:** Proposed
+**Status:** Implemented
 **Created:** 2026-05-17
+**Shipped:** 2026-05-17 (PR #57)
 **Related JTBDs:** JTBD-1 (informed upgrade decisions), JTBD-5 (report accuracy)
 **Depends on:** RFC-0026 (PRE_1_0 stability tier — uses `MavenVersion.is_stable` as the gate)
 
