@@ -1,7 +1,8 @@
 # RFC-0028: Phase 6 Wrap-up — Render Empty Sections + Fix Console Severity Buckets
 
-**Status:** Proposed
+**Status:** Implemented
 **Created:** 2026-05-18
+**Shipped:** 2026-05-18 (PR #60)
 **Related JTBDs:** JTBD-5 (report clarity), JTBD-1 (informed decisions)
 **Depends on:** none
 

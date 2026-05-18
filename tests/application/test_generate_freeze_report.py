@@ -326,6 +326,33 @@ class _SleepyVersionStatusResolver:
         return ()
 
 
+# ---------------------------------------------------------------------------
+# RFC-0028 — security_scanned flag is set from scanner presence
+# ---------------------------------------------------------------------------
+
+
+class _NullScanner:
+    async def scan(self, libraries):  # type: ignore[no-untyped-def]
+        return ()
+
+
+async def test_execute_sets_security_scanned_true_when_scanner_injected(
+    empty_catalog: Catalog,
+) -> None:
+    """RFC-0028: flag reflects adapter presence at construction time."""
+    use_case = GenerateFreezeReport(_OkParser(empty_catalog), vulnerability_scanner=_NullScanner())
+    report = await use_case.execute(Path("/some/path"))
+    assert report.security_scanned is True
+
+
+async def test_execute_sets_security_scanned_false_when_scanner_absent(
+    empty_catalog: Catalog,
+) -> None:
+    use_case = GenerateFreezeReport(_OkParser(empty_catalog))  # no scanner
+    report = await use_case.execute(Path("/some/path"))
+    assert report.security_scanned is False
+
+
 async def test_phase1_adapters_run_concurrently(empty_catalog: Catalog) -> None:
     """RFC-0025: the six Phase 1 adapters fan out via ``asyncio.gather``.
 

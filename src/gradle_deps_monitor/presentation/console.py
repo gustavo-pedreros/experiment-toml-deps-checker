@@ -9,6 +9,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from gradle_deps_monitor.domain import FreezeReport, Severity
+from gradle_deps_monitor.domain.advisory import AdvisorySeverity
 from gradle_deps_monitor.domain.changelog import BreakingSignal
 from gradle_deps_monitor.domain.compliance import ComplianceSeverity
 from gradle_deps_monitor.domain.diff import FreezeDiff
@@ -141,14 +142,22 @@ def print_summary(
         else:
             critical = sum(1 for la in vulnerable if la.has_critical)
             high = sum(1 for la in vulnerable if la.has_high)
+            # RFC-0028: enumerate every populated severity bucket
+            # explicitly. Pre-fix anything-non-critical-non-high was
+            # collapsed to ``N other``, hiding the medium/low split.
+            # Bucket each library by its max severity so the counts
+            # partition the vulnerable set.
+            medium = sum(1 for la in vulnerable if la.max_severity == AdvisorySeverity.MEDIUM)
+            low = sum(1 for la in vulnerable if la.max_severity == AdvisorySeverity.LOW)
             parts: list[str] = []
             if critical:
                 parts.append(f"[bold red]{critical} critical[/bold red]")
             if high:
                 parts.append(f"[bold yellow]{high} high[/bold yellow]")
-            remaining = len(vulnerable) - critical - high
-            if remaining > 0:
-                parts.append(f"{remaining} other")
+            if medium:
+                parts.append(f"[yellow]{medium} medium[/yellow]")
+            if low:
+                parts.append(f"[blue]{low} low[/blue]")
             con.print(f"[bold]Security[/bold] — {len(vulnerable)} vulnerable: {', '.join(parts)}")
             for la in sorted(vulnerable, key=lambda x: x.alias):
                 sev = la.max_severity
@@ -379,14 +388,22 @@ def _print_risk_score(rsr: RiskScoreReport, con: Console) -> None:
 
     critical = rsr.critical_count
     high = rsr.high_count
+    # RFC-0028: enumerate every populated severity bucket explicitly.
+    # Pre-fix anything-non-critical-non-high collapsed to ``N other``,
+    # which was actively misleading when MEDIUM/LOW dominated the
+    # tail (stress test: console said "157 other" while MD showed
+    # 137 medium + 20 low).
+    medium = sum(1 for lib in rsr.scored_libraries if lib.level is RiskLevel.MEDIUM)
+    low = sum(1 for lib in rsr.scored_libraries if lib.level is RiskLevel.LOW)
     rs_parts: list[str] = []
     if critical:
         rs_parts.append(f"[bold red]{critical} critical[/bold red]")
     if high:
         rs_parts.append(f"[bold yellow]{high} high[/bold yellow]")
-    remaining = len(rsr.scored_libraries) - critical - high
-    if remaining > 0:
-        rs_parts.append(f"{remaining} other")
+    if medium:
+        rs_parts.append(f"[yellow]{medium} medium[/yellow]")
+    if low:
+        rs_parts.append(f"[blue]{low} low[/blue]")
     con.print(
         f"[bold]Risk Score[/bold] (experimental) — "
         f"{len(rsr.scored_libraries)} libraries with non-zero score"

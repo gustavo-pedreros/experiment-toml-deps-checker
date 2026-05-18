@@ -110,7 +110,7 @@ merit its own feature phase.
 | ✅ | Parallel Orchestration of Independent Adapter Stages | [RFC-0025](proposals/0025-parallel-use-case-orchestration.md) |
 | ✅ | `PRE_1_0` Stability Tier for `0.x.y` Versions | [RFC-0026](proposals/0026-pre-1-0-stability-tier.md) |
 | ✅ | Stability-Gated `<release>` Fallback in Version Registries | [RFC-0027](proposals/0027-version-registry-stability-gate.md) |
-| 🚧 | Phase 6 Wrap-up — Render Empty Sections + Fix Console Severity Buckets | [RFC-0028](proposals/0028-phase6-wrap-up-empty-sections-and-console-buckets.md) |
+| ✅ | Phase 6 Wrap-up — Render Empty Sections + Fix Console Severity Buckets | [RFC-0028](proposals/0028-phase6-wrap-up-empty-sections-and-console-buckets.md) |
 
 ## Backlog
 
