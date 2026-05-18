@@ -199,10 +199,10 @@ Implemented.
 
 ## Definition of done (PR1 only)
 
-- [ ] `infrastructure/_shared/http/` package with `policy.py`,
+- [x] `infrastructure/_shared/http/` package with `policy.py`,
   `rate_limit.py`, `transport.py`, `client.py`, all with module
   docstrings.
-- [ ] `tests/infrastructure/_shared/http/` mirror with:
+- [x] `tests/infrastructure/_shared/http/` mirror with:
   - `test_rate_limit.py` — 429, 403-with-header, 403-without-header,
     200 baseline.
   - `test_transport.py` — retry on 429 with `Retry-After` honored,
@@ -212,14 +212,14 @@ Implemented.
   - `test_client.py` — factory returns properly-configured client;
     `make_resilient_client` is itself usable in tests via the
     standard `httpx.MockTransport` substitution.
-- [ ] `GitHubAdvisoryScanner` uses `make_resilient_client`; existing
+- [x] `GitHubAdvisoryScanner` uses `make_resilient_client`; existing
   GHSA tests pass unchanged.
-- [ ] `changelog_fetcher._is_rate_limited` aliases the shared
+- [x] `changelog_fetcher._is_rate_limited` aliases the shared
   `is_rate_limited`; existing `test_changelog_fetcher.py` imports
   (`_is_rate_limited`, `_RateLimitTracker`) work unchanged.
-- [ ] `CHANGELOG.md` `[Unreleased]` ### Added entry for the shared
+- [x] `CHANGELOG.md` `[Unreleased]` ### Added entry for the shared
   HTTP layer (mention that it's only adopted in GHSA so far).
-- [ ] All five quality stages pass on the Py 3.11-3.14 CI matrix.
+- [x] All five quality stages pass on the Py 3.11-3.14 CI matrix.
 
 ## Open questions
 

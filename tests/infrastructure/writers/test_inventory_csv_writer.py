@@ -541,14 +541,14 @@ def test_duplicate_of_cross_section_join(tmp_path: Path) -> None:
     Pre-fix the reader had to manually correlate Catalog Health's
     duplicate-library finding with Security's per-library CVE row;
     post-RFC the inventory row for ``core_okhttp`` carries
-    ``duplicate_of=segpass_okhttp`` and vice-versa, making the
+    ``duplicate_of=legacy_okhttp`` and vice-versa, making the
     compound story visible at-a-glance.
     """
     catalog = Catalog(
         source_path=tmp_path / "libs.versions.toml",
         libraries=(
             Library("core_okhttp", "com.squareup.okhttp3", "okhttp", MavenVersion("5.3.2")),
-            Library("segpass_okhttp", "com.squareup.okhttp3", "okhttp", MavenVersion("4.2.2")),
+            Library("legacy_okhttp", "com.squareup.okhttp3", "okhttp", MavenVersion("4.2.2")),
             Library("solo", "g", "solo", MavenVersion("1.0.0")),
         ),
         plugins=(),
@@ -557,8 +557,8 @@ def test_duplicate_of_cross_section_join(tmp_path: Path) -> None:
     report = FreezeReport(catalog=catalog, generated_at=_TS)
     dest = tmp_path / "freeze-inventory.csv"
     InventoryCsvWriter().write(report, dest)
-    assert _row_by_alias(dest, "core_okhttp")["duplicate_of"] == "segpass_okhttp"
-    assert _row_by_alias(dest, "segpass_okhttp")["duplicate_of"] == "core_okhttp"
+    assert _row_by_alias(dest, "core_okhttp")["duplicate_of"] == "legacy_okhttp"
+    assert _row_by_alias(dest, "legacy_okhttp")["duplicate_of"] == "core_okhttp"
     assert _row_by_alias(dest, "solo")["duplicate_of"] == ""
 
 

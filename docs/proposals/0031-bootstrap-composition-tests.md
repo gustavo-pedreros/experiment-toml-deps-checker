@@ -114,10 +114,10 @@ TestCreateDiffCommandWiring  (3 tests — writers + loader)
 
 ## Definition of done
 
-- [ ] `tests/test_bootstrap.py` created with the 18 tests above.
-- [ ] All five quality stages pass on Py 3.11 / 3.12 / 3.13 / 3.14 CI matrix.
-- [ ] No new dependencies, no production-code changes, no schema changes.
-- [ ] CHANGELOG `[Unreleased]` test-coverage entry under ### Added.
+- [x] `tests/test_bootstrap.py` created with the 18 tests above.
+- [x] All five quality stages pass on Py 3.11 / 3.12 / 3.13 / 3.14 CI matrix.
+- [x] No new dependencies, no production-code changes, no schema changes.
+- [x] CHANGELOG `[Unreleased]` test-coverage entry under ### Added.
 
 ## Out of scope
 

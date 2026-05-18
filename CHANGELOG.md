@@ -20,6 +20,13 @@ be assigned once a stable public API is established.
   leaves a half-rendered `freeze.md` / `freeze.json` / `freeze-*.csv`
   behind — the previous file (if any) is left untouched, and no
   temp file survives. Closes audit risk R8.
+- **Housekeeping pass (2026-05-18).** Ticked DoD checkboxes on
+  RFC-0029 / RFC-0030 / RFC-0031 (all marked `Status: Implemented`
+  but DoD blocks still showed `[ ]`). Renamed `segpass_okhttp` →
+  `legacy_okhttp` in the `test_duplicate_of_cross_section_join`
+  fixture and the RFC-0017 example so the public tool repo no
+  longer references the source corpus's internal alias names.
+  No behaviour change; test count unchanged.
 - **HTTP-resilience policy consolidated** (RFC-0030 PR3, closes RFC).
   Every adapter's per-module `_HTTP_TIMEOUT = …` constant was
   retired — call sites now construct `HttpPolicy(timeout_seconds=…)`
