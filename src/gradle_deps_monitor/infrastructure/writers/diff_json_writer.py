@@ -15,6 +15,7 @@ from gradle_deps_monitor.domain.diff import (
     VersionBump,
 )
 from gradle_deps_monitor.domain.finding import Severity
+from gradle_deps_monitor.infrastructure.writers._atomic import atomic_write
 
 # Schema version for the freeze-diff.json output. Follows SemVer per ADR-0008,
 # bumped independently from the freeze.json schema version.
@@ -31,11 +32,8 @@ class DiffJsonWriter:
 
     def write(self, diff: FreezeDiff, dest: Path) -> None:
         """Write *diff* to *dest*, creating parent directories as needed."""
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(
-            json.dumps(_serialise(diff), indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        with atomic_write(dest) as fh:
+            fh.write(json.dumps(_serialise(diff), indent=2, ensure_ascii=False) + "\n")
 
 
 # ---------------------------------------------------------------------------

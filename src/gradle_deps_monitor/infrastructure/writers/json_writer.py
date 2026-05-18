@@ -19,6 +19,7 @@ from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.risk_score import RiskScoreReport
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
 from gradle_deps_monitor.domain.version_status import LibraryVersionStatus
+from gradle_deps_monitor.infrastructure.writers._atomic import atomic_write
 
 # Schema version for the freeze.json output. Follows SemVer per ADR-0008:
 #   - MAJOR (x.0.0): breaking changes (removed/renamed fields, type changes)
@@ -33,11 +34,8 @@ class JsonWriter:
 
     def write(self, report: FreezeReport, dest: Path) -> None:
         """Write *report* to *dest*, creating parent directories as needed."""
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(
-            json.dumps(_serialise(report), indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        with atomic_write(dest) as fh:
+            fh.write(json.dumps(_serialise(report), indent=2, ensure_ascii=False) + "\n")
 
 
 # ---------------------------------------------------------------------------

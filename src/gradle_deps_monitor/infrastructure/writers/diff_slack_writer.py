@@ -9,6 +9,7 @@ from typing import Any
 from gradle_deps_monitor.domain.diff import FreezeDiff, VersionBump
 from gradle_deps_monitor.domain.finding import Severity
 from gradle_deps_monitor.domain.severity_style import style_for
+from gradle_deps_monitor.infrastructure.writers._atomic import atomic_write
 
 _MAX_ENTRIES = 8  # Max library rows shown per section in Slack
 
@@ -31,11 +32,8 @@ class DiffSlackWriter:
 
     def write(self, diff: FreezeDiff, dest: Path) -> None:
         """Write *diff* to *dest*, creating parent directories as needed."""
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(
-            json.dumps(_build_payload(diff), indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        with atomic_write(dest) as fh:
+            fh.write(json.dumps(_build_payload(diff), indent=2, ensure_ascii=False) + "\n")
 
 
 # ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ from gradle_deps_monitor.domain.module_usage import ModuleUsageMap
 from gradle_deps_monitor.domain.risk_score import RiskLevel, RiskScoreReport
 from gradle_deps_monitor.domain.severity_style import style_for
 from gradle_deps_monitor.domain.toolchain import ToolchainFinding
+from gradle_deps_monitor.infrastructure.writers._atomic import atomic_write
 
 # Maximum number of non-stable library entries shown in the Slack message.
 _MAX_NON_STABLE = 10
@@ -34,11 +35,8 @@ class SlackWriter:
 
     def write(self, report: FreezeReport, dest: Path) -> None:
         """Write *report* as Block Kit JSON to *dest*."""
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(
-            json.dumps(_build_payload(report), indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        with atomic_write(dest) as fh:
+            fh.write(json.dumps(_build_payload(report), indent=2, ensure_ascii=False) + "\n")
 
 
 # ---------------------------------------------------------------------------

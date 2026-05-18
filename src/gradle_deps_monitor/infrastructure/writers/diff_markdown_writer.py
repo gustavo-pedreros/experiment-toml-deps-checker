@@ -13,6 +13,7 @@ from gradle_deps_monitor.domain.diff import (
 )
 from gradle_deps_monitor.domain.finding import Severity
 from gradle_deps_monitor.domain.severity_style import style_for
+from gradle_deps_monitor.infrastructure.writers._atomic import atomic_write
 
 
 def _severity_icon(severity_value: str) -> str:
@@ -41,8 +42,8 @@ class DiffMarkdownWriter:
 
     def write(self, diff: FreezeDiff, dest: Path) -> None:
         """Write *diff* to *dest*, creating parent directories as needed."""
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(_render(diff), encoding="utf-8")
+        with atomic_write(dest) as fh:
+            fh.write(_render(diff))
 
 
 # ---------------------------------------------------------------------------
