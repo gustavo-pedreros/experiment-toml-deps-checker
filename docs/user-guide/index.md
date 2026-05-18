@@ -15,14 +15,15 @@ read the output, and wire the tool into CI. It complements the
 
 1. **[Getting started](getting-started.md)** — install, run, read
    the first report.
-2. *Configuration* — `gradle-deps-monitor.toml`, environment
-   variables, cache controls. *(Coming next — RFC-0021 Phase 2.)*
-3. *Feature deep-dives* — Risk Score, Module Usage, BoM resolution,
-   License audit, CVE scanning. *(Coming next.)*
-4. *CI integration* — GitHub Actions and Bitrise recipes, plus the
-   exit-code contract from RFC-0018. *(Coming next.)*
-5. *Troubleshooting* — what each warning means and what to do about
-   it. *(Coming next.)*
+2. **[Configuration](configuration.md)** —
+   `gradle-deps-monitor.toml`, environment variables, cache
+   controls.
+3. **[Feature deep-dives](features.md)** — CVE scanning, BoM
+   resolution, License audit, Module Usage map, Risk Score.
+4. **[CI integration](ci-integration.md)** — GitHub Actions and
+   Bitrise recipes, plus the exit-code contract from RFC-0018.
+5. **[Troubleshooting](troubleshooting.md)** — what each warning
+   means and what to do about it.
 
 ## Quick links
 

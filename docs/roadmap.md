@@ -81,19 +81,21 @@ sections. All seven items shipped.
 | ✅ | Compliance per-library attribution | [RFC-0015](proposals/0015-compliance-per-library-attribution.md) |
 | ✅ | Unified report style (severity + row layout) | [RFC-0016](proposals/0016-unified-report-style.md) |
 
-## Phase 5 — Scale & CI Integration 🚧 In progress
+## Phase 5 — Scale & CI Integration ✅ Closed (2026-05-18)
 
 Focuses on making the tool production-ready for large Android teams,
 improving audit visibility through CSV exports, and establishing
-policy enforcement for CI/CD.
+policy enforcement for CI/CD. All five items shipped; CI Gatekeeper
+landed as v1 (flag-driven) — the v2 expression DSL is tracked
+separately as a follow-up RFC.
 
 | Status | Item | Reference |
 |--------|------|-----------|
 | ✅ | Comprehensive CSV Export (Inventory & Findings) | [RFC-0017](proposals/0017-csv-export.md) |
-| 📋 | Official User Guide (English) | [RFC-0021](proposals/0021-user-guide.md) |
+| ✅ | Official User Guide (English) | [RFC-0021](proposals/0021-user-guide.md) |
 | ✅ | High-Performance & Accurate Module Scanner | [RFC-0019](proposals/0019-module-scanner.md) |
 | ✅ | Robust Version Detection (Rich Versions) | [RFC-0020](proposals/0020-rich-versions.md) |
-| 📋 | CI Gatekeeper (Policy Enforcement) | [RFC-0018](proposals/0018-ci-gatekeeper.md) |
+| ✅ | CI Gatekeeper (Policy Enforcement) — v1 | [RFC-0018](proposals/0018-ci-gatekeeper.md) |
 
 ## Phase 6 — Real-world stress test follow-ups ✅ Closed (2026-05-18)
 
