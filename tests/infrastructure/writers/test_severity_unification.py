@@ -143,13 +143,13 @@ def test_slack_uses_unified_error_emoji_in_every_section(tmp_path: Path) -> None
 
 
 def test_json_emits_common_severity_on_every_finding(tmp_path: Path) -> None:
-    """All finding-shaped objects expose ``common_severity`` (schema 1.6.0)."""
+    """All finding-shaped objects expose ``common_severity`` (schema 1.7.0)."""
     report = _report_with_one_error_per_section(tmp_path)
     dest = tmp_path / "freeze.json"
     JsonWriter().write(report, dest)
     data = json.loads(dest.read_text(encoding="utf-8"))
 
-    assert data["schema_version"] == "1.6.0"
+    assert data["schema_version"] == "1.7.0"
 
     # Every finding-shaped object now has common_severity = "error".
     assert data["health"]["findings"][0]["common_severity"] == "error"

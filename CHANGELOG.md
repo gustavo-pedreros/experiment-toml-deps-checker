@@ -11,6 +11,24 @@ be assigned once a stable public API is established.
 ## [Unreleased]
 
 ### Added
+- New `Stability.PRE_1_0` enum value for naked `0.x.y` numeric
+  versions. Per SemVer §4 ("major version zero is for initial
+  development; anything may change at any time") a `0.5.0` pin
+  carries a fundamentally different upgrade-risk signal than a
+  `1.0.0` pin, and the classifier no longer conflates the two. The
+  console outdated counter, Slack non-stable count, and any other
+  consumer that filters on `is Stability.STABLE` automatically pick
+  up the new tier without code change. Suffix-qualified `0.x.y-*`
+  versions (e.g. `0.5.0-alpha01`) keep classifying by their suffix
+  — the qualifier is the stronger signal. `is_prerelease` is
+  intentionally **not** broadened to include PRE_1_0: that property
+  retains its "publisher tagged the artifact with a pre-release
+  suffix" semantics, and PRE_1_0 is a separate axis. RFC-0026 /
+  issue #8 from the 2026-05 stress-test menu.
+- `freeze.json` schema bumped to `1.7.0` (MINOR per ADR-0008). The
+  `stability` field gains the new permitted enum value `pre_1_0`.
+  Consumers reading `1.x` continue to work; no existing value
+  changes meaning.
 - `ChangelogFetcher` now tracks per-library outcomes during scraping
   and returns a new `ChangelogFetchStats` alongside the entries
   (attempted / fetched / fallback_url_only / rate_limited /
