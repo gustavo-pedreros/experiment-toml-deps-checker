@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 760" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title>System context — sources, services, and outputs (C4-context-ish)</title>
+  <desc>
+    The CLI sits between local inputs (the Android project's catalog and
+    build files) and a handful of external services (Maven Central,
+    Google Maven, GitHub Advisory Database, Sonatype OSS Index, GitHub
+    Releases). It produces five report artefacts on every check run plus
+    a Rich-rendered console summary. All network access goes through a
+    1-hour disk cache so subsequent runs stay offline-friendly.
+  </desc>
+
+  <defs>
+    <marker id="inarrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3a7da0"/>
+    </marker>
+    <marker id="outarrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5e9168"/>
+    </marker>
+    <marker id="netarrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a85a30"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title { font-size: 20px; font-weight: 600; fill: #1a1a1a; }
+    .subtitle { font-size: 12px; fill: #555; }
+    .actor-name { font-size: 13px; font-weight: 600; fill: #1a1a1a; }
+    .system-name { font-size: 18px; font-weight: 700; fill: #fff; }
+    .system-sub { font-size: 11px; fill: #fff; }
+    .ext-name { font-size: 12px; font-weight: 600; fill: #1a1a1a; }
+    .ext-sub { font-size: 10px; fill: #555; font-style: italic; }
+    .file-name { font-size: 11px; fill: #1a1a1a; font-family: monospace; }
+    .file-desc { font-size: 10px; fill: #555; }
+    .conn-label { font-size: 10px; fill: #555; }
+    .legend-title { font-size: 12px; font-weight: 700; fill: #1a1a1a; }
+    .legend-text { font-size: 11px; fill: #333; }
+  </style>
+
+  <text x="40" y="40" class="title">System Context</text>
+  <text x="40" y="60" class="subtitle">gradle-deps-monitor between local project files and external metadata services · all network paths cached on disk for 1h</text>
+
+  <!-- USER -->
+  <g>
+    <circle cx="90" cy="170" r="22" fill="#fff" stroke="#444" stroke-width="2"/>
+    <line x1="90" y1="192" x2="90" y2="225" stroke="#444" stroke-width="2"/>
+    <line x1="68" y1="205" x2="112" y2="205" stroke="#444" stroke-width="2"/>
+    <line x1="90" y1="225" x2="72" y2="255" stroke="#444" stroke-width="2"/>
+    <line x1="90" y1="225" x2="108" y2="255" stroke="#444" stroke-width="2"/>
+    <text x="90" y="285" class="actor-name" text-anchor="middle">Developer /</text>
+    <text x="90" y="301" class="actor-name" text-anchor="middle">Auditor</text>
+    <text x="90" y="318" class="file-desc" text-anchor="middle">runs `gradle-</text>
+    <text x="90" y="330" class="file-desc" text-anchor="middle">deps-monitor`</text>
+  </g>
+
+  <!-- THE SYSTEM (centre, big rounded box) -->
+  <g>
+    <rect x="430" y="160" width="320" height="200" rx="14" fill="#3a7da0" stroke="#1f5a78" stroke-width="3"/>
+    <text x="590" y="190" class="system-name" text-anchor="middle">gradle-deps-monitor</text>
+    <text x="590" y="208" class="system-sub" text-anchor="middle">Python 3.11+ CLI · Typer + asyncio</text>
+
+    <rect x="450" y="225" width="280" height="34" rx="5" fill="#fff" opacity="0.9"/>
+    <text x="590" y="247" class="ext-name" text-anchor="middle" font-family="monospace">check &lt;catalog_dir&gt;</text>
+
+    <rect x="450" y="265" width="280" height="34" rx="5" fill="#fff" opacity="0.9"/>
+    <text x="590" y="287" class="ext-name" text-anchor="middle" font-family="monospace">diff &lt;baseline&gt; &lt;current&gt;</text>
+
+    <text x="590" y="324" class="system-sub" text-anchor="middle">2 CLI subcommands · 14 outbound ports</text>
+    <text x="590" y="342" class="system-sub" text-anchor="middle">empirical: 9.74 s cold-cache, 170 libs</text>
+  </g>
+
+  <!-- USER → CLI arrow -->
+  <line x1="135" y1="265" x2="425" y2="265" stroke="#444" stroke-width="2" marker-end="url(#inarrow)"/>
+  <text x="280" y="258" class="conn-label">invokes</text>
+
+  <!-- LOCAL INPUTS (left side, below user) -->
+  <g>
+    <rect x="40" y="380" width="320" height="180" rx="10" fill="#fffaee" stroke="#c89030" stroke-width="2"/>
+    <text x="200" y="406" class="ext-name" text-anchor="middle">LOCAL FILESYSTEM</text>
+    <text x="200" y="422" class="ext-sub" text-anchor="middle">Android project under analysis</text>
+
+    <rect x="60" y="438" width="280" height="36" rx="4" fill="#fff" stroke="#888"/>
+    <text x="70" y="455" class="file-name">gradle/libs.versions.toml</text>
+    <text x="70" y="468" class="file-desc">the version catalog being audited</text>
+
+    <rect x="60" y="482" width="280" height="36" rx="4" fill="#fff" stroke="#888"/>
+    <text x="70" y="499" class="file-name">**/build.gradle(.kts)</text>
+    <text x="70" y="512" class="file-desc">module-usage scan (opt-in via --module-usage)</text>
+
+    <rect x="60" y="526" width="280" height="28" rx="4" fill="#fff" stroke="#888"/>
+    <text x="70" y="544" class="file-name">~/.cache/gradle-deps-monitor/</text>
+  </g>
+
+  <!-- INPUTS → CLI arrow -->
+  <line x1="365" y1="438" x2="425" y2="280" stroke="#3a7da0" stroke-width="2" marker-end="url(#inarrow)"/>
+  <text x="370" y="395" class="conn-label">reads</text>
+
+  <!-- EXTERNAL SERVICES (right side, network) -->
+  <g>
+    <text x="970" y="155" class="legend-title" text-anchor="middle">EXTERNAL HTTP SERVICES</text>
+
+    <rect x="820" y="170" width="300" height="40" rx="6" fill="#fff" stroke="#a85a30"/>
+    <text x="970" y="190" class="ext-name" text-anchor="middle">Maven Central</text>
+    <text x="970" y="204" class="ext-sub" text-anchor="middle">repo1.maven.org · maven-metadata.xml · POMs</text>
+
+    <rect x="820" y="218" width="300" height="40" rx="6" fill="#fff" stroke="#a85a30"/>
+    <text x="970" y="238" class="ext-name" text-anchor="middle">Google Maven</text>
+    <text x="970" y="252" class="ext-sub" text-anchor="middle">dl.google.com/dl/android/maven2 · AndroidX POMs</text>
+
+    <rect x="820" y="266" width="300" height="40" rx="6" fill="#fff" stroke="#a85a30"/>
+    <text x="970" y="286" class="ext-name" text-anchor="middle">GitHub Advisory Database</text>
+    <text x="970" y="300" class="ext-sub" text-anchor="middle">GraphQL · CVE / GHSA · needs GITHUB_TOKEN</text>
+
+    <rect x="820" y="314" width="300" height="40" rx="6" fill="#fff" stroke="#a85a30"/>
+    <text x="970" y="334" class="ext-name" text-anchor="middle">Sonatype OSS Index</text>
+    <text x="970" y="348" class="ext-sub" text-anchor="middle">REST · CVE batch · needs OSS_INDEX_* creds</text>
+
+    <rect x="820" y="362" width="300" height="40" rx="6" fill="#fff" stroke="#a85a30"/>
+    <text x="970" y="382" class="ext-name" text-anchor="middle">GitHub Releases / REST</text>
+    <text x="970" y="396" class="ext-sub" text-anchor="middle">api.github.com · release notes scraping</text>
+  </g>
+
+  <!-- CLI → External services arrows -->
+  <line x1="755" y1="200" x2="815" y2="190" stroke="#a85a30" stroke-width="1.5" marker-end="url(#netarrow)"/>
+  <line x1="755" y1="225" x2="815" y2="238" stroke="#a85a30" stroke-width="1.5" marker-end="url(#netarrow)"/>
+  <line x1="755" y1="260" x2="815" y2="286" stroke="#a85a30" stroke-width="1.5" marker-end="url(#netarrow)"/>
+  <line x1="755" y1="290" x2="815" y2="334" stroke="#a85a30" stroke-width="1.5" marker-end="url(#netarrow)"/>
+  <line x1="755" y1="320" x2="815" y2="382" stroke="#a85a30" stroke-width="1.5" marker-end="url(#netarrow)"/>
+
+  <!-- OUTPUTS (bottom, 5 files + console) -->
+  <g>
+    <text x="590" y="430" class="legend-title" text-anchor="middle">OUTPUTS — generated on every `check` run</text>
+
+    <rect x="380" y="445" width="220" height="36" rx="4" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="490" y="462" class="file-name" text-anchor="middle">freeze.md</text>
+    <text x="490" y="475" class="file-desc" text-anchor="middle">human-readable, primary report</text>
+
+    <rect x="610" y="445" width="220" height="36" rx="4" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="720" y="462" class="file-name" text-anchor="middle">freeze.json (schema v1.7)</text>
+    <text x="720" y="475" class="file-desc" text-anchor="middle">machine-readable snapshot</text>
+
+    <rect x="380" y="489" width="220" height="36" rx="4" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="490" y="506" class="file-name" text-anchor="middle">freeze-slack.json</text>
+    <text x="490" y="519" class="file-desc" text-anchor="middle">Slack Block Kit summary</text>
+
+    <rect x="610" y="489" width="220" height="36" rx="4" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="720" y="506" class="file-name" text-anchor="middle">freeze-inventory.csv</text>
+    <text x="720" y="519" class="file-desc" text-anchor="middle">flat per-library join (15 cols) ← RFC-0017</text>
+
+    <rect x="380" y="533" width="220" height="36" rx="4" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="490" y="550" class="file-name" text-anchor="middle">freeze-findings.csv</text>
+    <text x="490" y="563" class="file-desc" text-anchor="middle">one row per finding, every section ← RFC-0017</text>
+
+    <rect x="610" y="533" width="220" height="36" rx="4" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="720" y="550" class="file-name" text-anchor="middle">Rich console summary</text>
+    <text x="720" y="563" class="file-desc" text-anchor="middle">stdout · severity-coloured</text>
+  </g>
+
+  <!-- CLI → outputs arrow -->
+  <line x1="590" y1="365" x2="590" y2="440" stroke="#5e9168" stroke-width="2" marker-end="url(#outarrow)"/>
+  <text x="600" y="405" class="conn-label">writes</text>
+
+  <!-- LEGEND (bottom) -->
+  <g>
+    <rect x="40" y="610" width="1100" height="110" rx="8" fill="#f6f6f6" stroke="#bbb"/>
+    <text x="60" y="635" class="legend-title">Notes</text>
+    <text x="60" y="657" class="legend-text">· All five external services are hit through a single shared httpx.AsyncClient with disk-cache TTL = 1 h (diskcache library).</text>
+    <text x="60" y="675" class="legend-text">· Security scanner is optional: when neither GITHUB_TOKEN nor OSS_INDEX_* are set, the Security report section renders "⊘ scan not configured" (RFC-0028).</text>
+    <text x="60" y="693" class="legend-text">· Risk Score (--risk-score) and Module Usage (--module-usage) are opt-in flags; their CSV columns are empty when the flag is off (RFC-0017 empty-cell convention).</text>
+    <text x="60" y="711" class="legend-text">· Maven Central version resolver post-RFC-0027 gates the publisher's &lt;release&gt; tag through MavenVersion.is_stable to avoid the protoc-style pre-release-as-latest bug.</text>
+  </g>
+</svg>

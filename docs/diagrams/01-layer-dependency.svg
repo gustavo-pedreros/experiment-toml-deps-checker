@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 660" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title>Layered dependencies (ADR-0006 + import-linter)</title>
+  <desc>
+    Top-to-bottom stack of the six architecture layers; arrows on the right
+    spine show the only allowed direction of import. Red dashed arrows on the
+    left annotate the forbidden direction enforced by import-linter contracts
+    in pyproject.toml. Source layer "checks" sits parallel to "application":
+    both depend only on the domain.
+  </desc>
+
+  <defs>
+    <marker id="allowed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2a8a3e"/>
+    </marker>
+    <marker id="forbidden" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title { font-size: 20px; font-weight: 600; fill: #1a1a1a; }
+    .subtitle { font-size: 12px; fill: #555; }
+    .layer-name { font-size: 17px; font-weight: 600; fill: #1a1a1a; }
+    .layer-desc { font-size: 12px; fill: #333; }
+    .role-tag { font-size: 11px; font-style: italic; fill: #666; text-anchor: end; }
+    .legend { font-size: 12px; fill: #333; }
+    .legend-title { font-size: 13px; font-weight: 600; fill: #1a1a1a; }
+  </style>
+
+  <text x="40" y="40" class="title">Layered Dependencies</text>
+  <text x="40" y="60" class="subtitle">ADR-0006 (Pragmatic Clean Architecture) · enforced by 5 import-linter contracts in pyproject.toml</text>
+
+  <!-- Layer 1: bootstrap / cli -->
+  <g>
+    <rect x="60" y="90" width="660" height="80" rx="6" fill="#fbe9e7" stroke="#b27574"/>
+    <text x="80" y="120" class="layer-name">bootstrap / cli</text>
+    <text x="80" y="142" class="layer-desc">Composition root. Wires concrete adapters into use cases.</text>
+    <text x="80" y="158" class="layer-desc">bootstrap.py · cli.py</text>
+    <text x="700" y="120" class="role-tag">composition</text>
+  </g>
+
+  <!-- Layer 2: presentation -->
+  <g>
+    <rect x="60" y="190" width="660" height="80" rx="6" fill="#fff3d9" stroke="#b89a4a"/>
+    <text x="80" y="220" class="layer-name">presentation</text>
+    <text x="80" y="242" class="layer-desc">Typer CLI commands, Rich console summary, severity styling.</text>
+    <text x="80" y="258" class="layer-desc">presentation/commands/ · presentation/console.py</text>
+    <text x="700" y="220" class="role-tag">delivery</text>
+  </g>
+
+  <!-- Layer 3: infrastructure -->
+  <g>
+    <rect x="60" y="290" width="660" height="100" rx="6" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="80" y="320" class="layer-name">infrastructure</text>
+    <text x="80" y="342" class="layer-desc">Adapters that implement application ports (HTTP, file I/O, parsing).</text>
+    <text x="80" y="358" class="layer-desc">parsing/ · registries/ · resolvers/ · scanners/ · fetchers/ ·</text>
+    <text x="80" y="374" class="layer-desc">checkers/ · writers/ · loaders/ · config/</text>
+    <text x="700" y="320" class="role-tag">adapters</text>
+  </g>
+
+  <!-- Row 4: application + checks side by side -->
+  <g>
+    <rect x="60" y="410" width="320" height="100" rx="6" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="80" y="440" class="layer-name">application</text>
+    <text x="80" y="462" class="layer-desc">Use cases + outbound port Protocols.</text>
+    <text x="80" y="478" class="layer-desc">generate_freeze_report · compute_freeze_diff ·</text>
+    <text x="80" y="494" class="layer-desc">compute_risk_score · bom_enrichment · ports/</text>
+    <text x="360" y="440" class="role-tag">orchestration</text>
+
+    <rect x="400" y="410" width="320" height="100" rx="6" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="420" y="440" class="layer-name">checks</text>
+    <text x="420" y="462" class="layer-desc">Pure rule engines over the catalog domain.</text>
+    <text x="420" y="478" class="layer-desc">catalog_health/ rules · runner</text>
+    <text x="700" y="440" class="role-tag">rules</text>
+  </g>
+
+  <!-- Layer 5: domain (deepest) -->
+  <g>
+    <rect x="60" y="530" width="660" height="80" rx="6" fill="#d8e3ef" stroke="#4f6f8d"/>
+    <text x="80" y="560" class="layer-name">domain</text>
+    <text x="80" y="582" class="layer-desc">Pure value objects + dataclasses. Zero internal dependencies.</text>
+    <text x="80" y="598" class="layer-desc">Catalog · Library · FreezeReport · MavenVersion · Advisory · LicenseAudit · …</text>
+    <text x="700" y="560" class="role-tag">core</text>
+  </g>
+
+  <!-- Allowed-direction arrow on the right spine -->
+  <line x1="760" y1="105" x2="760" y2="595" stroke="#2a8a3e" stroke-width="3" marker-end="url(#allowed)"/>
+  <text x="775" y="200" class="legend">allowed</text>
+  <text x="775" y="216" class="legend">import</text>
+  <text x="775" y="232" class="legend">direction</text>
+  <text x="775" y="248" class="legend">(top → bottom)</text>
+
+  <!-- Forbidden arrows on the side: presentation→infrastructure, application→infrastructure -->
+  <g>
+    <text x="775" y="320" class="legend-title">Forbidden</text>
+    <text x="775" y="336" class="legend">(import-linter)</text>
+
+    <line x1="785" y1="380" x2="785" y2="335" stroke="#c0392b" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#forbidden)"/>
+    <text x="800" y="360" class="legend">infra ↛ presentation</text>
+
+    <line x1="900" y1="295" x2="900" y2="265" stroke="#c0392b" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#forbidden)"/>
+    <text x="800" y="280" class="legend">presentation ↛ infra</text>
+
+    <line x1="900" y1="405" x2="900" y2="295" stroke="#c0392b" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#forbidden)"/>
+    <text x="800" y="400" class="legend">app ↛ infra</text>
+
+    <line x1="900" y1="525" x2="900" y2="405" stroke="#c0392b" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#forbidden)"/>
+    <text x="800" y="520" class="legend">domain ↛ anything</text>
+  </g>
+
+  <!-- Footer / source -->
+  <text x="40" y="640" class="subtitle">Generated 2026-05-18 · source of truth: tool.importlinter contracts in pyproject.toml</text>
+</svg>

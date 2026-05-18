@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 1180" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title>Ports → Adapters map (Pragmatic Clean Architecture)</title>
+  <desc>
+    Left column: outbound port Protocols declared in application/ports/.
+    Right column: concrete adapters under infrastructure/ that implement
+    each port. Composition root (bootstrap.py) chooses which adapter is
+    wired per port at construction time. Adapters with no port (e.g.
+    inventory_csv_writer) satisfy the de-facto ReportWriter Protocol
+    structurally.
+  </desc>
+
+  <defs>
+    <marker id="conn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#666"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title { font-size: 20px; font-weight: 600; fill: #1a1a1a; }
+    .subtitle { font-size: 12px; fill: #555; }
+    .col-header { font-size: 14px; font-weight: 700; fill: #1a1a1a; }
+    .col-subheader { font-size: 11px; fill: #555; font-style: italic; }
+    .port-name { font-size: 13px; font-weight: 600; fill: #1a1a1a; font-family: monospace; }
+    .adapter-name { font-size: 12px; fill: #1a1a1a; font-family: monospace; }
+    .subdir-tag { font-size: 10px; fill: #fff; font-weight: 600; }
+  </style>
+
+  <text x="40" y="40" class="title">Ports → Adapters</text>
+  <text x="40" y="60" class="subtitle">application/ports/ Protocols (left) implemented by concrete adapters in infrastructure/ (right) · wired by bootstrap.py</text>
+
+  <!-- Column headers -->
+  <text x="180" y="100" class="col-header" text-anchor="middle">PORT</text>
+  <text x="180" y="116" class="col-subheader" text-anchor="middle">application/ports/</text>
+  <text x="780" y="100" class="col-header" text-anchor="middle">ADAPTER(S)</text>
+  <text x="780" y="116" class="col-subheader" text-anchor="middle">infrastructure/&lt;subdir&gt;/</text>
+
+  <!-- Row helper: starts y=140, step 60 -->
+
+  <!-- CatalogParser -->
+  <g>
+    <rect x="60" y="140" width="240" height="44" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="158" class="port-name" text-anchor="middle">CatalogParser</text>
+    <text x="180" y="174" class="col-subheader" text-anchor="middle">read libs.versions.toml</text>
+  </g>
+  <line x1="300" y1="162" x2="540" y2="162" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="140" width="240" height="44" rx="5" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="167" class="adapter-name" text-anchor="middle">TomlCatalogParser</text>
+    <rect x="780" y="148" width="74" height="14" rx="3" fill="#5e9168"/>
+    <text x="817" y="159" class="subdir-tag" text-anchor="middle">parsing/</text>
+  </g>
+
+  <!-- BomResolver -->
+  <g>
+    <rect x="60" y="195" width="240" height="44" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="213" class="port-name" text-anchor="middle">BomResolver</text>
+    <text x="180" y="229" class="col-subheader" text-anchor="middle">resolve BoM children</text>
+  </g>
+  <line x1="300" y1="217" x2="540" y2="217" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="195" width="240" height="44" rx="5" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="222" class="adapter-name" text-anchor="middle">MavenBomResolver</text>
+    <rect x="780" y="203" width="86" height="14" rx="3" fill="#5e9168"/>
+    <text x="823" y="214" class="subdir-tag" text-anchor="middle">resolvers/</text>
+  </g>
+
+  <!-- HealthChecker (callable, lives in checks/) -->
+  <g>
+    <rect x="60" y="250" width="240" height="44" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="268" class="port-name" text-anchor="middle">HealthChecker</text>
+    <text x="180" y="284" class="col-subheader" text-anchor="middle">catalog-wide rule engine</text>
+  </g>
+  <line x1="300" y1="272" x2="540" y2="272" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="250" width="240" height="44" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="660" y="277" class="adapter-name" text-anchor="middle">_run_health_checks</text>
+    <rect x="780" y="258" width="64" height="14" rx="3" fill="#7d6a99"/>
+    <text x="812" y="269" class="subdir-tag" text-anchor="middle">checks/</text>
+  </g>
+
+  <!-- ComplianceChecker -->
+  <g>
+    <rect x="60" y="305" width="240" height="44" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="323" class="port-name" text-anchor="middle">ComplianceChecker</text>
+    <text x="180" y="339" class="col-subheader" text-anchor="middle">Play Store policy KB</text>
+  </g>
+  <line x1="300" y1="327" x2="540" y2="327" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="305" width="240" height="44" rx="5" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="332" class="adapter-name" text-anchor="middle">PlayStoreComplianceChecker</text>
+    <rect x="780" y="313" width="80" height="14" rx="3" fill="#5e9168"/>
+    <text x="820" y="324" class="subdir-tag" text-anchor="middle">checkers/</text>
+  </g>
+
+  <!-- ToolchainChecker -->
+  <g>
+    <rect x="60" y="360" width="240" height="44" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="378" class="port-name" text-anchor="middle">ToolchainChecker</text>
+    <text x="180" y="394" class="col-subheader" text-anchor="middle">compatibility matrices</text>
+  </g>
+  <line x1="300" y1="382" x2="540" y2="382" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="360" width="240" height="44" rx="5" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="387" class="adapter-name" text-anchor="middle">ToolchainCompatibilityChecker</text>
+    <rect x="780" y="368" width="80" height="14" rx="3" fill="#5e9168"/>
+    <text x="820" y="379" class="subdir-tag" text-anchor="middle">checkers/</text>
+  </g>
+
+  <!-- LibraryHealthChecker -->
+  <g>
+    <rect x="60" y="415" width="240" height="44" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="433" class="port-name" text-anchor="middle">LibraryHealthChecker</text>
+    <text x="180" y="449" class="col-subheader" text-anchor="middle">deprecations + inactivity</text>
+  </g>
+  <line x1="300" y1="437" x2="540" y2="437" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="415" width="240" height="44" rx="5" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="442" class="adapter-name" text-anchor="middle">LibraryHealthChecker</text>
+    <rect x="780" y="423" width="80" height="14" rx="3" fill="#5e9168"/>
+    <text x="820" y="434" class="subdir-tag" text-anchor="middle">checkers/</text>
+  </g>
+
+  <!-- LicenseChecker -->
+  <g>
+    <rect x="60" y="470" width="240" height="44" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="488" class="port-name" text-anchor="middle">LicenseChecker</text>
+    <text x="180" y="504" class="col-subheader" text-anchor="middle">POM &lt;licenses&gt; classifier</text>
+  </g>
+  <line x1="300" y1="492" x2="540" y2="492" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="470" width="240" height="44" rx="5" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="497" class="adapter-name" text-anchor="middle">PomLicenseChecker</text>
+    <rect x="780" y="478" width="80" height="14" rx="3" fill="#5e9168"/>
+    <text x="820" y="489" class="subdir-tag" text-anchor="middle">checkers/</text>
+  </g>
+
+  <!-- ChangelogFetcher -->
+  <g>
+    <rect x="60" y="525" width="240" height="44" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="543" class="port-name" text-anchor="middle">ChangelogFetcher</text>
+    <text x="180" y="559" class="col-subheader" text-anchor="middle">GitHub release notes + stats</text>
+  </g>
+  <line x1="300" y1="547" x2="540" y2="547" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="525" width="240" height="44" rx="5" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="552" class="adapter-name" text-anchor="middle">ChangelogFetcher</text>
+    <rect x="780" y="533" width="80" height="14" rx="3" fill="#5e9168"/>
+    <text x="820" y="544" class="subdir-tag" text-anchor="middle">fetchers/</text>
+  </g>
+
+  <!-- ModuleUsageScanner -->
+  <g>
+    <rect x="60" y="580" width="240" height="44" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="598" class="port-name" text-anchor="middle">ModuleUsageScanner</text>
+    <text x="180" y="614" class="col-subheader" text-anchor="middle">build.gradle(.kts) parser</text>
+  </g>
+  <line x1="300" y1="602" x2="540" y2="602" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="580" width="240" height="44" rx="5" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="607" class="adapter-name" text-anchor="middle">GradleModuleScanner</text>
+    <rect x="780" y="588" width="80" height="14" rx="3" fill="#5e9168"/>
+    <text x="820" y="599" class="subdir-tag" text-anchor="middle">scanners/</text>
+  </g>
+
+  <!-- VersionRegistry → 2 adapters -->
+  <g>
+    <rect x="60" y="640" width="240" height="56" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="664" class="port-name" text-anchor="middle">VersionRegistry</text>
+    <text x="180" y="682" class="col-subheader" text-anchor="middle">maven-metadata.xml fetch</text>
+  </g>
+  <line x1="300" y1="660" x2="540" y2="660" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <line x1="300" y1="688" x2="540" y2="688" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="640" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="655" class="adapter-name" text-anchor="middle">MavenCentralRegistry</text>
+    <rect x="780" y="643" width="86" height="14" rx="3" fill="#5e9168"/>
+    <text x="823" y="654" class="subdir-tag" text-anchor="middle">registries/</text>
+
+    <rect x="540" y="666" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="681" class="adapter-name" text-anchor="middle">GoogleMavenRegistry</text>
+    <rect x="780" y="669" width="86" height="14" rx="3" fill="#5e9168"/>
+    <text x="823" y="680" class="subdir-tag" text-anchor="middle">registries/</text>
+  </g>
+
+  <!-- VersionStatusResolver -->
+  <g>
+    <rect x="60" y="710" width="240" height="44" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="728" class="port-name" text-anchor="middle">VersionStatusResolver</text>
+    <text x="180" y="744" class="col-subheader" text-anchor="middle">pinned vs latest classifier</text>
+  </g>
+  <line x1="300" y1="732" x2="540" y2="732" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="710" width="240" height="44" rx="5" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="737" class="adapter-name" text-anchor="middle">MavenVersionStatusResolver</text>
+    <rect x="780" y="718" width="86" height="14" rx="3" fill="#5e9168"/>
+    <text x="823" y="729" class="subdir-tag" text-anchor="middle">resolvers/</text>
+  </g>
+
+  <!-- VulnerabilityScanner → 3 adapters -->
+  <g>
+    <rect x="60" y="770" width="240" height="80" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="794" class="port-name" text-anchor="middle">VulnerabilityScanner</text>
+    <text x="180" y="812" class="col-subheader" text-anchor="middle">CVE / GHSA lookup</text>
+    <text x="180" y="830" class="col-subheader" text-anchor="middle">composite or null</text>
+  </g>
+  <line x1="300" y1="784" x2="540" y2="784" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <line x1="300" y1="810" x2="540" y2="810" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <line x1="300" y1="836" x2="540" y2="836" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="774" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="789" class="adapter-name" text-anchor="middle">GitHubAdvisoryScanner</text>
+    <rect x="780" y="777" width="78" height="14" rx="3" fill="#5e9168"/>
+    <text x="819" y="788" class="subdir-tag" text-anchor="middle">scanners/</text>
+
+    <rect x="540" y="800" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="815" class="adapter-name" text-anchor="middle">OssIndexScanner</text>
+    <rect x="780" y="803" width="78" height="14" rx="3" fill="#5e9168"/>
+    <text x="819" y="814" class="subdir-tag" text-anchor="middle">scanners/</text>
+
+    <rect x="540" y="826" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="841" class="adapter-name" text-anchor="middle">CompositeScanner</text>
+    <rect x="780" y="829" width="78" height="14" rx="3" fill="#5e9168"/>
+    <text x="819" y="840" class="subdir-tag" text-anchor="middle">scanners/</text>
+  </g>
+
+  <!-- ReportWriter → 5 adapters -->
+  <g>
+    <rect x="60" y="865" width="240" height="120" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="889" class="port-name" text-anchor="middle">ReportWriter</text>
+    <text x="180" y="907" class="col-subheader" text-anchor="middle">serialise FreezeReport</text>
+    <text x="180" y="925" class="col-subheader" text-anchor="middle">5 implementations</text>
+    <text x="180" y="965" class="col-subheader" text-anchor="middle">.write(report, path)</text>
+  </g>
+  <line x1="300" y1="879" x2="540" y2="879" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <line x1="300" y1="905" x2="540" y2="905" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <line x1="300" y1="931" x2="540" y2="931" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <line x1="300" y1="957" x2="540" y2="957" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <line x1="300" y1="975" x2="540" y2="975" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="869" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="884" class="adapter-name" text-anchor="middle">MarkdownWriter</text>
+    <rect x="780" y="872" width="62" height="14" rx="3" fill="#5e9168"/>
+    <text x="811" y="883" class="subdir-tag" text-anchor="middle">writers/</text>
+
+    <rect x="540" y="895" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="910" class="adapter-name" text-anchor="middle">JsonWriter</text>
+    <rect x="780" y="898" width="62" height="14" rx="3" fill="#5e9168"/>
+    <text x="811" y="909" class="subdir-tag" text-anchor="middle">writers/</text>
+
+    <rect x="540" y="921" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="936" class="adapter-name" text-anchor="middle">SlackWriter</text>
+    <rect x="780" y="924" width="62" height="14" rx="3" fill="#5e9168"/>
+    <text x="811" y="935" class="subdir-tag" text-anchor="middle">writers/</text>
+
+    <rect x="540" y="947" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="962" class="adapter-name" text-anchor="middle">InventoryCsvWriter</text>
+    <rect x="780" y="950" width="62" height="14" rx="3" fill="#5e9168"/>
+    <text x="811" y="961" class="subdir-tag" text-anchor="middle">writers/</text>
+
+    <rect x="540" y="973" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="988" class="adapter-name" text-anchor="middle">FindingsCsvWriter</text>
+    <rect x="780" y="976" width="62" height="14" rx="3" fill="#5e9168"/>
+    <text x="811" y="987" class="subdir-tag" text-anchor="middle">writers/</text>
+  </g>
+
+  <!-- DiffWriter → 3 adapters (compact) -->
+  <g>
+    <rect x="60" y="1000" width="240" height="80" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="1022" class="port-name" text-anchor="middle">DiffWriter</text>
+    <text x="180" y="1040" class="col-subheader" text-anchor="middle">serialise FreezeDiff</text>
+  </g>
+  <line x1="300" y1="1014" x2="540" y2="1014" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <line x1="300" y1="1040" x2="540" y2="1040" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <line x1="300" y1="1066" x2="540" y2="1066" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="1004" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="1019" class="adapter-name" text-anchor="middle">DiffMarkdownWriter</text>
+    <rect x="780" y="1007" width="62" height="14" rx="3" fill="#5e9168"/>
+    <text x="811" y="1018" class="subdir-tag" text-anchor="middle">writers/</text>
+
+    <rect x="540" y="1030" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="1045" class="adapter-name" text-anchor="middle">DiffJsonWriter</text>
+    <rect x="780" y="1033" width="62" height="14" rx="3" fill="#5e9168"/>
+    <text x="811" y="1044" class="subdir-tag" text-anchor="middle">writers/</text>
+
+    <rect x="540" y="1056" width="240" height="20" rx="3" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="1071" class="adapter-name" text-anchor="middle">DiffSlackWriter</text>
+    <rect x="780" y="1059" width="62" height="14" rx="3" fill="#5e9168"/>
+    <text x="811" y="1070" class="subdir-tag" text-anchor="middle">writers/</text>
+  </g>
+
+  <!-- SnapshotLoader -->
+  <g>
+    <rect x="60" y="1090" width="240" height="44" rx="5" fill="#ece4f2" stroke="#7d6a99"/>
+    <text x="180" y="1108" class="port-name" text-anchor="middle">SnapshotLoader</text>
+    <text x="180" y="1124" class="col-subheader" text-anchor="middle">read prior freeze.json</text>
+  </g>
+  <line x1="300" y1="1112" x2="540" y2="1112" stroke="#666" stroke-width="1" marker-end="url(#conn)"/>
+  <g>
+    <rect x="540" y="1090" width="240" height="44" rx="5" fill="#e6f2e8" stroke="#5e9168"/>
+    <text x="660" y="1117" class="adapter-name" text-anchor="middle">JsonSnapshotLoader</text>
+    <rect x="780" y="1098" width="62" height="14" rx="3" fill="#5e9168"/>
+    <text x="811" y="1109" class="subdir-tag" text-anchor="middle">loaders/</text>
+  </g>
+
+  <!-- Right-side notes -->
+  <g>
+    <rect x="920" y="140" width="240" height="200" rx="6" fill="#fff7ec" stroke="#c89030"/>
+    <text x="940" y="162" class="col-header">Wiring</text>
+    <text x="940" y="184" class="col-subheader" font-size="11">bootstrap.create_check_command()</text>
+    <text x="940" y="200" class="col-subheader" font-size="11">selects the adapter per port:</text>
+
+    <text x="940" y="222" class="col-subheader" font-size="11">• Composite when GHSA + OSS</text>
+    <text x="940" y="238" class="col-subheader" font-size="11">  Index creds both present</text>
+    <text x="940" y="258" class="col-subheader" font-size="11">• None when neither set</text>
+    <text x="940" y="278" class="col-subheader" font-size="11">  (Security section renders</text>
+    <text x="940" y="294" class="col-subheader" font-size="11">  "⊘ scan not configured")</text>
+    <text x="940" y="316" class="col-subheader" font-size="11">• Module scanner injected</text>
+    <text x="940" y="332" class="col-subheader" font-size="11">  only with --module-usage</text>
+  </g>
+
+  <g>
+    <rect x="920" y="360" width="240" height="180" rx="6" fill="#e8f4f8" stroke="#3a7da0"/>
+    <text x="940" y="382" class="col-header">Adapter location</text>
+    <rect x="940" y="395" width="50" height="14" rx="3" fill="#5e9168"/>
+    <text x="965" y="406" class="subdir-tag" text-anchor="middle">infra</text>
+    <text x="998" y="406" class="col-subheader" font-size="11">network/HTTP/file IO</text>
+
+    <rect x="940" y="420" width="50" height="14" rx="3" fill="#7d6a99"/>
+    <text x="965" y="431" class="subdir-tag" text-anchor="middle">checks</text>
+    <text x="998" y="431" class="col-subheader" font-size="11">pure rule engine</text>
+
+    <rect x="940" y="445" width="50" height="14" rx="3" fill="#888"/>
+    <text x="965" y="456" class="subdir-tag" text-anchor="middle">port</text>
+    <text x="998" y="456" class="col-subheader" font-size="11">application/ports/</text>
+
+    <text x="940" y="486" class="col-subheader" font-size="11">15 ports total · ~24 adapters.</text>
+    <text x="940" y="504" class="col-subheader" font-size="11">Adapter swappability is what</text>
+    <text x="940" y="522" class="col-subheader" font-size="11">tests use to stub out IO.</text>
+  </g>
+</svg>
