@@ -17,6 +17,7 @@ from gradle_deps_monitor.domain.advisory import (
     LibraryAdvisory,
 )
 from gradle_deps_monitor.domain.catalog import Library
+from gradle_deps_monitor.infrastructure._shared.http import HttpPolicy, make_resilient_client
 
 _API_BASE = "https://api.github.com"
 _ADVISORIES_URL = f"{_API_BASE}/advisories"
@@ -77,14 +78,20 @@ class GitHubAdvisoryScanner:
         """Return advisories for every library in *libraries*.
 
         Libraries with no known advisories get an entry with an empty
-        ``advisories`` tuple.
+        ``advisories`` tuple. The underlying ``httpx.AsyncClient`` is
+        built by
+        :func:`~gradle_deps_monitor.infrastructure._shared.http.make_resilient_client`
+        (RFC-0030), so transient 429 / 5xx / network errors are
+        retried with exponential backoff + jitter and ``Retry-After``
+        is honored.
 
         :raises VulnerabilityScanError: On unrecoverable network or API error.
         """
         if self._client is not None:
             return await self._scan_with(self._client, libraries)
 
-        async with httpx.AsyncClient(headers=self._auth_headers(), timeout=30.0) as client:
+        policy = HttpPolicy(timeout_seconds=30.0, max_concurrency=_MAX_CONCURRENT_REQUESTS)
+        async with make_resilient_client(policy=policy, headers=self._auth_headers()) as client:
             return await self._scan_with(client, libraries)
 
     async def _scan_with(

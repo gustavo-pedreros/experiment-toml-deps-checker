@@ -34,6 +34,9 @@ import httpx
 
 from gradle_deps_monitor.domain.catalog import Library
 from gradle_deps_monitor.domain.changelog import BreakingSignal, ChangelogEntry, ChangelogFetchStats
+from gradle_deps_monitor.infrastructure._shared.http.rate_limit import (
+    is_rate_limited as _shared_is_rate_limited,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -74,24 +77,12 @@ _CLASS_RATE_LIMITED = "rate_limited"
 _CLASS_UNKNOWN_NO_REPO = "unknown_no_repo"
 
 
-def _is_rate_limited(response: httpx.Response) -> bool:
-    """Return ``True`` for documented GitHub rate-limit responses.
-
-    RFC-0024 PR #2. Two conditions are treated as rate-limit hits:
-
-    - HTTP 429 (secondary / abuse-detection limit).
-    - HTTP 403 with the response header ``X-RateLimit-Remaining: 0``
-      (primary limit exhausted).
-
-    Plain 403 without the rate-limit header is intentionally NOT
-    counted — those can come from auth failures, blocked content, or
-    other causes that don't map to "set a token to fix this".
-    """
-    if response.status_code == 429:
-        return True
-    if response.status_code == 403:
-        return bool(response.headers.get("X-RateLimit-Remaining") == "0")
-    return False
+# RFC-0030: rate-limit detection lifted to
+# ``infrastructure/_shared/http/rate_limit.py``. The canonical
+# definition lives there; this module re-exports under the original
+# ``_is_rate_limited`` name so existing test imports
+# (``from .changelog_fetcher import _is_rate_limited``) keep working.
+_is_rate_limited = _shared_is_rate_limited
 
 
 class _RateLimitTracker:
