@@ -1,7 +1,8 @@
 # RFC-0021: Official User Guide
 
-**Status:** In progress (Phase 1 shipped 2026-05-18; Phase 2/3 pending)
+**Status:** Implemented
 **Created:** 2026-05-07
+**Shipped:** Phase 1 + Phase 2/3 both landed 2026-05-18
 **Related JTBDs:** JTBD-5 (Readability), Onboarding
 **Depends on:** none
 
@@ -41,16 +42,28 @@ While this is a documentation task, it must be "integrated" into the project str
   `docs/user-guide/` directory so Phase 2 chapters can land as
   separate files without rewriting the index.
 
-### Phase 2: Content Drafting (next PR)
-- Write the core sections (Configuration, Feature Deep-Dives,
-  Troubleshooting).
-- Verify all CLI flags against the actual implementation
-  (post-RFC-0029 + RFC-0018 surface).
+### Phase 2: Content Drafting ✅ shipped 2026-05-18
+- [x] `docs/user-guide/configuration.md` — `[risk]` weights and
+  thresholds, `[cache]` section, environment variables, cache CLI
+  flags, diff command notes.
+- [x] `docs/user-guide/features.md` — five feature deep-dives:
+  CVE scanning (with the severity → `CommonSeverity` mapping
+  table), BoM resolution (with example output), License audit
+  (with classpath-exception note), Module Usage map (with the
+  RFC-0022 accessor coverage), Risk Score (with weights table +
+  ASCII-bar example).
+- [x] `docs/user-guide/troubleshooting.md` — 8 common warning
+  scenarios with cause + fix.
+- [x] CLI flags verified against the actual implementation
+  (post-RFC-0029 cache flags + RFC-0018 gatekeeper flags).
 
-### Phase 3: CI Examples (folded into Phase 2 per plan)
-- Add tested examples for GitHub Actions and Bitrise — driven by
-  the RFC-0018 v1 exit-code contract and the `GITHUB_ACTIONS`
-  annotation emitter that already ships.
+### Phase 3: CI Examples ✅ shipped 2026-05-18 (folded into Phase 2)
+- [x] `docs/user-guide/ci-integration.md` — exit-code contract
+  table (mirrors RFC-0018), GitHub Actions workflow with
+  `GITHUB_TOKEN` + `--fail-on-errors` + workflow-annotation
+  example, optional PR-comment-with-diff job, Bitrise workflow
+  with Slack notification on failure, plus performance tips
+  (cache restore, daily fresh-CVE scheduled run).
 
 ## Alternatives considered
 
@@ -64,7 +77,14 @@ While this is a documentation task, it must be "integrated" into the project str
 
 ## Definition of Done (DoD)
 
-- [ ] **Content**: Full English guide covering all major features.
-- [ ] **Discoverability**: Clearly linked from the main README.
-- [ ] **Accuracy**: All code snippets and CLI flags are verified to be correct.
-- [ ] **Cleanup**: No duplicate or legacy documentation files remain in the root.
+- [x] **Content**: Full English guide covering all major features —
+  five chapters under `docs/user-guide/` (index + getting-started +
+  configuration + features + ci-integration + troubleshooting).
+- [x] **Discoverability**: Linked first under `## Documentation` in
+  the main README.
+- [x] **Accuracy**: All CLI flags and snippets verified against the
+  current implementation surface (post-RFC-0018 + RFC-0029 +
+  RFC-0030 + RFC-0032).
+- [x] **Cleanup**: No duplicate or legacy `USER_GUIDE.md` files
+  exist at the repo root (the original RFC's Phase 1 cleanup step
+  was a no-op for this repo).
