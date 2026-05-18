@@ -24,6 +24,7 @@ import httpx
 
 from gradle_deps_monitor.domain.catalog import Library
 from gradle_deps_monitor.domain.license import LicenseAudit, LicenseFinding, LicenseTier
+from gradle_deps_monitor.infrastructure._shared.http import HttpPolicy, make_resilient_client
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -246,7 +247,12 @@ class PomLicenseChecker:
         :param libraries: All catalog libraries to classify.
         :returns: Audit containing only non-permissive findings.
         """
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        # RFC-0030: transient 429 / 5xx / network errors retry with
+        # backoff before bubbling up. POM 404s — the common "no
+        # license metadata published" case — are NOT retried (handled
+        # downstream as UNKNOWN tier).
+        policy = HttpPolicy(timeout_seconds=self._timeout)
+        async with make_resilient_client(policy=policy) as client:
             tasks = [self._check_library(client, lib) for lib in libraries]
             all_findings: list[LicenseFinding] = list(await asyncio.gather(*tasks))
 
