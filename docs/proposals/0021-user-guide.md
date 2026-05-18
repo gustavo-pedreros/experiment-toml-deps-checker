@@ -1,6 +1,6 @@
 # RFC-0021: Official User Guide
 
-**Status:** Draft
+**Status:** In progress (Phase 1 shipped 2026-05-18; Phase 2/3 pending)
 **Created:** 2026-05-07
 **Related JTBDs:** JTBD-5 (Readability), Onboarding
 **Depends on:** none
@@ -30,16 +30,27 @@ While this is a documentation task, it must be "integrated" into the project str
 
 ## Implementation Plan
 
-### Phase 1: Tracer Bullet & Cleanup
-- Create the skeletal guide.
-- Link from README and remove the legacy Spanish file.
+### Phase 1: Tracer Bullet & Cleanup ✅ shipped 2026-05-18
+- [x] Create the skeletal guide at `docs/user-guide/`:
+  `index.md` (TOC + intro) + `getting-started.md` (install, first
+  run, console summary, credentials, opt-in flags, exit codes).
+- [x] Link from `README.md` Documentation section.
+- [x] No legacy `USER_GUIDE.md` files exist at repo root —
+  cleanup step was a no-op.
+- *Note:* moved from a single `docs/USER_GUIDE.md` to a
+  `docs/user-guide/` directory so Phase 2 chapters can land as
+  separate files without rewriting the index.
 
-### Phase 2: Content Drafting
-- Write the core sections (Check, Diff, Config).
-- Verify all CLI flags against the actual implementation.
+### Phase 2: Content Drafting (next PR)
+- Write the core sections (Configuration, Feature Deep-Dives,
+  Troubleshooting).
+- Verify all CLI flags against the actual implementation
+  (post-RFC-0029 + RFC-0018 surface).
 
-### Phase 3: CI Examples
-- Add tested examples for major CI platforms.
+### Phase 3: CI Examples (folded into Phase 2 per plan)
+- Add tested examples for GitHub Actions and Bitrise — driven by
+  the RFC-0018 v1 exit-code contract and the `GITHUB_ACTIONS`
+  annotation emitter that already ships.
 
 ## Alternatives considered
 

@@ -11,6 +11,13 @@ be assigned once a stable public API is established.
 ## [Unreleased]
 
 ### Added
+- **User Guide skeleton** (RFC-0021 Phase 1, tracer for the second
+  open Phase 5 commitment). New `docs/user-guide/` with `index.md`
+  (TOC + intro) and `getting-started.md` (install, first run,
+  reading the console summary, credentials, opt-in flags, exit
+  codes). Linked from the README's Documentation section. Phase 2
+  (Configuration, Feature Deep-Dives, CI Integration,
+  Troubleshooting) lands in the next PR.
 - **CI Gatekeeper v1** (RFC-0018, closes one of two Phase 5
   commitments). Two new opt-in flags on `check`:
   `--fail-on-errors` exits with code `1` when any error-level

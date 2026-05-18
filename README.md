@@ -159,6 +159,7 @@ the six layers and import rules are enforced by `import-linter` in
 
 ## Documentation
 
+- [**User Guide**](docs/user-guide/index.md) — install, run, configure, integrate with CI
 - [Roadmap](docs/roadmap.md) — phases, shipped features, backlog
 - [ADRs](docs/adr/) — architectural decisions (clean architecture, schema versioning, …)
 - [RFCs](docs/proposals/) — design proposals per feature
