@@ -1,8 +1,9 @@
 # RFC-0017: Comprehensive CSV Export (Inventory & Findings)
 
-**Status:** Revised draft (post-stress-test)
+**Status:** Implemented
 **Created:** 2026-05-07
 **Revised:** 2026-05-17 (post stress-test menu; post RFC-0019 through RFC-0027)
+**Shipped:** PR #58 (tracer, 2026-05-17) + PR #59 (enrichment + findings, 2026-05-18)
 **Related JTBDs:** JTBD-5 (Technical Audit Trail), cross-cutting
 **Depends on:** RFC-0026 (PRE_1_0 stability tier — exposed in inventory column)
 **Cross-cuts:** issue #6, #13 from the 2026-05 stress-test menu (see "Stabilisation links" below)

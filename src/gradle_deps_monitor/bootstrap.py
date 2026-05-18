@@ -41,6 +41,7 @@ from gradle_deps_monitor.infrastructure.scanners.oss_index_scanner import OssInd
 from gradle_deps_monitor.infrastructure.writers.diff_json_writer import DiffJsonWriter
 from gradle_deps_monitor.infrastructure.writers.diff_markdown_writer import DiffMarkdownWriter
 from gradle_deps_monitor.infrastructure.writers.diff_slack_writer import DiffSlackWriter
+from gradle_deps_monitor.infrastructure.writers.findings_csv_writer import FindingsCsvWriter
 from gradle_deps_monitor.infrastructure.writers.inventory_csv_writer import InventoryCsvWriter
 from gradle_deps_monitor.infrastructure.writers.json_writer import JsonWriter
 from gradle_deps_monitor.infrastructure.writers.markdown_writer import MarkdownWriter
@@ -109,6 +110,7 @@ def create_check_command(
     - :class:`~...infrastructure.writers.json_writer.JsonWriter`
     - :class:`~...infrastructure.writers.slack_writer.SlackWriter`
     - :class:`~...infrastructure.writers.inventory_csv_writer.InventoryCsvWriter`
+    - :class:`~...infrastructure.writers.findings_csv_writer.FindingsCsvWriter`
     """
     cfg = app_config or AppConfig()
     parser = TomlCatalogParser()
@@ -139,6 +141,7 @@ def create_check_command(
             (f"{_REPORT_STEM}.json", JsonWriter()),
             (f"{_REPORT_STEM}-slack.json", SlackWriter()),
             (f"{_REPORT_STEM}-inventory.csv", InventoryCsvWriter()),
+            (f"{_REPORT_STEM}-findings.csv", FindingsCsvWriter()),
         ],
     )
 
