@@ -2,9 +2,35 @@
 
 One immutable dataclass capturing every operational tunable the
 shared HTTP layer cares about. Per-adapter values are set at the
-adapter's call site (e.g. ``HttpPolicy(timeout_seconds=10.0)`` for
-Maven registries); the dataclass defaults are the conservative
+adapter's call site; the dataclass defaults are the conservative
 fallback for any caller that doesn't override.
+
+Per-adapter rationale
+---------------------
+- **Maven registries** (``MavenVersionStatusResolver``,
+  ``MavenBomResolver``): ``timeout_seconds=10.0``. Maven Central and
+  Google Maven respond in <1 s on the warm path; a 10 s ceiling lets
+  the resilient transport retry transient slowdowns without making
+  the whole freeze stall on a single misbehaving artifact.
+- **Maven POM / metadata adapters** (``ChangelogFetcher``,
+  ``PomLicenseChecker``, ``LibraryHealthChecker``):
+  ``timeout_seconds=15.0``. Tolerates GitHub Releases API tail
+  latency for changelog scraping; matches POM fetch latency
+  observed across the 170-library stress-test corpus.
+- **Vulnerability scanners** (``GitHubAdvisoryScanner``,
+  ``OssIndexScanner``): ``timeout_seconds=30.0``. Advisory queries
+  are larger and can hit secondary databases on the upstream side;
+  the longer ceiling avoids spurious retries while the resilient
+  transport still re-attempts on genuine 5xx / 429.
+
+Concurrency
+-----------
+``max_concurrency=20`` matches the GitHub Advisory Scanner pattern
+adopted across the project. Consumed by adapter-level
+``asyncio.Semaphore`` instances — the transport itself does not
+enforce this (transports are shared across concurrent tasks per
+httpx contract; per-transport state would require synchronisation
+we don't otherwise need).
 """
 
 from __future__ import annotations

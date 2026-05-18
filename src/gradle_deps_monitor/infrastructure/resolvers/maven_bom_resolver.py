@@ -18,8 +18,8 @@ import httpx
 from gradle_deps_monitor.domain.bom import BomResolution, ManagedCoordinate
 from gradle_deps_monitor.domain.catalog import Library
 from gradle_deps_monitor.domain.version import MavenVersion
+from gradle_deps_monitor.infrastructure._shared.http import HttpPolicy, make_resilient_client
 
-_HTTP_TIMEOUT = httpx.Timeout(10.0)
 _GOOGLE_PREFIXES: tuple[str, ...] = ("androidx.", "com.google.", "com.android.")
 _MAVEN_CENTRAL = "https://repo1.maven.org/maven2"
 _GOOGLE_MAVEN = "https://dl.google.com/dl/android/maven2"
@@ -36,7 +36,10 @@ class MavenBomResolver:
         if not boms:
             return ()
 
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+        # RFC-0030: resilient transport. Matches MavenVersionStatusResolver's
+        # 10 s timeout — both adapters hit the same registries from the same
+        # use case.
+        async with make_resilient_client(policy=HttpPolicy(timeout_seconds=10.0)) as client:
             tasks = [self._resolve_one(bom, client) for bom in boms]
             results = await asyncio.gather(*tasks, return_exceptions=False)
 

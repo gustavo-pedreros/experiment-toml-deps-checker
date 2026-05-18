@@ -33,9 +33,6 @@ from gradle_deps_monitor.infrastructure._shared.http import HttpPolicy, make_res
 _MAVEN_CENTRAL_BASE = "https://repo1.maven.org/maven2"
 _GOOGLE_MAVEN_BASE = "https://dl.google.com/dl/android/maven2"
 
-# HTTP request timeout (seconds).
-_HTTP_TIMEOUT = 15.0
-
 # Groups that are likely hosted on Google Maven rather than Maven Central.
 _GOOGLE_GROUPS = frozenset(
     {
@@ -234,12 +231,11 @@ class PomLicenseChecker:
     All HTTP requests are made concurrently via :func:`asyncio.gather`.
     The checker first tries Maven Central; for Google-group libraries it
     falls back to Google Maven when Maven Central returns a non-200 status.
-
-    :param http_timeout: Per-request timeout in seconds (default: 15).
+    Timeout / retry / backoff behaviour are owned by the shared
+    :class:`~...infrastructure._shared.http.HttpPolicy` and the resilient
+    transport built by
+    :func:`~...infrastructure._shared.http.make_resilient_client` (RFC-0030).
     """
-
-    def __init__(self, http_timeout: float = _HTTP_TIMEOUT) -> None:
-        self._timeout = http_timeout
 
     async def check(self, libraries: tuple[Library, ...]) -> LicenseAudit:
         """Audit *libraries* and return a :class:`~...domain.license.LicenseAudit`.
@@ -250,9 +246,9 @@ class PomLicenseChecker:
         # RFC-0030: transient 429 / 5xx / network errors retry with
         # backoff before bubbling up. POM 404s — the common "no
         # license metadata published" case — are NOT retried (handled
-        # downstream as UNKNOWN tier).
-        policy = HttpPolicy(timeout_seconds=self._timeout)
-        async with make_resilient_client(policy=policy) as client:
+        # downstream as UNKNOWN tier). 15 s timeout matches the other
+        # Maven-Central adapters.
+        async with make_resilient_client(policy=HttpPolicy(timeout_seconds=15.0)) as client:
             tasks = [self._check_library(client, lib) for lib in libraries]
             all_findings: list[LicenseFinding] = list(await asyncio.gather(*tasks))
 

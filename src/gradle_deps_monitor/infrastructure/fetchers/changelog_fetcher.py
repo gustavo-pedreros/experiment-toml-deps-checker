@@ -48,7 +48,6 @@ _GOOGLE_MAVEN_BASE = "https://dl.google.com/dl/android/maven2"
 _GITHUB_API_BASE = "https://api.github.com"
 _GITHUB_RAW_BASE = "https://raw.githubusercontent.com"
 
-_HTTP_TIMEOUT = 15.0
 # RFC-0030: cap concurrent requests so a catalog with 50+ major
 # upgrades doesn't open 50+ simultaneous GitHub Releases API
 # connections. Matches the GitHub Advisory Scanner's cap.
@@ -297,7 +296,9 @@ class ChangelogFetcher:
         # network blips. The per-library Semaphore caps concurrency for
         # both gather batches so a 170-lib catalog doesn't fan out 170
         # simultaneous Maven + GitHub requests.
-        policy = HttpPolicy(timeout_seconds=_HTTP_TIMEOUT, max_concurrency=_MAX_CONCURRENT_REQUESTS)
+        # RFC-0030: 15 s tolerates GitHub Releases API tail latency
+        # without keeping a Maven 404 path open longer than needed.
+        policy = HttpPolicy(timeout_seconds=15.0, max_concurrency=_MAX_CONCURRENT_REQUESTS)
         async with make_resilient_client(policy=policy) as client:
             sem = asyncio.Semaphore(_MAX_CONCURRENT_REQUESTS)
 
