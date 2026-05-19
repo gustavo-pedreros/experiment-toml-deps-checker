@@ -43,6 +43,12 @@ dev = [
     "mypy>=1.10",
     "import-linter>=2.0",
 ]
+# Downstream analytics tooling (tools/analytics/). Opt-in: not part of
+# the default install path. See ADR-0010 + RFC-0033.
+analytics = [
+    "duckdb>=1.1,<2.0",
+    "tabulate>=0.9",
+]
 
 [project.scripts]
 gradle-deps-monitor = "gradle_deps_monitor.cli:app"
