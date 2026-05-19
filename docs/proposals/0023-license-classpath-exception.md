@@ -1,7 +1,8 @@
 # RFC-0023: License Classifier — GPL with Classpath Exception
 
-**Status:** Proposed
+**Status:** Implemented
 **Created:** 2026-05-16
+**Shipped:** 2026-05-16 (PR #51)
 **Related JTBDs:** JTBD-2 (compliance / legal), JTBD-5 (report accuracy)
 **Depends on:** RFC-0009 (License Audit)
 
@@ -215,19 +216,19 @@ splitting into multiple PRs would add ceremony without lowering risk.
 
 ## Definition of Done (DoD)
 
-- [ ] **Integration:** `_CLASSPATH_EXCEPTION_KEYWORDS` pre-check is in
+- [x] **Integration:** `_CLASSPATH_EXCEPTION_KEYWORDS` pre-check is in
   place in `_classify_license`; no wiring change needed in
   `bootstrap.py`.
-- [ ] **Architecture:** Follows ADR-0006 (Clean Architecture) and
+- [x] **Architecture:** Follows ADR-0006 (Clean Architecture) and
   ADR-0009 (Tracer Bullets).
-- [ ] **Accuracy — positive cases:** Unit tests verify
+- [x] **Accuracy — positive cases:** Unit tests verify
   `_classify_license` returns PERMISSIVE for the full prose form,
   the SPDX expression form, the URL-only form, and mixed-case input.
-- [ ] **Accuracy — negative cases:** Unit tests verify vanilla GPL
+- [x] **Accuracy — negative cases:** Unit tests verify vanilla GPL
   still returns STRONG_COPYLEFT and vanilla LGPL still returns
   WEAK_COPYLEFT.
-- [ ] **No regression:** All existing tests in
+- [x] **No regression:** All existing tests in
   `tests/infrastructure/checkers/test_pom_license_checker.py` pass
   unmodified.
-- [ ] **Documentation:** CHANGELOG entry under `[Unreleased] / Fixed`
+- [x] **Documentation:** CHANGELOG entry under `[0.1.0] / Fixed`
   credits RFC-0023 and describes the symptom + fix.

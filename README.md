@@ -73,12 +73,30 @@ gradle-deps-monitor check gradle --module-usage --risk-score
 ## Commands
 
 ```bash
-gradle-deps-monitor check <gradle-dir> [--out DIR] [--module-usage] [--risk-score]
+gradle-deps-monitor check <gradle-dir> [--out DIR] [--module-usage] [--risk-score] \
+                                       [--no-cache] [--clear-cache] [--cache-ttl SECONDS] \
+                                       [--fail-on-errors] [--warn-on CATEGORY[,…]]
 gradle-deps-monitor diff  <current.json> [--prev <previous.json>] [--out DIR]
 ```
 
 `diff` compares two `freeze.json` reports. Run without `--prev` to register a
 baseline on first use.
+
+## CI gating
+
+Use `--fail-on-errors` to exit `1` on any error-level finding (critical CVE,
+compliance violation, toolchain error, strong-copyleft license). Use
+`--warn-on <category[,…]>` to surface a "Policy warnings" section without
+changing the exit code; categories are `high-vulnerability`, `compliance`,
+`toolchain`, `library-health`, `deprecated`, `breaking`, `license`.
+
+Exit codes follow `sysexits.h`: `0` success, `1` policy violation, `2` usage
+error (bad flag), `3` configuration / parse error. Under GitHub Actions
+(`GITHUB_ACTIONS=true`), the CLI also emits `::error file=…::…` / `::warning
+file=…::…` workflow annotations so violations show up inline in PR diffs.
+
+End-to-end recipes for GitHub Actions and Bitrise live in
+[`docs/user-guide/ci-integration.md`](docs/user-guide/ci-integration.md).
 
 ## Outputs
 
