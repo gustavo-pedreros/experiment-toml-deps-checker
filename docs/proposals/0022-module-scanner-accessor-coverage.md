@@ -1,7 +1,8 @@
 # RFC-0022: Module Scanner — Accessor Coverage Follow-up
 
-**Status:** Proposed
+**Status:** Implemented
 **Created:** 2026-05-15
+**Shipped:** 2026-05-15 (PR #50)
 **Related JTBDs:** JTBD-3 (blast radius), JTBD-5 (report accuracy)
 **Depends on:** RFC-0019 (Module Scanner)
 
@@ -314,23 +315,23 @@ housekeeping in three commits within a single PR.
 
 ## Definition of Done (DoD)
 
-- [ ] **Integration:** Updated scanner wired in the **Composition
+- [x] **Integration:** Updated scanner wired in the **Composition
   Root** (`bootstrap.py`). _(No wiring change required; verify the
   use case still receives an instance.)_
-- [ ] **Architecture:** Follows ADR-0006 (Clean Architecture) and
+- [x] **Architecture:** Follows ADR-0006 (Clean Architecture) and
   ADR-0009 (Tracer Bullets).
-- [ ] **Accuracy — underscore:** Unit tests verify
+- [x] **Accuracy — underscore:** Unit tests verify
   `_alias_to_accessor` and `_alias_to_camel` correctly normalise
   underscore-only, dash-only, and mixed aliases.
-- [ ] **Accuracy — `platform()`:** Unit tests verify detection of
+- [x] **Accuracy — `platform()`:** Unit tests verify detection of
   `platform()`, `enforcedPlatform()`, and `testFixtures()` wrappers
   in both Groovy and KTS forms.
-- [ ] **Integration corpus:** Fixture under `tests/fixtures/`
+- [x] **Integration corpus:** Fixture under `tests/fixtures/`
   exercises both fixes and asserts non-zero counts where the previous
   scanner returned zero.
-- [ ] **No regression:** All existing tests in
+- [x] **No regression:** All existing tests in
   `tests/infrastructure/scanners/test_gradle_module_scanner.py` pass
   unmodified.
-- [ ] **Documentation:** Markdown writer banner rewritten to
+- [x] **Documentation:** Markdown writer banner rewritten to
   enumerate all four accessor forms; CHANGELOG entry credits
   RFC-0022.

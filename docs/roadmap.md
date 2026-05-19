@@ -117,6 +117,26 @@ these RFCs or rolled into RFC-0017 (CSV export) / RFC-0028
 | ✅ | Stability-Gated `<release>` Fallback in Version Registries | [RFC-0027](proposals/0027-version-registry-stability-gate.md) |
 | ✅ | Phase 6 Wrap-up — Render Empty Sections + Fix Console Severity Buckets | [RFC-0028](proposals/0028-phase6-wrap-up-empty-sections-and-console-buckets.md) |
 
+## Phase 7 — Stability Hardening + v0.1.0 cut ✅ Closed (2026-05-18)
+
+A 3-agent audit after Phase 6 close surfaced ten operational
+fragility risks (R1–R10) that didn't qualify as user-visible bugs
+but were worth fixing before the first public release. This phase
+addressed all ten plus the two open Phase 5 commitments (RFC-0018
+CI Gatekeeper, RFC-0021 User Guide), and ended with the v0.1.0
+git tag — the project's first public release.
+
+| Status | Item | Reference |
+|--------|------|-----------|
+| ✅ | Test infra modernization + Py 3.11/3.12/3.13/3.14 CI matrix | (no RFC — closes R1, R2) |
+| ✅ | Cache controls (CLI flags, env-var root, per-source TTL) | [RFC-0029](proposals/0029-cache-controls.md) — closes R7 |
+| ✅ | Shared HTTP resilience layer (retry / backoff / Retry-After) | [RFC-0030](proposals/0030-http-resilience.md) — closes R3, R4, R5, R6 |
+| ✅ | Bootstrap composition-root unit tests | [RFC-0031](proposals/0031-bootstrap-composition-tests.md) — closes R9 |
+| ✅ | Atomic report writes (temp-file + os.replace) | [RFC-0032](proposals/0032-atomic-writes.md) — closes R8 |
+| ✅ | CI Gatekeeper v1 (`--fail-on-errors`, `--warn-on`, GHA annotations) | [RFC-0018](proposals/0018-ci-gatekeeper.md) — Phase 5 close |
+| ✅ | Official User Guide (5 chapters) | [RFC-0021](proposals/0021-user-guide.md) — Phase 5 close |
+| ✅ | `v0.1.0` git tag — first public release | (release prep — closes R10) |
+
 ## Backlog
 
 Items accepted into the roadmap, scheduled after Phase 6.
