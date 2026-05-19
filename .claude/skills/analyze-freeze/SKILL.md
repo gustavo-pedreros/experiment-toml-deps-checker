@@ -91,10 +91,23 @@ directory MUST contain both `freeze-inventory.csv` and
   runner caught it. Point to `tools/analytics/schema.sql` and
   `docs/proposals/0017-csv-export.md`. Do not edit those files
   yourself; defer to a maintainer.
-- A section renders "No rows" with a "Scanner not run" hint → the
-  user ran `gradle-deps-monitor check` without the relevant opt-in
-  flag (`--risk-score`, `--module-usage`) or without CVE credentials.
-  Mention the flag they'd need for that dimension.
+- A section renders "Scanner not run for this dimension. Re-run
+  `gradle-deps-monitor check --risk-score` …" → the user ran
+  `check` without the relevant opt-in. Repeat the suggested command
+  to them.
+- The `Compound: duplicates with CVEs` section renders "No rows for
+  this query against this report." → this is the **expected** clean
+  outcome. Don't flag it as an error. The query only emits rows
+  when the catalog has duplicate aliases on the same coordinate AND
+  one of them carries a CVE.
+- A path with spaces in the argument → quote the directory when
+  invoking `python tools/analytics/runner.py --dir "<path with
+  spaces>"`. The runner uses `pathlib.Path` internally so embedded
+  spaces are safe once Bash-quoted at the call site.
+- `duckdb.duckdb.ParserException` from a PIVOT or window function →
+  the user is on an older DuckDB minor than the project pins. Tell
+  them to reinstall the extra (`pip install -U -e ".[analytics]"`)
+  to pick up the pinned `duckdb>=1.1,<2.0`.
 
 ## Why this skill exists
 

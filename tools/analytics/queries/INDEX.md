@@ -63,11 +63,14 @@ Soft signals (nudge toward canonical, don't decide alone):
 
 | # | Name | Purpose | Columns touched | What it tells a reviewer |
 |---|------|---------|-----------------|--------------------------|
-| 01 | `top_risk` | Top 15 libraries by composite risk score with explanatory dimensions | `alias`, `coordinate`, `version`, `risk_score`, `risk_level`, `drift`, `vulnerability_count`, `license_tier` | Where to start triage. Compresses the 5-dimension risk story into one ranked list. |
-
-> The 7 queries planned for PR2 (`02_drift_by_severity` …
-> `08_bom_coverage`) are documented in [RFC-0033](../../../docs/proposals/0033-analyze-freeze-skill.md);
-> their rows land in this registry as each query is added.
+| 01 | `top_risk` | Top 15 libraries by composite risk score with explanatory dimensions | `risk_score`, `risk_level`, `drift`, `vulnerability_count`, `license_tier` | Where to start triage. Compresses the 5-dimension risk story into one ranked list. |
+| 02 | `drift_by_severity` | Catalog buckets at `drift × risk_level` | `drift`, `risk_level` | Go/no-go bucket counts ("how much is `major` × `HIGH`?") in one glance. |
+| 03 | `compound_security_duplicates` | Duplicate aliases on the same coordinate where one copy has CVEs | `coordinate`, `vulnerability_count`, `duplicate_of` (implicit) via self-join | The RFC-0017 issue-#13 compound: hidden CVE exposure caused by stale duplicate aliases. |
+| 04 | `unstable_prerelease_in_prod` | Libraries pinned to a non-stable tier | `stability_tier`, `drift`, `latest_stable` | Pre-release ships in the catalog that may need a deliberate review. |
+| 05 | `inactive_or_unhealthy` | Libraries flagged anything other than `active` | `health_status`, `usage_count` | RFC-0006 library-health signal lifted from the narrative — what to migrate off. |
+| 06 | `license_risk` | Non-permissive / unknown licenses | `license_tier` | Compliance review cohort, ordered by tier severity. |
+| 07 | `finding_severity_breakdown` | `findings` distribution per section × severity | `section`, `common_severity` (findings) | "Where are my ERRORs?" — one-shot cross-section bucket counts. |
+| 08 | `bom_coverage` | Library counts per BoM cohort | `bom_parent` | BoM hygiene — is BoM adoption consistent or fragmented across cohorts? |
 
 ## Coverage
 

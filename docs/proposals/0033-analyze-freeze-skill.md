@@ -1,7 +1,8 @@
 # RFC-0033: `/analyze-freeze` skill and canonical query library
 
-**Status:** Proposed
+**Status:** Implemented
 **Created:** 2026-05-19
+**Shipped:** 2026-05-19 (PR1 #75 tracer + PR2 fill)
 **Related JTBDs:** JTBD-5 (operator control), JTBD-3 (reproducible runs)
 **Depends on:** ADR-0010 (analytics stack — DuckDB), RFC-0017 (CSV export)
 **Opens phase:** Phase 8 — Analytics & insights
@@ -290,20 +291,20 @@ roadmap. CHANGELOG entry.
 
 ## Definition of done
 
-- [ ] PR1 lands ADR-0010 + this RFC + `tools/analytics/` scaffold +
+- [x] PR1 lands ADR-0010 + this RFC + `tools/analytics/` scaffold +
   skill stub + `01_top_risk.sql` + skeletal INDEX.md + Phase 8
   roadmap row + `[analytics]` extra + CHANGELOG entry.
-- [ ] PR1 smoke test: `python tools/analytics/runner.py --dir
+- [x] PR1 smoke test: `python tools/analytics/runner.py --dir
   reports/sunflower-2026-05-19/` exits 0, prints a Markdown document
   with one `## Top risk` section, top row is one of `androidx-compose-*`
   (risk_score 28).
-- [ ] PR1 skill invocation: `/analyze-freeze reports/sunflower-2026-05-19/`
+- [x] PR1 skill invocation: `/analyze-freeze reports/sunflower-2026-05-19/`
   in Claude Code resolves the path, runs the runner, surfaces a
   1–2 sentence summary citing top-risk libraries, doesn't write
   any files.
-- [ ] PR2 lands queries 02–08, render polish, User Guide page,
+- [x] PR2 lands queries 02–08, render polish, User Guide page,
   README pointer, CONTRIBUTING reading-order update.
-- [ ] PR2 verification on `reports/sunflower-2026-05-19/`:
+- [x] PR2 verification on `reports/sunflower-2026-05-19/`:
   - All 8 sections present in stdout.
   - `compound_security_duplicates` renders "no rows" (Sunflower
     has none) — confirms empty-result rendering.
@@ -314,9 +315,9 @@ roadmap. CHANGELOG entry.
   - `license_risk` lists `junit` (weak_copyleft) + `guava` (unknown).
   - `finding_severity_breakdown` totals match the 10 data rows in
     `freeze-findings.csv`.
-- [ ] `docs/roadmap.md` shows Phase 8 ✅ Closed (v1) with RFC-0033
+- [x] `docs/roadmap.md` shows Phase 8 ✅ Closed (v1) with RFC-0033
   ✅ and RFC-0010 📋.
-- [ ] RFC-0033 status flipped to `Implemented` in PR2.
+- [x] RFC-0033 status flipped to `Implemented` in PR2.
 
 ## Out of scope
 

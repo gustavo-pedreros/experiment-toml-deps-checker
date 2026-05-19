@@ -9,13 +9,22 @@ context faster than re-reading every commit.
 1. `README.md` — what the tool does today, install + first run, the
    five outputs.
 2. `docs/user-guide/` — operator manual: getting started, configuration,
-   each feature explained, CI integration recipes, troubleshooting.
+   each feature explained, CI integration recipes, analyzing a freeze
+   report, troubleshooting.
 3. `docs/roadmap.md` — phases shipped, current focus, backlog.
 4. `docs/jtbd.md` — the user jobs the tool serves.
 5. `docs/adr/` — accepted architectural decisions; do not relitigate
    without a strong reason.
 6. `docs/proposals/` — RFCs (open and shipped) per feature.
-7. `docs/diagrams/` — four hand-drawn architecture diagrams from
+7. `.claude/skills/` — Claude Code skills (parameterised recipes
+   bundled with the repo). The canonical example is
+   [`analyze-freeze`](.claude/skills/analyze-freeze/SKILL.md), which
+   wraps the `tools/analytics/` query library. See
+   [ADR-0010](docs/adr/0010-analytics-stack-duckdb.md) for the
+   architectural rationale (DuckDB query layer, tabulate-only
+   render) and [the User Guide chapter](docs/user-guide/analyzing-a-freeze-report.md)
+   for the skill-vs-sub-agent primer.
+8. `docs/diagrams/` — four hand-drawn architecture diagrams from
    system-context down to port↔adapter map.
 
 ## Dev setup

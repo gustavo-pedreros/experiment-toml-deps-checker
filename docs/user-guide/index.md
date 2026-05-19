@@ -22,7 +22,10 @@ read the output, and wire the tool into CI. It complements the
    resolution, License audit, Module Usage map, Risk Score.
 4. **[CI integration](ci-integration.md)** — GitHub Actions and
    Bitrise recipes, plus the exit-code contract from RFC-0018.
-5. **[Troubleshooting](troubleshooting.md)** — what each warning
+5. **[Analyzing a freeze report](analyzing-a-freeze-report.md)** —
+   the `/analyze-freeze` Claude Code skill, the canonical query
+   library, and how to extend it.
+6. **[Troubleshooting](troubleshooting.md)** — what each warning
    means and what to do about it.
 
 ## Quick links
