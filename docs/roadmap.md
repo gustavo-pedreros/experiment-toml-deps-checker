@@ -137,6 +137,17 @@ git tag — the project's first public release.
 | ✅ | Official User Guide (5 chapters) | [RFC-0021](proposals/0021-user-guide.md) — Phase 5 close |
 | ✅ | `v0.1.0` git tag — first public release | (release prep — closes R10) |
 
+## Phase 8 follow-ups 🚧 In progress
+
+Small, surgical cleanups that surfaced after Phase 8 v1 closed but
+before the v0.2.0 release cut. Each item is single-PR-sized and
+breaks a default that pre-1.0 SemVer permits us to break without a
+new MAJOR.
+
+| Status | Item | Reference |
+|--------|------|-----------|
+| 🚧 | Slack output becomes opt-in (`--slack` flag + `[output] slack = true`) | [RFC-0034](proposals/0034-output-slack-opt-in.md) |
+
 ## Phase 8 — Analytics & insights ✅ Closed v1 (2026-05-19)
 
 Downstream consumption of the RFC-0017 CSVs. The freeze report

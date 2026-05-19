@@ -72,6 +72,23 @@ cold ones on the validation corpus (170 libraries: ~5 s warm vs.
 ~9 s cold). It is safe to share across projects — entries are keyed
 by Maven coordinate, not by your catalog.
 
+### `[output]` — Opt-in output writers (RFC-0034)
+
+```toml
+[output]
+# When true, also emit freeze-slack.json (Slack Block Kit).
+# When false (default), the Slack writer is skipped.
+# CLI: --slack / --no-slack overrides this value.
+slack = true
+```
+
+The four "load-bearing" outputs (`freeze.md`, `freeze.json`,
+`freeze-inventory.csv`, `freeze-findings.csv`) are always emitted —
+the diff command and the `/analyze-freeze` skill depend on them.
+Only Slack is exposed as opt-in today. The same shape will extend
+to the planned HTML export when RFC-0010 lands
+(`[output] html = true`).
+
 ### Unknown keys
 
 Unknown top-level sections or keys are logged as warnings, not
@@ -127,4 +144,6 @@ gradle-deps-monitor diff first/freeze.json
 ```
 
 Outputs land alongside `check` outputs by default (`./reports/`):
-`freeze-diff.md`, `freeze-diff.json`, `freeze-diff-slack.json`.
+`freeze-diff.md`, `freeze-diff.json`. Add `--slack` (or
+`[output] slack = true` in a `gradle-deps-monitor.toml` at the cwd)
+to also emit `freeze-diff-slack.json` per RFC-0034.

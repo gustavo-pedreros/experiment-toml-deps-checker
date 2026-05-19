@@ -61,19 +61,24 @@ By default, reports land in `./reports/`. Override with `--out`:
 gradle-deps-monitor check /path/to/your/project/gradle --out freeze-reports/$(date +%Y-%m-%d)
 ```
 
-A successful run produces a Rich console summary plus five files:
+A successful run produces a Rich console summary plus four files
+(five with `--slack`):
 
 | File | Format | What it is |
 |---|---|---|
 | `freeze.md` | Markdown | Human-readable canonical report (one section per check) |
 | `freeze.json` | JSON | Machine-readable snapshot, SemVer-versioned per ADR-0008 |
-| `freeze-slack.json` | JSON (Block Kit) | Slack-friendly summary, post via incoming webhook |
 | `freeze-inventory.csv` | CSV | One row per catalog library, all dimensions joined (RFC-0017) |
 | `freeze-findings.csv` | CSV | One row per finding across every section (RFC-0017) |
+| `freeze-slack.json` *(opt-in via `--slack`)* | JSON (Block Kit) | Slack-friendly summary, post via incoming webhook (RFC-0034) |
 
 The Markdown report is the canonical one for humans; the JSON is the
 canonical one for tooling (its schema follows SemVer — see
 [ADR-0008](../adr/0008-json-schema-semver.md)).
+
+Pass `--slack` (or set `[output] slack = true` in your config — see
+[Configuration](configuration.md)) to also emit the Block Kit JSON
+for posting to a Slack incoming webhook.
 
 ## Reading the console summary
 
@@ -97,7 +102,7 @@ Library Health       ⚠ 3 deprecated
 Major Upgrades       4 likely-breaking, 12 other
 
 Reports written → reports/
-  • freeze.md  • freeze.json  • freeze-slack.json
+  • freeze.md  • freeze.json
   • freeze-inventory.csv  • freeze-findings.csv
 ```
 

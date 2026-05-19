@@ -228,26 +228,22 @@ foo = "bar"
         tmp_path: Path,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """``[output]`` and ``[library_health]`` are reserved for future RFCs.
+        """``[library_health]`` is still reserved for a future RFC.
 
-        ``[cache]`` is no longer "reserved-but-unused"; it is wired in
-        RFC-0029 and has its own dedicated tests below.
+        ``[cache]`` (RFC-0029) and ``[output]`` (RFC-0034) are now
+        consumed sections and have their own dedicated tests.
         """
         _write(
             tmp_path,
             """
-[output]
-default_dir = "freeze-reports"
-
 [library_health]
 extra_kb_path = "ops/extra.yaml"
 """,
         )
         with caplog.at_level(logging.WARNING):
             cfg = load_config(tmp_path)
-        # Risk weights and risk thresholds use defaults; cache also uses defaults.
+        # Risk weights, thresholds, cache, output all use defaults.
         assert cfg == AppConfig()
-        assert "output" not in caplog.text.lower() or "ignored" not in caplog.text.lower()
         assert "library_health" not in caplog.text.lower() or "ignored" not in caplog.text.lower()
 
 
@@ -344,3 +340,46 @@ ttl_seconds_advisory = 3600
         _write(tmp_path, '[cache]\nroot = "~/.custom-cache"\n')
         cfg = load_config(tmp_path)
         assert cfg.cache.root == Path.home() / ".custom-cache"
+
+
+# ---------------------------------------------------------------------------
+# [output] section (RFC-0034)
+# ---------------------------------------------------------------------------
+
+
+class TestOutputSection:
+    def test_section_absent_uses_default(self, tmp_path: Path) -> None:
+        _write(tmp_path, "[cache]\nttl_seconds_maven = 60\n")
+        cfg = load_config(tmp_path)
+        assert cfg.output.slack is False
+
+    def test_slack_true_is_parsed(self, tmp_path: Path) -> None:
+        _write(tmp_path, "[output]\nslack = true\n")
+        cfg = load_config(tmp_path)
+        assert cfg.output.slack is True
+
+    def test_slack_false_is_parsed(self, tmp_path: Path) -> None:
+        _write(tmp_path, "[output]\nslack = false\n")
+        cfg = load_config(tmp_path)
+        assert cfg.output.slack is False
+
+    def test_section_must_be_table(self, tmp_path: Path) -> None:
+        _write(tmp_path, 'output = "oops"')
+        with pytest.raises(ConfigError, match=r"\[output\].*must be a TOML table"):
+            load_config(tmp_path)
+
+    def test_slack_must_be_boolean(self, tmp_path: Path) -> None:
+        _write(tmp_path, '[output]\nslack = "yes"\n')
+        with pytest.raises(ConfigError, match="must be a boolean"):
+            load_config(tmp_path)
+
+    def test_unknown_key_warns_but_doesnt_fail(
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        _write(tmp_path, "[output]\nslack = true\nfuture_html = true\n")
+        with caplog.at_level(logging.WARNING):
+            cfg = load_config(tmp_path)
+        assert cfg.output.slack is True
+        assert "future_html" in caplog.text
