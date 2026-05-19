@@ -8,6 +8,30 @@ be assigned once a stable public API is established.
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Phase 8 — Analytics & insights opener (tracer).** First
+  project-level Claude Code skill: `/analyze-freeze <report-dir>`
+  runs a DuckDB-backed canonical query library against the RFC-0017
+  CSVs (`freeze-inventory.csv` + `freeze-findings.csv`) and emits a
+  Markdown insight summary. v1 ships the `top_risk` query
+  end-to-end; queries 02–08 land in PR2. Analytics deps (DuckDB +
+  pandas) are opt-in via the new `[analytics]` extra
+  (`pip install -e ".[analytics]"`) — the default install path is
+  untouched. Architecture pinned by [ADR-0010](docs/adr/0010-analytics-stack-duckdb.md)
+  (DuckDB query layer; pandas confined to rendering; analytics code
+  in `tools/analytics/`, outside the 6 Clean Architecture layers).
+  See [RFC-0033](docs/proposals/0033-analyze-freeze-skill.md).
+- [ADR-0010](docs/adr/0010-analytics-stack-duckdb.md) — Analytics
+  stack: DuckDB as the query layer for downstream insights, with
+  the "SQL for compute, pandas for render" discipline.
+- [RFC-0033](docs/proposals/0033-analyze-freeze-skill.md) —
+  `/analyze-freeze` skill + canonical query library design.
+
+---
+
 ## [0.1.0] — 2026-05-18
 
 First public release of `gradle-deps-monitor` — a freeze-time

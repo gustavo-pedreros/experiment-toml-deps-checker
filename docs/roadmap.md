@@ -137,15 +137,29 @@ git tag — the project's first public release.
 | ✅ | Official User Guide (5 chapters) | [RFC-0021](proposals/0021-user-guide.md) — Phase 5 close |
 | ✅ | `v0.1.0` git tag — first public release | (release prep — closes R10) |
 
+## Phase 8 — Analytics & insights 🚧 In progress
+
+Downstream consumption of the RFC-0017 CSVs. The freeze report
+became a high-fidelity interchange surface in Phase 5 but had no
+canonical consumer; Phase 8 ships the first analytical query layer
+and the first project-level Claude Code skill, positioned upstream
+of the future HTML export. The architectural constraint that
+binds the phase is [ADR-0010](adr/0010-analytics-stack-duckdb.md)
+(DuckDB as the query layer; pandas confined to rendering).
+
+| Status | Item | Reference |
+|--------|------|-----------|
+| 🚧 | `/analyze-freeze` skill + canonical query library | [RFC-0033](proposals/0033-analyze-freeze-skill.md) |
+| 📋 | HTML export (consumes the canonical query layer) | [RFC-0010](proposals/0010-html-export.md) |
+
 ## Backlog
 
-Items accepted into the roadmap, scheduled after Phase 6.
+Items accepted into the roadmap, scheduled after Phase 8.
 Ordering inside the backlog is not yet fixed; items here may be
 re-promoted into a later phase or split into sub-RFCs.
 
 | Status | Item | Reference |
 |--------|------|-----------|
-| 📋 | HTML export (incorporates risk & freeze trend rendering) | [RFC-0010](proposals/0010-html-export.md) |
 | 💭 | Tag annotation auto-generation | — |
 | 💭 | Trend dashboard across freeze history | — |
 
@@ -175,6 +189,8 @@ decisions. The most consequential ones for newcomers:
 - [ADR-0006](adr/0006-pragmatic-clean-architecture.md) — Pragmatic Clean Architecture for the Python CLI
 - [ADR-0007](adr/0007-tooling-stack.md) — Tooling stack
 - [ADR-0008](adr/0008-json-schema-semver.md) — JSON output `schema_version` follows SemVer (`x.y.z`)
+- [ADR-0009](adr/0009-tracer-bullets-and-spikes.md) — Tracer bullets and spikes for integrated development
+- [ADR-0010](adr/0010-analytics-stack-duckdb.md) — Analytics stack: DuckDB as the query layer for downstream insights
 
 ## How to evolve this roadmap
 

@@ -121,6 +121,11 @@ splitting into sub-RFCs.
 | [0026](0026-pre-1-0-stability-tier.md) | `PRE_1_0` Stability Tier for `0.x.y` Versions | Proposed | 1, 5 |
 | [0027](0027-version-registry-stability-gate.md) | Stability-Gated `<release>` Fallback in Version Registries | Proposed | 1, 5 |
 | [0028](0028-phase6-wrap-up-empty-sections-and-console-buckets.md) | Phase 6 Wrap-up — Render Empty Sections + Fix Console Severity Buckets | Proposed | 1, 5 |
+| [0029](0029-cache-controls.md) | Cache controls (CLI flags, per-source TTL, env-var root) | Proposed | 5 |
+| [0030](0030-http-resilience.md) | Shared HTTP resilience layer (retry / backoff / Retry-After) | Proposed | 5 |
+| [0031](0031-bootstrap-composition-tests.md) | Bootstrap composition-root unit tests | Proposed | 5 |
+| [0032](0032-atomic-writes.md) | Atomic report writes (temp-file + os.replace) | Proposed | 3, 5 |
+| [0033](0033-analyze-freeze-skill.md) | `/analyze-freeze` skill and canonical query library | Proposed | 3, 5 |
 
 > Lifecycle status (Accepted, In progress, Shipped) is tracked in
 > [`docs/roadmap.md`](../roadmap.md). The "Status" column above
