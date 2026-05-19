@@ -46,9 +46,18 @@ Several options were considered:
   Python and in the browser.
 - **DuckDB for compute, pandas for render only.** A hybrid where
   the `.sql` files are the portable asset and pandas is confined
-  to a single render function that calls `to_markdown()`. Keeps
-  the compute layer browser-portable; gains a one-line Markdown
-  emitter without re-implementing tabulation.
+  to a single render function that calls `to_markdown()`. Originally
+  attractive because pandas 2.x pulled `tabulate` transitively, so
+  the dep cost looked like one package. Empirically falsified during
+  the RFC-0033 tracer: pandas 3.x dropped that transitive pull, so
+  `tabulate` has to be declared explicitly anyway — at which point
+  pandas is doing nothing except wrapping a one-line `tabulate` call
+  in a DataFrame round-trip. Rejected after that finding.
+- **DuckDB + tabulate (chosen).** DuckDB does compute; `tabulate`
+  formats `rel.fetchall()` directly into a GitHub-flavoured
+  Markdown table. No pandas, no numpy. Same one-line render
+  ergonomics as `df.to_markdown()`, two-dep total install footprint
+  (DuckDB engine + ~40 KB of `tabulate`).
 
 The CSV contract itself is implicit (no `schema_version` field —
 [RFC-0017](../proposals/0017-csv-export.md) declined to add one to
@@ -65,11 +74,12 @@ file per canonical question. Each file is self-contained: a single
 `findings`, with no DuckDB-only extensions that won't survive a
 port to DuckDB-WASM.
 
-**Pandas is permitted only in the render layer** (`tools/analytics/render.py`).
-The single allowed pandas touchpoint is `DuckDBPyRelation.df()` →
-`DataFrame.to_markdown()`. Computation — filtering, joining, grouping,
-aggregating, pivoting — happens in SQL. This is a discipline-based
-rule, not a tooling-enforced one; reviewers check it at PR time.
+**`tabulate` is the only presentation-layer library.** The render
+function in `tools/analytics/render.py` reads `rel.columns` and
+`rel.fetchall()` from a DuckDB relation and feeds them to
+`tabulate(..., tablefmt="github")`. No pandas, no numpy. All
+computation — filtering, joining, grouping, aggregating, pivoting —
+happens in SQL.
 
 **Analytics code lives outside the shipped package.** `tools/analytics/`
 is a sibling of `src/`, intentionally outside `src/gradle_deps_monitor/`
@@ -83,13 +93,13 @@ dependencies.
 analytics` extra:
 
 ```toml
-analytics = ["duckdb>=1.1,<2.0", "pandas>=2.2", "tabulate>=0.9"]
+analytics = ["duckdb>=1.1,<2.0", "tabulate>=0.9"]
 ```
 
 Install: `pip install -e ".[analytics]"`. Users who only run
-`gradle-deps-monitor check` never pay the cost. `tabulate` is pinned
-explicitly because pandas 3.x dropped it as a transitive dependency;
-`DataFrame.to_markdown()` still requires it at call time.
+`gradle-deps-monitor check` never pay the cost. Two packages total —
+no pandas, no numpy — so the install is dominated by DuckDB itself
+(~50 MB engine) plus a ~40 KB tabulate.
 
 **The CSV contract is enforced at load time.** `tools/analytics/runner.py`
 reads the header row of each CSV, compares it against the expected
@@ -97,13 +107,29 @@ column list (mirrored in `tools/analytics/schema.sql`), and fails
 fast with a pointer to RFC-0017 + `schema.sql` on mismatch. This is
 the implicit-versioning mechanism the CSVs lack.
 
+**Reconsider pandas at RFC-0010 time.** The HTML export (currently
+📋 Planned in Phase 8, see [RFC-0010](../proposals/0010-html-export.md))
+may introduce build-time logic that doesn't fit cleanly in SQL: chart
+data shaping, multi-CSV merges, trend rollups across freezes. If that
+shape emerges, revisit this ADR — the natural extension is to add
+`pandas` (and possibly `altair` / `plotly`) to the `[analytics]`
+extra at that point. Today there is no such pressure: every
+canonical query is a single `SELECT` and tabulate is sufficient.
+
 ## Consequences
 
 **Positive**
 
 - **Zero new runtime deps for the shipped package.** Default
-  `pip install gradle-deps-monitor` is unchanged. Only `pip install
-  -e ".[analytics]"` pulls DuckDB + pandas.
+  `pip install gradle-deps-monitor` is unchanged. Only
+  `pip install -e ".[analytics]"` pulls DuckDB + tabulate.
+- **Smallest viable surface for an opt-in extra.** Two packages —
+  the engine and a 40 KB Markdown formatter. No numpy, no pandas,
+  no transitive surprises.
+- **No "pandas-as-compute" creep risk.** With pandas absent, the
+  ambient temptation to write `df.groupby(...)` in `render.py`
+  disappears. The discipline becomes structural rather than
+  reviewer-policed.
 - **Queries survive a future migration to DuckDB-WASM.** The day
   RFC-0010 (HTML export) ships, `runner.py` and `render.py` are
   replaced by JavaScript loaders and renderers; the `.sql` files
@@ -115,8 +141,7 @@ the implicit-versioning mechanism the CSVs lack.
 - **RFC-0017's empty-cell semantics work natively.** Empty cells
   in CSVs (meaning "scanner not run") are inferred as `NULL` by
   DuckDB; queries that depend on opt-in scanners gate with
-  `IS NOT NULL` and the render layer detects all-NULL columns to
-  emit "Scanner not run" hints.
+  `IS NOT NULL`.
 - **Architecture boundaries stay clean.** `tools/analytics/`
   outside `src/` means no new import-linter contract is needed, no
   Clean Architecture layer is introduced, and the dependency
@@ -124,20 +149,17 @@ the implicit-versioning mechanism the CSVs lack.
 
 **Negative**
 
-- **Three deps in `[analytics]` instead of one.** Accepted in
-  exchange for `pandas.DataFrame.to_markdown()` ergonomics; the
-  alternative (`tabulate`-only render) requires hand-rolling column
-  alignment and would still pull a render dep. `tabulate` is the
-  only user-facing import beyond DuckDB and pandas — and only
-  because pandas 3.x dropped the transitive pull that made the
-  call self-sufficient in pandas 2.x.
-- **"SQL for compute, pandas for render" is a discipline-based
-  rule, not tooling-enforced.** No linter prevents a future
-  contributor from sneaking compute into `render.py`. Mitigated
-  by: (a) the rule restated in `tools/analytics/README.md` and
-  `tools/analytics/queries/INDEX.md`; (b) the single `df = rel.df()`
-  touchpoint making any new `df.<method>()` call beyond `to_markdown()`
-  visible at code review.
+- **Render ergonomics are slightly less batteries-included than
+  pandas.** `tabulate(rel.fetchall(), headers=rel.columns,
+  tablefmt="github")` is two lines instead of one
+  `df.to_markdown(index=False)`. Accepted in exchange for removing
+  a 50 MB dependency surface and the creep risk.
+- **No build-time data-shape primitive available.** If a future
+  canonical query needs post-SQL massaging that genuinely doesn't
+  fit in SQL (e.g. zip-with-running-totals across freezes for a
+  trend report), there's nothing on the Python side to reach for.
+  This pressure is the trigger to revisit the ADR (see the
+  "Reconsider pandas at RFC-0010 time" hook above).
 - **DuckDB version drift is a new operational concern.** A query
   that works on DuckDB 1.1 might behave differently on 1.3 or 2.0
   (e.g. `PIVOT` syntax changes). Mitigated by the pinned range

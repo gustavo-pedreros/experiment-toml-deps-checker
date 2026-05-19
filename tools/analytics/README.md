@@ -15,15 +15,15 @@ shipped package. See [ADR-0010](../../docs/adr/0010-analytics-stack-duckdb.md).
   headers against the schema (fail-fast on drift), runs every
   `queries/*.sql` in numeric order, and emits a Markdown summary to
   stdout.
-- **`render.py`** — the **only** allowed pandas touchpoint
-  (`rel.df().to_markdown()`). Compute happens in SQL; this file just
-  formats. See ADR-0010.
+- **`render.py`** — Markdown rendering via `tabulate` over
+  `rel.fetchall()`. The only allowed presentation library. Compute
+  happens in SQL; this file just formats. See ADR-0010.
 - **`queries/`** — the canonical query library. Read `queries/INDEX.md`
   for what counts as canonical and how to add a new query.
 
 ## Install
 
-The analytics deps (DuckDB + pandas) are opt-in:
+The analytics deps (DuckDB + tabulate) are opt-in:
 
 ```bash
 pip install -e ".[analytics]"
@@ -63,10 +63,12 @@ design.
   pivoting — all in `queries/*.sql`. The `.sql` files are the asset
   that survives a port to DuckDB-WASM (planned for the RFC-0010 HTML
   export).
-- **Pandas is presentation-only.** The single touchpoint is
-  `render.py`. The only allowed pandas call beyond `rel.df()` is
-  `df.to_markdown(index=False)`. Anything else (`df.groupby()`,
-  `df.merge()`, `df.apply()`, …) is a violation — move it to SQL.
+- **`tabulate` is the only presentation library.** The single
+  touchpoint is `render.py`, which reads `rel.columns` and
+  `rel.fetchall()` from a DuckDB relation and formats them as a
+  GitHub-flavoured Markdown table. No pandas, no polars. If a
+  future change requires dataframe-style logic here, reopen
+  ADR-0010 rather than smuggling pandas back in.
 - **DuckDB version is pinned** in `pyproject.toml`
   (`duckdb>=1.1,<2.0`). Re-evaluate annually; a major DuckDB upgrade
   may change `PIVOT` / window-function semantics.

@@ -1,22 +1,23 @@
 """Markdown rendering for analytics query results.
 
-This module is the single allowed pandas touchpoint per ADR-0010.
-Compute happens in SQL (queries/*.sql); this file only converts a
-DuckDB relation into a Markdown table via pandas.DataFrame.to_markdown().
+Per ADR-0010, this module is the only allowed presentation-layer
+touchpoint. Compute happens in SQL (``queries/*.sql``); this file
+only formats a DuckDB relation as a Markdown table via ``tabulate``.
 
-If you find yourself adding a `df.groupby(...)`, `df.merge(...)`,
-`df.apply(...)`, or any other compute call here, stop and move it to
-SQL. That's the discipline that keeps queries/*.sql portable to
-DuckDB-WASM for the future RFC-0010 HTML export.
+If you find yourself needing column transforms, groupings, or any
+other "tidy-up" of the rows here — stop and move it to SQL. The
+``.sql`` files are the asset that survives the future port to
+DuckDB-WASM (RFC-0010 HTML export); this Python is throwaway in
+that scenario.
 """
 
 from __future__ import annotations
 
 import duckdb
+from tabulate import tabulate
 
 # Human-readable titles per query name. Keep in sync with the
-# queries/*.sql filenames (strip leading "NN_" and use this map for
-# the display title).
+# queries/*.sql filenames (strip leading "NN_" and look up here).
 TITLES: dict[str, str] = {
     "top_risk": "Top risk",
 }
@@ -30,15 +31,16 @@ def section_title(query_name: str) -> str:
 def render_section(query_name: str, rel: duckdb.DuckDBPyRelation) -> str:
     """Render a query result as a Markdown section.
 
-    The ONLY allowed pandas touchpoint: ``rel.df()`` followed by
-    ``df.to_markdown(index=False)``. Any other ``df.<method>(...)`` call
-    here is a violation of ADR-0010.
+    Reads ``rel.columns`` for headers and ``rel.fetchall()`` for the
+    body rows, then formats as a GitHub-flavoured Markdown table via
+    ``tabulate``. No pandas anywhere by design (ADR-0010).
     """
     title = section_title(query_name)
-    df = rel.df()
-    if df.empty:
+    columns = rel.columns
+    rows = rel.fetchall()
+    if not rows:
         return f"## {title}\n\n> No rows for this query against this report.\n"
-    table = df.to_markdown(index=False)
+    table = tabulate(rows, headers=columns, tablefmt="github")
     return f"## {title}\n\n{table}\n"
 
 

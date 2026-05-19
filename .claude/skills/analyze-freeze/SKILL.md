@@ -18,8 +18,9 @@ RFC-0017, v0.1.0+), it runs every canonical query in
 `## <Title>` section per query.
 
 The architecture is fixed by [ADR-0010](../../../docs/adr/0010-analytics-stack-duckdb.md):
-queries live as portable `.sql` files; pandas is confined to the
-render layer; analytics deps are opt-in via the `[analytics]` extra.
+queries live as portable `.sql` files; rendering uses `tabulate`
+only (no pandas); analytics deps are opt-in via the `[analytics]`
+extra (`duckdb` + `tabulate`).
 
 ## When to invoke
 
@@ -80,7 +81,7 @@ directory MUST contain both `freeze-inventory.csv` and
 
 ## Troubleshooting
 
-- `ModuleNotFoundError: No module named 'duckdb'` (or `pandas`) →
+- `ModuleNotFoundError: No module named 'duckdb'` (or `tabulate`) →
   the `[analytics]` extra isn't installed. Tell the user to run
   `pip install -e ".[analytics]"` from the repo root.
 - `freeze-inventory.csv not found` or `freeze-findings.csv not found`

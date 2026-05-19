@@ -121,7 +121,8 @@ def _run_queries(conn: duckdb.DuckDBPyConnection, report_dir: Path) -> str:
     """Iterate queries/*.sql in numeric order and return the combined Markdown."""
     # Sibling import — sys.path[0] is the script directory when invoked
     # as `python tools/analytics/runner.py`. Imported lazily so a
-    # missing pandas only surfaces when the runner is actually invoked.
+    # missing tabulate (extra not installed) only surfaces when the
+    # runner is actually invoked, not at --help time.
     import render  # type: ignore[import-not-found]
 
     sections: list[str] = []

@@ -55,8 +55,9 @@ themselves accumulated.
    contributors can extend the library without drifting from its
    purpose.
 3. **Stay within the ADR-0010 discipline** — every query is SQL
-   only; pandas appears only at the render boundary; analytics code
-   lives in `tools/analytics/`, outside `src/gradle_deps_monitor/`.
+   only; the render layer uses `tabulate` only (no pandas / no
+   dataframe library); analytics code lives in `tools/analytics/`,
+   outside `src/gradle_deps_monitor/`.
 4. **Open Phase 8 — Analytics & insights** in the roadmap and
    promote [RFC-0010](0010-html-export.md) (HTML export) from Backlog
    into the same phase, signaling the dependency direction: HTML
@@ -65,8 +66,8 @@ themselves accumulated.
 ## Non-goals
 
 - **A `gradle-deps-monitor analyze` CLI subcommand.** Would pull
-  `duckdb` and `pandas` into the main install path. Deferred to a
-  follow-up RFC if non-Claude-Code users ever ask for it.
+  `duckdb` and `tabulate` into the main install path. Deferred to
+  a follow-up RFC if non-Claude-Code users ever ask for it.
 - **An `--out file.md` flag** on the skill. Claude (main thread)
   can offer to write the file post-run if the user asks; YAGNI for
   v1.
@@ -77,8 +78,8 @@ themselves accumulated.
 - **A browser-time / HTML report.** Belongs to RFC-0010; this RFC
   only preserves the option (portable `.sql` files, DuckDB-WASM-ready)
   without committing to it.
-- **Polars or tabulate-only render.** Alternatives are noted in
-  ADR-0010 and explicitly rejected for v1.
+- **Polars (as an alternative to DuckDB).** Considered in
+  ADR-0010 and rejected for v1.
 
 ## Proposed solution
 
@@ -92,7 +93,7 @@ tools/analytics/                # downstream tooling — outside src/
 ├── README.md                   # what this folder is, how to run by hand
 ├── runner.py                   # CLI: load CSVs, run queries, render Markdown
 ├── schema.sql                  # CREATE TABLE inventory + findings (typed)
-├── render.py                   # pandas-based Markdown emitter (ONLY render)
+├── render.py                   # tabulate-based Markdown emitter (presentation only)
 └── queries/
     ├── INDEX.md                # registry + "what counts as canonical"
     ├── 01_top_risk.sql                       # PR1 (this RFC)
@@ -106,7 +107,7 @@ tools/analytics/                # downstream tooling — outside src/
 ```
 
 `pyproject.toml` gains `[project.optional-dependencies] analytics =
-["duckdb>=1.1,<2.0", "pandas>=2.2"]`. Install: `pip install -e
+["duckdb>=1.1,<2.0", "tabulate>=0.9"]`. Install: `pip install -e
 ".[analytics]"`.
 
 ### Runner behaviour
@@ -250,13 +251,23 @@ roadmap. CHANGELOG entry.
 
 ### Alternatives considered
 
-1. **Pandas-as-compute** — rejected by [ADR-0010](../adr/0010-analytics-stack-duckdb.md):
+1. **DuckDB + pandas (with pandas confined to render).** Originally
+   the proposed stack — pandas 2.x pulled `tabulate` transitively,
+   so the dep cost looked like one package. Falsified during the
+   tracer: pandas 3.x dropped that transitive pull, so `tabulate`
+   would have to be declared explicitly anyway. With `tabulate`
+   explicit, pandas was reduced to wrapping a one-line render call
+   in a DataFrame round-trip. Dropped in favour of DuckDB +
+   tabulate direct; ADR-0010 documents the pivot and leaves a hook
+   to reconsider pandas at RFC-0010 (HTML export) time, where
+   build-time data shaping may earn it back.
+2. **Pandas-as-compute** — rejected by [ADR-0010](../adr/0010-analytics-stack-duckdb.md):
    blocks the WASM port that makes the future HTML report cheap.
-2. **`gradle-deps-monitor analyze` CLI subcommand** — would pull
-   `duckdb` and `pandas` into the main install path for everyone.
+3. **`gradle-deps-monitor analyze` CLI subcommand** — would pull
+   `duckdb` and `tabulate` into the main install path for everyone.
    Deferred; revisit if the skill proves valuable enough that
    non-Claude-Code users demand a CLI path.
-3. **Sub-agent instead of skill** — rejected because the work is
+4. **Sub-agent instead of skill** — rejected because the work is
    parameterised by a directory argument and lives entirely in
    stdout, not in a freeform task that benefits from a fresh
    context. Sub-agents earn their cost when the work is bounded,
@@ -264,7 +275,7 @@ roadmap. CHANGELOG entry.
    (`housekeeper`/`test-runner`); `/analyze-freeze` is none of
    those — its value is the canonical queries + runner contract,
    not isolation.
-4. **`uv run --with duckdb --with pandas python tools/analytics/runner.py …`**
+5. **`uv run --with duckdb --with tabulate python tools/analytics/runner.py …`**
    instead of installing the `[analytics]` extra — clever (works
    on a clean clone without `pip install`), but introduces `uv` as
    a new tool dependency the project hasn't adopted elsewhere.
@@ -314,8 +325,9 @@ roadmap. CHANGELOG entry.
 - Diff-report analytics (separate RFC).
 - HTML / browser-time report (RFC-0010, now positioned in Phase 8
   but tracked separately).
-- Polars or `tabulate`-only render (ADR-0010 alternatives;
-  reconsider if pandas pulls its weight only at render).
+- Polars (ADR-0010 alternative). Pandas: deferred per ADR-0010's
+  RFC-0010 hook — revisit if the HTML export earns it back at
+  build-time.
 - Tests in `tests/analytics/`. Analytics is downstream tooling;
   mypy/import-linter scope is unchanged. One optional happy-path
   smoke test in `tools/analytics/` only if `runner.py` grows

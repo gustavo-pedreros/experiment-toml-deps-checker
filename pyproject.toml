@@ -45,11 +45,8 @@ dev = [
 ]
 # Downstream analytics tooling (tools/analytics/). Opt-in: not part of
 # the default install path. See ADR-0010 + RFC-0033.
-# Note: pandas 3.x dropped tabulate as a transitive dep, so we pin it
-# explicitly — pandas.DataFrame.to_markdown() requires it at call time.
 analytics = [
     "duckdb>=1.1,<2.0",
-    "pandas>=2.2",
     "tabulate>=0.9",
 ]
 

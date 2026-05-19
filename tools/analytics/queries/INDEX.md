@@ -7,12 +7,14 @@ self-contained DuckDB query against the two RFC-0017 tables
 
 The discipline is set by [ADR-0010](../../../docs/adr/0010-analytics-stack-duckdb.md):
 
-> Compute lives in SQL; pandas is presentation-only.
+> All compute happens in SQL. The presentation layer (`render.py`)
+> uses `tabulate` only — no pandas, no polars, no client-side
+> dataframe library.
 
-If you find yourself reaching for pandas to filter, join, group, or
-pivot — stop. Put it in SQL. The `.sql` files are the asset that
-survives the future port to DuckDB-WASM (RFC-0010 HTML export); the
-`render.py` is throwaway in that scenario.
+If you find yourself reaching for a dataframe library to filter,
+join, group, or pivot — stop. Put it in SQL. The `.sql` files are
+the asset that survives the future port to DuckDB-WASM (RFC-0010
+HTML export); `render.py` is throwaway in that scenario.
 
 ## When is a query "canonical"?
 

@@ -18,15 +18,17 @@ be assigned once a stable public API is established.
   CSVs (`freeze-inventory.csv` + `freeze-findings.csv`) and emits a
   Markdown insight summary. v1 ships the `top_risk` query
   end-to-end; queries 02–08 land in PR2. Analytics deps (DuckDB +
-  pandas) are opt-in via the new `[analytics]` extra
+  tabulate) are opt-in via the new `[analytics]` extra
   (`pip install -e ".[analytics]"`) — the default install path is
   untouched. Architecture pinned by [ADR-0010](docs/adr/0010-analytics-stack-duckdb.md)
-  (DuckDB query layer; pandas confined to rendering; analytics code
-  in `tools/analytics/`, outside the 6 Clean Architecture layers).
+  (DuckDB query layer; tabulate-only render; analytics code in
+  `tools/analytics/`, outside the 6 Clean Architecture layers).
   See [RFC-0033](docs/proposals/0033-analyze-freeze-skill.md).
 - [ADR-0010](docs/adr/0010-analytics-stack-duckdb.md) — Analytics
-  stack: DuckDB as the query layer for downstream insights, with
-  the "SQL for compute, pandas for render" discipline.
+  stack: DuckDB as the query layer for downstream insights;
+  tabulate as the only presentation library (no pandas in v1);
+  pandas reconsideration deferred to RFC-0010 (HTML export) if
+  build-time data shaping ever earns it back.
 - [RFC-0033](docs/proposals/0033-analyze-freeze-skill.md) —
   `/analyze-freeze` skill + canonical query library design.
 
