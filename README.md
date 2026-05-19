@@ -182,7 +182,7 @@ the six layers and import rules are enforced by `import-linter` in
 - [ADRs](docs/adr/) — architectural decisions (clean architecture, schema versioning, …)
 - [RFCs](docs/proposals/) — design proposals per feature
 - [Diagrams](docs/diagrams/) — four-zoom-level architecture overview
-- [Contributing](docs/CONTRIBUTING-AI.md) — AI-assisted development workflow
+- [Contributing](CONTRIBUTING.md) — reading order, dev setup, conventions, how to propose changes
 
 ## Development
 
