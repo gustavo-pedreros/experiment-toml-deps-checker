@@ -38,7 +38,7 @@ CREATE TABLE findings (
     section              VARCHAR,   -- Catalog Health | Compliance | Toolchain | Library Health | Security | License | Changelog
     rule_id              VARCHAR,   -- finding identifier (may have synthetic prefixes: library-health.* license.* changelog.*)
     severity             VARCHAR,   -- section-specific domain value
-    common_severity      VARCHAR,   -- ERROR | WARNING | INFO (normalized)
+    common_severity      VARCHAR,   -- error | warning | info | suggestion (normalized, lowercase)
     target               VARCHAR,   -- alias or "catalog"
     message              VARCHAR,
     recommendation       VARCHAR

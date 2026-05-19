@@ -137,19 +137,20 @@ git tag — the project's first public release.
 | ✅ | Official User Guide (5 chapters) | [RFC-0021](proposals/0021-user-guide.md) — Phase 5 close |
 | ✅ | `v0.1.0` git tag — first public release | (release prep — closes R10) |
 
-## Phase 8 — Analytics & insights 🚧 In progress
+## Phase 8 — Analytics & insights ✅ Closed v1 (2026-05-19)
 
 Downstream consumption of the RFC-0017 CSVs. The freeze report
 became a high-fidelity interchange surface in Phase 5 but had no
-canonical consumer; Phase 8 ships the first analytical query layer
-and the first project-level Claude Code skill, positioned upstream
-of the future HTML export. The architectural constraint that
-binds the phase is [ADR-0010](adr/0010-analytics-stack-duckdb.md)
-(DuckDB as the query layer; pandas confined to rendering).
+canonical consumer; Phase 8 v1 shipped the first analytical query
+layer and the first project-level Claude Code skill (`/analyze-freeze`),
+positioned upstream of the future HTML export. The architectural
+constraint binding the phase is [ADR-0010](adr/0010-analytics-stack-duckdb.md)
+(DuckDB as the query layer; `tabulate` as the only presentation
+library; pandas explicitly deferred to RFC-0010 time).
 
 | Status | Item | Reference |
 |--------|------|-----------|
-| 🚧 | `/analyze-freeze` skill + canonical query library | [RFC-0033](proposals/0033-analyze-freeze-skill.md) |
+| ✅ | `/analyze-freeze` skill + canonical query library (8 queries) | [RFC-0033](proposals/0033-analyze-freeze-skill.md) |
 | 📋 | HTML export (consumes the canonical query layer) | [RFC-0010](proposals/0010-html-export.md) |
 
 ## Backlog

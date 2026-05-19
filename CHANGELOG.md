@@ -12,18 +12,34 @@ be assigned once a stable public API is established.
 
 ### Added
 
-- **Phase 8 — Analytics & insights opener (tracer).** First
+- **Phase 8 — Analytics & insights v1 closed (2026-05-19).** First
   project-level Claude Code skill: `/analyze-freeze <report-dir>`
   runs a DuckDB-backed canonical query library against the RFC-0017
   CSVs (`freeze-inventory.csv` + `freeze-findings.csv`) and emits a
-  Markdown insight summary. v1 ships the `top_risk` query
-  end-to-end; queries 02–08 land in PR2. Analytics deps (DuckDB +
-  tabulate) are opt-in via the new `[analytics]` extra
-  (`pip install -e ".[analytics]"`) — the default install path is
-  untouched. Architecture pinned by [ADR-0010](docs/adr/0010-analytics-stack-duckdb.md)
-  (DuckDB query layer; tabulate-only render; analytics code in
-  `tools/analytics/`, outside the 6 Clean Architecture layers).
-  See [RFC-0033](docs/proposals/0033-analyze-freeze-skill.md).
+  Markdown insight summary. Ships with 8 canonical queries covering
+  every distinct CSV dimension: `top_risk`, `drift_by_severity`,
+  `compound_security_duplicates` (the RFC-0017 issue-#13 exposure),
+  `unstable_prerelease_in_prod`, `inactive_or_unhealthy`,
+  `license_risk`, `finding_severity_breakdown`, and `bom_coverage`.
+  Analytics deps (DuckDB + tabulate) are opt-in via the new
+  `[analytics]` extra (`pip install -e ".[analytics]"`) — the
+  default install path is untouched. Architecture pinned by
+  [ADR-0010](docs/adr/0010-analytics-stack-duckdb.md) (DuckDB query
+  layer; tabulate-only render; analytics code in `tools/analytics/`,
+  outside the 6 Clean Architecture layers). See
+  [RFC-0033](docs/proposals/0033-analyze-freeze-skill.md).
+- **Scanner-not-run hints.** When a canonical query depends on an
+  opt-in scanner that wasn't run for the freeze (e.g. `--risk-score`
+  off, or `GITHUB_TOKEN` unset for the CVE check), the relevant
+  section now renders a "Scanner not run for this dimension. Re-run
+  `gradle-deps-monitor check --risk-score` to populate this section."
+  hint instead of a generic "no rows" footer.
+- **`Tip:` line in the post-`check` console summary**, pointing
+  users at `/analyze-freeze <out-dir>` when both CSVs are written.
+- **User Guide chapter** —
+  [`docs/user-guide/analyzing-a-freeze-report.md`](docs/user-guide/analyzing-a-freeze-report.md):
+  skill-vs-sub-agent primer, worked example against the Sunflower
+  freeze, instructions for adding a new canonical query.
 - [ADR-0010](docs/adr/0010-analytics-stack-duckdb.md) — Analytics
   stack: DuckDB as the query layer for downstream insights;
   tabulate as the only presentation library (no pandas in v1);

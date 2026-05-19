@@ -117,6 +117,28 @@ def _query_name(sql_path: Path) -> str:
     return parts[1] if len(parts) == 2 and parts[0].isdigit() else stem
 
 
+# Map opt-in column → query names that depend on it. When the column
+# is uniformly NULL across the inventory, the runner tells the render
+# layer to emit a "Scanner not run" hint instead of a plain "no rows"
+# footer for the affected queries.
+_QUERIES_BY_SCANNER_COLUMN: dict[str, tuple[str, ...]] = {
+    "risk_score": ("top_risk", "drift_by_severity"),
+    "vulnerability_count": ("compound_security_duplicates",),
+}
+
+
+def _scanner_columns_all_null(conn: duckdb.DuckDBPyConnection) -> set[str]:
+    """Return the set of opt-in columns that are NULL for every inventory row."""
+    all_null: set[str] = set()
+    for column in _QUERIES_BY_SCANNER_COLUMN:
+        (count_non_null,) = conn.execute(
+            f"SELECT COUNT(*) FROM inventory WHERE {column} IS NOT NULL"
+        ).fetchone()
+        if count_non_null == 0:
+            all_null.add(column)
+    return all_null
+
+
 def _run_queries(conn: duckdb.DuckDBPyConnection, report_dir: Path) -> str:
     """Iterate queries/*.sql in numeric order and return the combined Markdown."""
     # Sibling import — sys.path[0] is the script directory when invoked
@@ -125,13 +147,27 @@ def _run_queries(conn: duckdb.DuckDBPyConnection, report_dir: Path) -> str:
     # runner is actually invoked, not at --help time.
     import render  # type: ignore[import-not-found]
 
+    scanner_columns_all_null = _scanner_columns_all_null(conn)
+    queries_with_dead_scanner: set[str] = {
+        query_name
+        for column, query_names in _QUERIES_BY_SCANNER_COLUMN.items()
+        if column in scanner_columns_all_null
+        for query_name in query_names
+    }
+
     sections: list[str] = []
     sql_files = sorted(_QUERIES_DIR.glob("*.sql"))
     for sql_path in sql_files:
         sql_text = sql_path.read_text(encoding="utf-8")
         rel = conn.sql(sql_text)
         name = _query_name(sql_path)
-        sections.append(render.render_section(name, rel))
+        sections.append(
+            render.render_section(
+                name,
+                rel,
+                scanner_columns_all_null=(name in queries_with_dead_scanner),
+            )
+        )
     return render.render_document(sections, str(report_dir))
 
 

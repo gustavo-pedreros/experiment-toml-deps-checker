@@ -365,6 +365,17 @@ def print_summary(
         con.print(f"[bold]Reports written[/bold] → [blue]{out_dir}[/blue]")
         for path in written_files:
             con.print(f"  [dim]•[/dim] {path.name}")
+        # Hint at the /analyze-freeze skill when both CSVs landed (RFC-0033).
+        # The skill consumes freeze-inventory.csv + freeze-findings.csv; if
+        # either is missing (e.g. CSV writers disabled) the hint is skipped.
+        names = {p.name for p in written_files}
+        if any(n.endswith("-inventory.csv") for n in names) and any(
+            n.endswith("-findings.csv") for n in names
+        ):
+            con.print(
+                f"  [dim]Tip: run [/dim][cyan]/analyze-freeze {out_dir}[/cyan]"
+                "[dim] in Claude Code for insights.[/dim]"
+            )
 
 
 _RISK_LEVEL_STYLE: dict[RiskLevel, str] = {
