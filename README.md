@@ -3,7 +3,8 @@
 Freeze-time technical due-diligence for Android `libs.versions.toml` catalogs.
 One CLI run audits every pinned dependency — version drift, CVEs, Play Store
 compliance, toolchain compatibility, abandonment, licenses — and writes
-structured reports (Markdown, JSON, CSV, Slack) ready to commit or post from CI.
+structured reports (Markdown, JSON, two CSVs by default; Slack Block Kit
+opt-in via `--slack`) ready to commit or post from CI.
 
 > Single Python CLI. No wrapper scripts. Read-only against your repo.
 
@@ -44,7 +45,7 @@ Play Store           ❗ 1 violation
                        PLAY-DEP-001  SafetyNet → Play Integrity
 
 Reports written → freeze-reports/2026-05-04
-  • freeze.md  • freeze.json  • freeze-slack.json
+  • freeze.md  • freeze.json
   • freeze-inventory.csv  • freeze-findings.csv
 ```
 
@@ -75,8 +76,9 @@ gradle-deps-monitor check gradle --module-usage --risk-score
 ```bash
 gradle-deps-monitor check <gradle-dir> [--out DIR] [--module-usage] [--risk-score] \
                                        [--no-cache] [--clear-cache] [--cache-ttl SECONDS] \
-                                       [--fail-on-errors] [--warn-on CATEGORY[,…]]
-gradle-deps-monitor diff  <current.json> [--prev <previous.json>] [--out DIR]
+                                       [--fail-on-errors] [--warn-on CATEGORY[,…]] \
+                                       [--slack]
+gradle-deps-monitor diff  <current.json> [--prev <previous.json>] [--out DIR] [--slack]
 ```
 
 `diff` compares two `freeze.json` reports. Run without `--prev` to register a
@@ -104,10 +106,11 @@ End-to-end recipes for GitHub Actions and Bitrise live in
 |---|---|---|
 | `check` | `freeze.md` | Markdown — commit alongside the catalog |
 | `check` | `freeze.json` | JSON — `schema_version` 1.x (SemVer, additive MINOR) |
-| `check` | `freeze-slack.json` | Slack Block Kit — POST to an incoming webhook |
 | `check` | `freeze-inventory.csv` | 15-column per-library snapshot for spreadsheets / BI |
 | `check` | `freeze-findings.csv` | Per-finding rows across every section |
-| `diff` | `freeze-diff.md` / `.json` / `-slack.json` | Same triad, comparing two freezes |
+| `check` | `freeze-slack.json` *(opt-in via `--slack`)* | Slack Block Kit — POST to an incoming webhook |
+| `diff` | `freeze-diff.md` / `.json` | Markdown + JSON comparison of two freezes |
+| `diff` | `freeze-diff-slack.json` *(opt-in via `--slack`)* | Slack Block Kit for the diff |
 
 JSON schema is versioned per [ADR-0008](docs/adr/0008-json-schema-semver.md):
 consumers reading `1.x` MUST tolerate unknown fields and unknown enum values.
@@ -145,6 +148,9 @@ medium   = 40
 root                 = "~/.cache/gradle-deps-monitor"
 ttl_seconds_maven    = 3600         # Maven Central + Google Maven metadata
 ttl_seconds_advisory = 86400        # GitHub Advisory DB + OSS Index
+
+[output]            # opt-in writers (RFC-0034)
+slack = true         # also emit freeze-slack.json (default false)
 ```
 
 Resolution order: built-in defaults → `gradle-deps-monitor.toml` →

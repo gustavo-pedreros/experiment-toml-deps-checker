@@ -19,7 +19,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from gradle_deps_monitor.domain.config import AppConfig, CacheConfig
+from gradle_deps_monitor.domain.config import AppConfig, CacheConfig, OutputConfig
 from gradle_deps_monitor.domain.risk_score import RiskThresholds, RiskWeights
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,11 +32,11 @@ _KNOWN_SECTIONS = frozenset(
     {
         "risk_weights",
         "risk_thresholds",
+        "cache",
+        "output",
         # Sections reserved for future RFCs are listed here so that early
         # adopters can populate them without triggering the unknown-section
         # warning. The values are not consumed yet.
-        "cache",
-        "output",
         "library_health",
     }
 )
@@ -80,8 +80,14 @@ def load_config(project_root: Path) -> AppConfig:
     weights = _parse_risk_weights(data.get("risk_weights"), config_path)
     thresholds = _parse_risk_thresholds(data.get("risk_thresholds"), config_path)
     cache = _parse_cache(data.get("cache"), config_path)
+    output = _parse_output(data.get("output"), config_path)
 
-    return AppConfig(risk_weights=weights, risk_thresholds=thresholds, cache=cache)
+    return AppConfig(
+        risk_weights=weights,
+        risk_thresholds=thresholds,
+        cache=cache,
+        output=output,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +214,39 @@ def _parse_cache(section: Any, path: Path) -> CacheConfig:
         ttl_seconds_maven=ttl_maven,
         ttl_seconds_advisory=ttl_advisory,
     )
+
+
+def _parse_output(section: Any, path: Path) -> OutputConfig:
+    """Build an :class:`OutputConfig` from the optional ``[output]`` table.
+
+    Recognised keys: ``slack`` (bool — RFC-0034). Unknown keys emit a
+    warning and are ignored.
+    """
+    if section is None:
+        return OutputConfig()
+    if not isinstance(section, dict):
+        raise ConfigError(
+            f"Section [output] in {path} must be a TOML table, got {type(section).__name__}."
+        )
+
+    defaults = OutputConfig()
+    field_names = ("slack",)
+
+    slack_value = defaults.slack
+    if "slack" in section:
+        raw_slack = section["slack"]
+        if not isinstance(raw_slack, bool):
+            raise ConfigError(
+                f"Value for output.slack in {path} must be a boolean, "
+                f"got {type(raw_slack).__name__} {raw_slack!r}."
+            )
+        slack_value = raw_slack
+
+    unknown = set(section) - set(field_names)
+    if unknown:
+        _LOGGER.warning("Unknown keys in [output] in %s: %s (ignored)", path, sorted(unknown))
+
+    return OutputConfig(slack=slack_value)
 
 
 # ---------------------------------------------------------------------------

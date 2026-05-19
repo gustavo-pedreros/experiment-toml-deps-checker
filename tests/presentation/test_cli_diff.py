@@ -162,14 +162,26 @@ def test_diff_creates_json_file(tmp_path: Path) -> None:
     assert (out / "freeze-diff.json").exists()
 
 
-def test_diff_creates_slack_json_file(tmp_path: Path) -> None:
+def test_diff_creates_slack_json_file_when_flag_passed(tmp_path: Path) -> None:
+    after = tmp_path / "freeze.json"
+    _write_freeze(after, _FREEZE_AFTER)
+    out = tmp_path / "reports"
+
+    runner.invoke(app, ["diff", str(after), "--out", str(out), "--slack"])
+
+    # RFC-0034: Slack writer is opt-in; only emitted when --slack is passed.
+    assert (out / "freeze-diff-slack.json").exists()
+
+
+def test_diff_default_omits_slack(tmp_path: Path) -> None:
     after = tmp_path / "freeze.json"
     _write_freeze(after, _FREEZE_AFTER)
     out = tmp_path / "reports"
 
     runner.invoke(app, ["diff", str(after), "--out", str(out)])
 
-    assert (out / "freeze-diff-slack.json").exists()
+    # RFC-0034: Slack writer is opt-in; default omits it.
+    assert not (out / "freeze-diff-slack.json").exists()
 
 
 def test_diff_json_is_valid_json(tmp_path: Path) -> None:
@@ -188,7 +200,7 @@ def test_diff_slack_json_has_blocks(tmp_path: Path) -> None:
     _write_freeze(after, _FREEZE_AFTER)
     out = tmp_path / "reports"
 
-    runner.invoke(app, ["diff", str(after), "--out", str(out)])
+    runner.invoke(app, ["diff", str(after), "--out", str(out), "--slack"])
 
     data = json.loads((out / "freeze-diff-slack.json").read_text(encoding="utf-8"))
     assert "blocks" in data

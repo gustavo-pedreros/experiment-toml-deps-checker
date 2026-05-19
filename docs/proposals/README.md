@@ -126,6 +126,7 @@ splitting into sub-RFCs.
 | [0031](0031-bootstrap-composition-tests.md) | Bootstrap composition-root unit tests | Proposed | 5 |
 | [0032](0032-atomic-writes.md) | Atomic report writes (temp-file + os.replace) | Proposed | 3, 5 |
 | [0033](0033-analyze-freeze-skill.md) | `/analyze-freeze` skill and canonical query library | Proposed | 3, 5 |
+| [0034](0034-output-slack-opt-in.md) | Slack output becomes opt-in (`--slack` flag + `[output]` config) | Proposed | 3, 5 |
 
 > Lifecycle status (Accepted, In progress, Shipped) is tracked in
 > [`docs/roadmap.md`](../roadmap.md). The "Status" column above

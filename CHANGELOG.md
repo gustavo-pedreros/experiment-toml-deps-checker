@@ -10,8 +10,36 @@ be assigned once a stable public API is established.
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: Slack output is now opt-in (RFC-0034).** `gradle-deps-monitor
+  check` no longer writes `freeze-slack.json` by default; the default
+  output set is 4 files (`freeze.md`, `freeze.json`,
+  `freeze-inventory.csv`, `freeze-findings.csv`). Similarly,
+  `gradle-deps-monitor diff` no longer writes `freeze-diff-slack.json`
+  by default; the default is 2 files (`freeze-diff.md`,
+  `freeze-diff.json`). Pre-1.0 SemVer permits this default change.
+  Migration — for CI pipelines that POST the Slack file to a webhook,
+  add the flag:
+  ```bash
+  gradle-deps-monitor check ./gradle --slack
+  gradle-deps-monitor diff old.json new.json --slack
+  ```
+  or set in `gradle-deps-monitor.toml`:
+  ```toml
+  [output]
+  slack = true
+  ```
+  See [RFC-0034](docs/proposals/0034-output-slack-opt-in.md).
+
 ### Added
 
+- [RFC-0034](docs/proposals/0034-output-slack-opt-in.md) — Slack
+  output becomes opt-in: `--slack` / `--no-slack` flag on both
+  `check` and `diff`, plus a new `[output] slack` knob in
+  `gradle-deps-monitor.toml`. The `[output]` section in the config
+  file is no longer "reserved-but-ignored" — it is now consumed
+  and validated.
 - **Phase 8 — Analytics & insights v1 closed (2026-05-19).** First
   project-level Claude Code skill: `/analyze-freeze <report-dir>`
   runs a DuckDB-backed canonical query library against the RFC-0017

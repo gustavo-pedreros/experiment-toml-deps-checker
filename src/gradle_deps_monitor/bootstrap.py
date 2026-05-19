@@ -12,6 +12,7 @@ import atexit
 import os
 import shutil
 from pathlib import Path
+from typing import Any
 
 from gradle_deps_monitor.application.compute_freeze_diff import ComputeFreezeDiff
 from gradle_deps_monitor.application.generate_freeze_report import GenerateFreezeReport
@@ -134,6 +135,7 @@ def create_check_command(
     no_cache: bool = False,
     clear_cache_first: bool = False,
     cache_ttl_override: int | None = None,
+    slack: bool | None = None,
 ) -> CheckCommand:
     """Return a fully wired :class:`~...presentation.commands.check_command.CheckCommand`.
 
@@ -145,9 +147,9 @@ def create_check_command(
         computation (opt-in; experimental — see ADR-0004).
         Defaults to ``False``.
     :param app_config: RFC-0012 application configuration. When ``None``,
-        defaults are used. The ``risk_weights``, ``risk_thresholds``, and
-        ``cache`` sections are forwarded to the risk score and the cache
-        layer; other sections are reserved for future RFCs.
+        defaults are used. The ``risk_weights``, ``risk_thresholds``,
+        ``cache``, and ``output`` sections are forwarded; other sections
+        are reserved for future RFCs.
     :param no_cache: RFC-0029 — bypass the persistent cache for this run.
         The adapters write to an ephemeral tempdir cleaned up at exit;
         the persistent cache is left untouched.
@@ -155,6 +157,10 @@ def create_check_command(
         before constructing adapters. No-op when ``no_cache=True``.
     :param cache_ttl_override: RFC-0029 — when not ``None``, applies the
         same TTL to every adapter (overrides per-source defaults).
+    :param slack: RFC-0034 — when ``True``, include ``SlackWriter`` in
+        the writers list. When ``None`` (default), defer to
+        ``app_config.output.slack`` (which defaults to ``False``).
+        The CLI flag wins over the config file.
 
     Concrete adapters created here:
 
@@ -162,6 +168,7 @@ def create_check_command(
     - :class:`~...infrastructure.writers.markdown_writer.MarkdownWriter`
     - :class:`~...infrastructure.writers.json_writer.JsonWriter`
     - :class:`~...infrastructure.writers.slack_writer.SlackWriter`
+      *(only when ``slack=True`` or ``[output] slack = true``)*
     - :class:`~...infrastructure.writers.inventory_csv_writer.InventoryCsvWriter`
     - :class:`~...infrastructure.writers.findings_csv_writer.FindingsCsvWriter`
     """
@@ -196,20 +203,34 @@ def create_check_command(
         risk_weights=cfg.risk_weights,
         risk_thresholds=cfg.risk_thresholds,
     )
-    return CheckCommand(
-        use_case=use_case,
-        writers=[
-            (f"{_REPORT_STEM}.md", MarkdownWriter()),
-            (f"{_REPORT_STEM}.json", JsonWriter()),
-            (f"{_REPORT_STEM}-slack.json", SlackWriter()),
-            (f"{_REPORT_STEM}-inventory.csv", InventoryCsvWriter()),
-            (f"{_REPORT_STEM}-findings.csv", FindingsCsvWriter()),
-        ],
-    )
+    slack_enabled = slack if slack is not None else cfg.output.slack
+    writers: list[tuple[str, Any]] = [
+        (f"{_REPORT_STEM}.md", MarkdownWriter()),
+        (f"{_REPORT_STEM}.json", JsonWriter()),
+        (f"{_REPORT_STEM}-inventory.csv", InventoryCsvWriter()),
+        (f"{_REPORT_STEM}-findings.csv", FindingsCsvWriter()),
+    ]
+    if slack_enabled:
+        # Insert Slack between json and the CSVs so the file listing
+        # mirrors the historical order when --slack is passed.
+        writers.insert(2, (f"{_REPORT_STEM}-slack.json", SlackWriter()))
+    return CheckCommand(use_case=use_case, writers=writers)
 
 
-def create_diff_command() -> DiffCommand:
+def create_diff_command(
+    *,
+    app_config: AppConfig | None = None,
+    slack: bool | None = None,
+) -> DiffCommand:
     """Return a fully wired :class:`~...presentation.commands.diff_command.DiffCommand`.
+
+    :param app_config: RFC-0012 application configuration. When ``None``,
+        defaults are used. Only the ``output`` section is consumed here
+        (other sections are check-only).
+    :param slack: RFC-0034 — when ``True``, include ``DiffSlackWriter``
+        in the writers list. When ``None`` (default), defer to
+        ``app_config.output.slack`` (which defaults to ``False``).
+        The CLI flag wins over the config file.
 
     Concrete adapters created here:
 
@@ -217,13 +238,18 @@ def create_diff_command() -> DiffCommand:
     - :class:`~...infrastructure.writers.diff_markdown_writer.DiffMarkdownWriter`
     - :class:`~...infrastructure.writers.diff_json_writer.DiffJsonWriter`
     - :class:`~...infrastructure.writers.diff_slack_writer.DiffSlackWriter`
+      *(only when ``slack=True`` or ``[output] slack = true``)*
     """
+    cfg = app_config or AppConfig()
+    slack_enabled = slack if slack is not None else cfg.output.slack
+    writers: list[tuple[str, Any]] = [
+        (f"{_DIFF_STEM}.md", DiffMarkdownWriter()),
+        (f"{_DIFF_STEM}.json", DiffJsonWriter()),
+    ]
+    if slack_enabled:
+        writers.append((f"{_DIFF_STEM}-slack.json", DiffSlackWriter()))
     return DiffCommand(
         use_case=ComputeFreezeDiff(),
         loader=JsonSnapshotLoader(),
-        writers=[
-            (f"{_DIFF_STEM}.md", DiffMarkdownWriter()),
-            (f"{_DIFF_STEM}.json", DiffJsonWriter()),
-            (f"{_DIFF_STEM}-slack.json", DiffSlackWriter()),
-        ],
+        writers=writers,
     )

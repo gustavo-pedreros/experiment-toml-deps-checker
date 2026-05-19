@@ -49,6 +49,25 @@ class CacheConfig:
 
 
 @dataclass(frozen=True)
+class OutputConfig:
+    """Per-writer toggles for the report-output surface (RFC-0034).
+
+    Only writers without an internal consumer are exposed as opt-in;
+    the load-bearing writers (Markdown, JSON, the two CSVs) are
+    always emitted because diff and ``/analyze-freeze`` depend on
+    them.
+
+    ``slack`` toggles ``SlackWriter`` (and ``DiffSlackWriter`` for
+    the diff command). Default is ``False``; the writer is enabled by
+    setting ``[output] slack = true`` in ``gradle-deps-monitor.toml``
+    or by passing ``--slack`` on the CLI (the flag wins per the
+    standard precedence).
+    """
+
+    slack: bool = False
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Top-level application configuration.
 
@@ -64,8 +83,11 @@ class AppConfig:
                             :class:`~gradle_deps_monitor.domain.risk_score.RiskLevel`.
     :param cache:           Persistent-cache configuration. See
                             :class:`CacheConfig`.
+    :param output:          Opt-in writer toggles (RFC-0034). See
+                            :class:`OutputConfig`.
     """
 
     risk_weights: RiskWeights = field(default_factory=RiskWeights)
     risk_thresholds: RiskThresholds = field(default_factory=RiskThresholds)
     cache: CacheConfig = field(default_factory=CacheConfig)
+    output: OutputConfig = field(default_factory=OutputConfig)

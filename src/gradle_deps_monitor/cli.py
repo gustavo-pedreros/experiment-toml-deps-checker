@@ -164,6 +164,18 @@ def check(
             ),
         ),
     ] = None,
+    slack: Annotated[
+        bool | None,
+        typer.Option(
+            "--slack/--no-slack",
+            help=(
+                "Whether to write freeze-slack.json (Slack Block Kit). "
+                "Opt-in since RFC-0034. When unset, defers to "
+                "[output] slack in gradle-deps-monitor.toml (default false). "
+                "Flag wins over config when both are present."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Generate a freeze report for the given Gradle catalog directory."""
     if risk_score and not _has_cve_credentials():
@@ -193,6 +205,7 @@ def check(
             no_cache=no_cache,
             clear_cache_first=clear_cache,
             cache_ttl_override=cache_ttl,
+            slack=slack,
         ).run(catalog_path, output_dir)
     except CatalogParseError as exc:
         typer.echo(f"Error: {exc}", err=True)
@@ -267,6 +280,18 @@ def diff(
             help="Directory where diff reports are written (created if absent).",
         ),
     ] = Path("reports"),
+    slack: Annotated[
+        bool | None,
+        typer.Option(
+            "--slack/--no-slack",
+            help=(
+                "Whether to write freeze-diff-slack.json (Slack Block Kit). "
+                "Opt-in since RFC-0034. When unset, defers to "
+                "[output] slack in gradle-deps-monitor.toml at cwd "
+                "(default false). Flag wins over config when both are present."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Diff two freeze reports and write a comparative summary.
 
@@ -274,7 +299,19 @@ def diff(
     Pass --prev BEFORE to compare two existing reports.
     """
     try:
-        freeze_diff, written_files = bootstrap.create_diff_command().run(after, prev, output_dir)
+        # Diff is not project-rooted (no gradle dir argument); we look
+        # for gradle-deps-monitor.toml in cwd as a best-effort source
+        # of the [output] section. Missing file is fine — defaults apply.
+        app_config = load_config(Path.cwd())
+    except ConfigError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=_EXIT_CONFIG) from exc
+
+    try:
+        freeze_diff, written_files = bootstrap.create_diff_command(
+            app_config=app_config,
+            slack=slack,
+        ).run(after, prev, output_dir)
     except (FileNotFoundError, ValueError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc

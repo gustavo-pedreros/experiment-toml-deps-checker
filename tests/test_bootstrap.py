@@ -126,6 +126,24 @@ class TestCreateCheckCommandWiring:
     def test_writers_filenames_and_order(self) -> None:
         cmd = bootstrap.create_check_command()
         filenames = [name for name, _writer in cmd._writers]
+        # RFC-0034: Slack writer is opt-in; default is 4 writers.
+        assert filenames == [
+            "freeze.md",
+            "freeze.json",
+            "freeze-inventory.csv",
+            "freeze-findings.csv",
+        ]
+
+    def test_writers_count(self) -> None:
+        cmd = bootstrap.create_check_command()
+        # RFC-0034: 4 writers by default (Slack opt-in).
+        assert len(cmd._writers) == 4
+
+    def test_slack_flag_inserts_writer(self) -> None:
+        cmd = bootstrap.create_check_command(slack=True)
+        filenames = [name for name, _writer in cmd._writers]
+        # Slack writer is inserted between json and the CSVs to match
+        # the historical file-listing order when --slack is passed.
         assert filenames == [
             "freeze.md",
             "freeze.json",
@@ -134,9 +152,22 @@ class TestCreateCheckCommandWiring:
             "freeze-findings.csv",
         ]
 
-    def test_writers_count(self) -> None:
-        cmd = bootstrap.create_check_command()
-        assert len(cmd._writers) == 5
+    def test_slack_config_inserts_writer(self) -> None:
+        from gradle_deps_monitor.domain.config import AppConfig, OutputConfig
+
+        cfg = AppConfig(output=OutputConfig(slack=True))
+        cmd = bootstrap.create_check_command(app_config=cfg)
+        filenames = [name for name, _writer in cmd._writers]
+        assert "freeze-slack.json" in filenames
+
+    def test_slack_flag_overrides_config(self) -> None:
+        """CLI flag wins over config per RFC-0012 precedence."""
+        from gradle_deps_monitor.domain.config import AppConfig, OutputConfig
+
+        cfg = AppConfig(output=OutputConfig(slack=True))
+        cmd = bootstrap.create_check_command(app_config=cfg, slack=False)
+        filenames = [name for name, _writer in cmd._writers]
+        assert "freeze-slack.json" not in filenames
 
     def test_module_usage_default_off_skips_scanner(self) -> None:
         cmd = bootstrap.create_check_command()
@@ -164,15 +195,33 @@ class TestCreateDiffCommandWiring:
     def test_writers_filenames_and_order(self) -> None:
         cmd = bootstrap.create_diff_command()
         filenames = [name for name, _writer in cmd._writers]
+        # RFC-0034: Slack writer is opt-in; default is 2 writers.
+        assert filenames == [
+            "freeze-diff.md",
+            "freeze-diff.json",
+        ]
+
+    def test_writers_count(self) -> None:
+        cmd = bootstrap.create_diff_command()
+        # RFC-0034: 2 writers by default (Slack opt-in).
+        assert len(cmd._writers) == 2
+
+    def test_slack_flag_appends_writer(self) -> None:
+        cmd = bootstrap.create_diff_command(slack=True)
+        filenames = [name for name, _writer in cmd._writers]
         assert filenames == [
             "freeze-diff.md",
             "freeze-diff.json",
             "freeze-diff-slack.json",
         ]
 
-    def test_writers_count(self) -> None:
-        cmd = bootstrap.create_diff_command()
-        assert len(cmd._writers) == 3
+    def test_slack_config_appends_writer(self) -> None:
+        from gradle_deps_monitor.domain.config import AppConfig, OutputConfig
+
+        cfg = AppConfig(output=OutputConfig(slack=True))
+        cmd = bootstrap.create_diff_command(app_config=cfg)
+        filenames = [name for name, _writer in cmd._writers]
+        assert "freeze-diff-slack.json" in filenames
 
     def test_loader_is_json_snapshot_loader(self) -> None:
         cmd = bootstrap.create_diff_command()
